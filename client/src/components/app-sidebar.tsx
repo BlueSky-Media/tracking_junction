@@ -1,10 +1,8 @@
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { LayoutDashboard, BarChart3, FileText, LogOut } from "lucide-react";
+import { LayoutDashboard, BarChart3, FileText, LogOut, GitBranch } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import logoFullImg from "@/assets/images/logo-full.png";
-import logoSquareImg from "@/assets/images/logo-square.png";
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +15,17 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+
+function LogoMark({ size = 24 }: { size?: number }) {
+  return (
+    <div
+      className="shrink-0 flex items-center justify-center rounded-md bg-primary"
+      style={{ width: size, height: size }}
+    >
+      <GitBranch className="text-primary-foreground" style={{ width: size * 0.6, height: size * 0.6 }} />
+    </div>
+  );
+}
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard, testId: "nav-dashboard" },
@@ -37,11 +46,15 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" data-testid="sidebar-nav">
       <SidebarHeader className="p-3">
         <Link href="/">
-          <div className="flex items-center gap-2 cursor-pointer" data-testid="sidebar-logo">
-            {collapsed ? (
-              <img src={logoSquareImg} alt="TrackingJunction" className="w-8 h-8 object-contain" />
-            ) : (
-              <img src={logoFullImg} alt="TrackingJunction" className="h-8 object-contain" />
+          <div className="flex items-center gap-2.5 cursor-pointer" data-testid="sidebar-logo">
+            <LogoMark size={collapsed ? 28 : 32} />
+            {!collapsed && (
+              <div className="flex flex-col leading-tight">
+                <span className="text-base font-bold tracking-tight">
+                  <span className="text-foreground">Tracking</span>
+                  <span className="text-primary">Junction</span>
+                </span>
+              </div>
             )}
           </div>
         </Link>
