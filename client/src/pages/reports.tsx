@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +12,8 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   BarChart3, ChevronDown, ChevronRight, Search,
   CalendarIcon, ChevronLeft, ChevronsLeft, ChevronsRight,
-  Globe, Monitor, Megaphone, Tag, Link2, Users,
+  Filter, X,
 } from "lucide-react";
-import { isUnauthorizedError } from "@/lib/auth-utils";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
@@ -69,59 +66,452 @@ interface EventLogResult {
   totalPages: number;
 }
 
-const DIMENSION_OPTIONS = [
-  { value: "domain", label: "Domain", icon: Globe },
-  { value: "deviceType", label: "Device Type", icon: Monitor },
-  { value: "page", label: "Audience", icon: Users },
-  { value: "utmSource", label: "UTM Source", icon: Link2 },
-  { value: "utmCampaign", label: "UTM Campaign", icon: Megaphone },
-  { value: "utmMedium", label: "UTM Medium", icon: Tag },
-];
-
-function buildDateQuery(dateRange: DateRange | undefined): string {
-  const params = new URLSearchParams();
-  if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
-  if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
-  return params.toString();
+interface Filters {
+  domain: string;
+  deviceType: string;
+  page: string;
+  utmSource: string;
+  utmCampaign: string;
+  utmMedium: string;
 }
 
-function buildDrilldownQuery(dateRange: DateRange | undefined, groupBy: string, parentFilter?: { key: string; value: string }): string {
+interface FilterOptions {
+  utmSources: string[];
+  utmCampaigns: string[];
+  utmMediums: string[];
+}
+
+const DRILL_DIMENSIONS = [
+  { value: "domain", label: "Domain" },
+  { value: "deviceType", label: "Device Type" },
+  { value: "page", label: "Audience" },
+  { value: "utmSource", label: "UTM Source" },
+  { value: "utmCampaign", label: "UTM Campaign" },
+  { value: "utmMedium", label: "UTM Medium" },
+];
+
+const ALL_FILTER = "__all__";
+
+function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, extra?: Record<string, string>): string {
   const params = new URLSearchParams();
-  params.set("groupBy", groupBy);
   if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
   if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
-  if (parentFilter) {
-    const filterValue = parentFilter.value === "(none)" || parentFilter.value === "(unknown)" ? "" : parentFilter.value;
-    params.set(parentFilter.key, filterValue);
+  if (filters.domain && filters.domain !== ALL_FILTER) params.set("domain", filters.domain);
+  if (filters.deviceType && filters.deviceType !== ALL_FILTER) params.set("deviceType", filters.deviceType);
+  if (filters.page && filters.page !== ALL_FILTER) params.set("page", filters.page);
+  if (filters.utmSource && filters.utmSource !== ALL_FILTER) params.set("utmSource", filters.utmSource);
+  if (filters.utmCampaign && filters.utmCampaign !== ALL_FILTER) params.set("utmCampaign", filters.utmCampaign);
+  if (filters.utmMedium && filters.utmMedium !== ALL_FILTER) params.set("utmMedium", filters.utmMedium);
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) {
+      params.set(k, v);
+    }
   }
   return params.toString();
 }
 
-function buildLogsQuery(dateRange: DateRange | undefined, logPage: number, search: string): string {
+function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logPage: number, search: string): string {
   const params = new URLSearchParams();
   params.set("page", logPage.toString());
   params.set("limit", "25");
   if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
   if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
+  if (filters.domain && filters.domain !== ALL_FILTER) params.set("domain", filters.domain);
+  if (filters.deviceType && filters.deviceType !== ALL_FILTER) params.set("deviceType", filters.deviceType);
+  if (filters.page && filters.page !== ALL_FILTER) params.set("audience", filters.page);
+  if (filters.utmSource && filters.utmSource !== ALL_FILTER) params.set("utmSource", filters.utmSource);
+  if (filters.utmCampaign && filters.utmCampaign !== ALL_FILTER) params.set("utmCampaign", filters.utmCampaign);
+  if (filters.utmMedium && filters.utmMedium !== ALL_FILTER) params.set("utmMedium", filters.utmMedium);
   if (search.trim()) params.set("search", search.trim());
   return params.toString();
 }
 
-function OverallSummary({ dateRange }: { dateRange: DateRange | undefined }) {
-  const query = buildDrilldownQuery(dateRange, "domain");
+const emptyFilters: Filters = {
+  domain: ALL_FILTER,
+  deviceType: ALL_FILTER,
+  page: ALL_FILTER,
+  utmSource: ALL_FILTER,
+  utmCampaign: ALL_FILTER,
+  utmMedium: ALL_FILTER,
+};
+
+function FilterBar({
+  filters,
+  onChange,
+  filterOptions,
+}: {
+  filters: Filters;
+  onChange: (f: Filters) => void;
+  filterOptions: FilterOptions | undefined;
+}) {
+  const activeCount = Object.values(filters).filter(v => v && v !== ALL_FILTER).length;
+
+  return (
+    <Card className="p-4" data-testid="card-filters">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <Filter className="w-4 h-4 text-muted-foreground" />
+        <span className="text-sm font-semibold">Filters</span>
+        {activeCount > 0 && (
+          <>
+            <Badge variant="secondary" className="text-xs" data-testid="badge-active-filters">{activeCount} active</Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange(emptyFilters)}
+              data-testid="button-clear-filters"
+            >
+              <X className="w-3 h-3 mr-1" />
+              Clear all
+            </Button>
+          </>
+        )}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Domain</label>
+          <Select value={filters.domain} onValueChange={(v) => onChange({ ...filters, domain: v })}>
+            <SelectTrigger data-testid="filter-domain">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_FILTER}>All Domains</SelectItem>
+              <SelectItem value="blueskylife.net">blueskylife.net</SelectItem>
+              <SelectItem value="blueskylife.io">blueskylife.io</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Device Type</label>
+          <Select value={filters.deviceType} onValueChange={(v) => onChange({ ...filters, deviceType: v })}>
+            <SelectTrigger data-testid="filter-deviceType">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_FILTER}>All Devices</SelectItem>
+              <SelectItem value="mobile">Mobile</SelectItem>
+              <SelectItem value="desktop">Desktop</SelectItem>
+              <SelectItem value="tablet">Tablet</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Audience</label>
+          <Select value={filters.page} onValueChange={(v) => onChange({ ...filters, page: v })}>
+            <SelectTrigger data-testid="filter-audience">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_FILTER}>All Audiences</SelectItem>
+              <SelectItem value="seniors">Seniors</SelectItem>
+              <SelectItem value="veterans">Veterans</SelectItem>
+              <SelectItem value="first-responders">First Responders</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">UTM Source</label>
+          <Select value={filters.utmSource} onValueChange={(v) => onChange({ ...filters, utmSource: v })}>
+            <SelectTrigger data-testid="filter-utmSource">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_FILTER}>All Sources</SelectItem>
+              {filterOptions?.utmSources.map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">UTM Campaign</label>
+          <Select value={filters.utmCampaign} onValueChange={(v) => onChange({ ...filters, utmCampaign: v })}>
+            <SelectTrigger data-testid="filter-utmCampaign">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_FILTER}>All Campaigns</SelectItem>
+              {filterOptions?.utmCampaigns.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">UTM Medium</label>
+          <Select value={filters.utmMedium} onValueChange={(v) => onChange({ ...filters, utmMedium: v })}>
+            <SelectTrigger data-testid="filter-utmMedium">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_FILTER}>All Mediums</SelectItem>
+              {filterOptions?.utmMediums.map((m) => (
+                <SelectItem key={m} value={m}>{m}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function DrilldownTable({
+  parentFilters,
+  dateRange,
+  globalFilters,
+  groupBy,
+  depth,
+  usedDimensions,
+}: {
+  parentFilters: Record<string, string>;
+  dateRange: DateRange | undefined;
+  globalFilters: Filters;
+  groupBy: string;
+  depth: number;
+  usedDimensions: string[];
+}) {
+  const [expandedRows, setExpandedRows] = useState<Record<string, string>>({});
+
+  const queryStr = buildQueryParams(dateRange, globalFilters, { groupBy, ...parentFilters });
 
   const { data, isLoading } = useQuery<DrilldownResult>({
-    queryKey: ["/api/analytics/drilldown", "overall-summary", query],
+    queryKey: ["/api/analytics/drilldown", queryStr],
     queryFn: async () => {
-      const res = await fetch(`/api/analytics/drilldown?${query}`, { credentials: "include" });
+      const res = await fetch(`/api/analytics/drilldown?${queryStr}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch drilldown");
+      return res.json();
+    },
+  });
+
+  const availableNextDimensions = DRILL_DIMENSIONS.filter(d => !usedDimensions.includes(d.value));
+
+  const toggleRowDrill = (groupValue: string, dimension: string) => {
+    setExpandedRows(prev => {
+      if (prev[groupValue]) {
+        const next = { ...prev };
+        delete next[groupValue];
+        return next;
+      }
+      return { ...prev, [groupValue]: dimension };
+    });
+  };
+
+  const setRowDimension = (groupValue: string, dimension: string) => {
+    setExpandedRows(prev => ({ ...prev, [groupValue]: dimension }));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2 p-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-10 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!data || data.rows.length === 0) {
+    return <p className="text-sm text-muted-foreground text-center py-4">No data available.</p>;
+  }
+
+  const dimLabel = DRILL_DIMENSIONS.find(d => d.value === groupBy)?.label || groupBy;
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {depth < 3 && availableNextDimensions.length > 0 && <TableHead className="w-8" />}
+            <TableHead className="min-w-[120px]">{dimLabel}</TableHead>
+            <TableHead className="text-right min-w-[80px]">Sessions</TableHead>
+            <TableHead className="text-right min-w-[80px]">Events</TableHead>
+            {data.totals.steps.map((s) => (
+              <TableHead key={`h-${s.stepNumber}-${s.stepName}`} className="text-center min-w-[90px]">
+                <div className="flex flex-col items-center">
+                  <span className="text-xs font-semibold">{s.stepName}</span>
+                </div>
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.rows.map((row) => {
+            const isExpanded = !!expandedRows[row.groupValue];
+            const canDrill = depth < 3 && availableNextDimensions.length > 0;
+            const selectedSubDim = expandedRows[row.groupValue] || "";
+
+            return (
+              <DrilldownRowComponent
+                key={row.groupValue}
+                row={row}
+                canDrill={canDrill}
+                isExpanded={isExpanded}
+                selectedSubDim={selectedSubDim}
+                availableNextDimensions={availableNextDimensions}
+                allSteps={data.totals.steps}
+                parentFilters={parentFilters}
+                dateRange={dateRange}
+                globalFilters={globalFilters}
+                groupBy={groupBy}
+                depth={depth}
+                usedDimensions={usedDimensions}
+                onToggle={() => toggleRowDrill(row.groupValue, availableNextDimensions[0]?.value || "")}
+                onChangeDim={(dim) => setRowDimension(row.groupValue, dim)}
+                dimLabel={dimLabel}
+              />
+            );
+          })}
+          <TableRow className="bg-muted/50 font-semibold border-t-2" data-testid={`row-totals-${groupBy}-depth${depth}`}>
+            {canDrillCell(depth, availableNextDimensions)}
+            <TableCell className="font-bold">Totals</TableCell>
+            <TableCell className="text-right font-mono">{data.totals.uniqueViews.toLocaleString()}</TableCell>
+            <TableCell className="text-right font-mono text-muted-foreground">{data.totals.grossViews.toLocaleString()}</TableCell>
+            {data.totals.steps.map((step) => (
+              <TableCell key={`tot-${step.stepNumber}-${step.stepName}`} className="text-center">
+                <div className="space-y-0.5">
+                  <p className="font-mono text-xs font-semibold">{step.completions.toLocaleString()}</p>
+                  <p className="font-mono text-xs text-muted-foreground">{step.conversionFromInitial.toFixed(1)}%</p>
+                </div>
+              </TableCell>
+            ))}
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function canDrillCell(depth: number, availableNextDimensions: typeof DRILL_DIMENSIONS) {
+  if (depth < 3 && availableNextDimensions.length > 0) {
+    return <TableCell />;
+  }
+  return null;
+}
+
+function DrilldownRowComponent({
+  row,
+  canDrill,
+  isExpanded,
+  selectedSubDim,
+  availableNextDimensions,
+  allSteps,
+  parentFilters,
+  dateRange,
+  globalFilters,
+  groupBy,
+  depth,
+  usedDimensions,
+  onToggle,
+  onChangeDim,
+  dimLabel,
+}: {
+  row: DrilldownRow;
+  canDrill: boolean;
+  isExpanded: boolean;
+  selectedSubDim: string;
+  availableNextDimensions: typeof DRILL_DIMENSIONS;
+  allSteps: DrilldownStepData[];
+  parentFilters: Record<string, string>;
+  dateRange: DateRange | undefined;
+  globalFilters: Filters;
+  groupBy: string;
+  depth: number;
+  usedDimensions: string[];
+  onToggle: () => void;
+  onChangeDim: (dim: string) => void;
+  dimLabel: string;
+}) {
+  const colSpan = 3 + allSteps.length + (canDrill ? 1 : 0);
+
+  return (
+    <>
+      <TableRow
+        className={canDrill ? "cursor-pointer hover-elevate" : ""}
+        onClick={canDrill ? onToggle : undefined}
+        data-testid={`row-drill-${groupBy}-${row.groupValue}`}
+      >
+        {canDrill && (
+          <TableCell className="w-8">
+            {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          </TableCell>
+        )}
+        <TableCell className="font-medium">{row.groupValue}</TableCell>
+        <TableCell className="text-right font-mono">{row.uniqueViews.toLocaleString()}</TableCell>
+        <TableCell className="text-right font-mono text-muted-foreground">{row.grossViews.toLocaleString()}</TableCell>
+        {row.steps.map((step) => {
+          const isLow = step.conversionFromPrev < 50 && step.conversionFromPrev > 0;
+          return (
+            <TableCell key={`${row.groupValue}-${step.stepNumber}-${step.stepName}`} className="text-center">
+              <div className="space-y-0.5">
+                <p className="font-mono text-xs">{step.completions.toLocaleString()}</p>
+                <p className={`font-mono text-xs ${isLow ? "text-destructive" : "text-muted-foreground"}`}>
+                  {step.conversionFromInitial.toFixed(1)}%
+                </p>
+              </div>
+            </TableCell>
+          );
+        })}
+      </TableRow>
+      {isExpanded && canDrill && (
+        <TableRow data-testid={`row-drilldown-${groupBy}-${row.groupValue}`}>
+          <TableCell colSpan={colSpan} className="p-0">
+            <div className="border-y bg-muted/20 px-4 py-3 space-y-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Badge variant="outline" className="text-xs">{dimLabel}: {row.groupValue}</Badge>
+                <span className="text-sm text-muted-foreground">drill down by</span>
+                <Select value={selectedSubDim} onValueChange={onChangeDim}>
+                  <SelectTrigger className="w-[180px]" data-testid={`select-subdim-${groupBy}-${row.groupValue}`}>
+                    <SelectValue placeholder="Select dimension..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableNextDimensions.map((d) => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedSubDim && (
+                <div className="border rounded-md bg-background">
+                  <DrilldownTable
+                    parentFilters={{ ...parentFilters, [groupBy]: row.groupValue }}
+                    dateRange={dateRange}
+                    globalFilters={globalFilters}
+                    groupBy={selectedSubDim}
+                    depth={depth + 1}
+                    usedDimensions={[...usedDimensions, selectedSubDim]}
+                  />
+                </div>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
+function FunnelReport({
+  dateRange,
+  filters,
+}: {
+  dateRange: DateRange | undefined;
+  filters: Filters;
+}) {
+  const [drillDimension, setDrillDimension] = useState<string>("domain");
+
+  const summaryQuery = buildQueryParams(dateRange, filters, { groupBy: "domain" });
+  const { data: summaryData, isLoading: summaryLoading } = useQuery<DrilldownResult>({
+    queryKey: ["/api/analytics/drilldown", "summary", summaryQuery],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/drilldown?${summaryQuery}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch summary");
       return res.json();
     },
   });
 
-  if (isLoading) {
+  if (summaryLoading) {
     return (
-      <Card className="p-5" data-testid="card-overall-summary">
+      <Card className="p-5" data-testid="card-funnel-report">
         <Skeleton className="h-5 w-48 mb-4" />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -132,16 +522,15 @@ function OverallSummary({ dateRange }: { dateRange: DateRange | undefined }) {
     );
   }
 
-  if (!data) return null;
+  if (!summaryData) return null;
 
-  const totals = data.totals;
+  const totals = summaryData.totals;
   const lastStep = totals.steps[totals.steps.length - 1];
   const overallConversion = lastStep ? lastStep.conversionFromInitial : 0;
-  const totalSteps = totals.steps.length;
 
   return (
-    <Card className="p-5" data-testid="card-overall-summary">
-      <h3 className="font-semibold mb-4" data-testid="text-overall-summary-title">Overall Funnel Summary</h3>
+    <Card className="p-5" data-testid="card-funnel-report">
+      <h3 className="font-semibold mb-4" data-testid="text-funnel-title">Funnel Summary</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Total Sessions</p>
@@ -157,15 +546,16 @@ function OverallSummary({ dateRange }: { dateRange: DateRange | undefined }) {
         </div>
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Funnel Steps</p>
-          <p className="text-2xl font-bold font-mono" data-testid="text-total-steps">{totalSteps}</p>
+          <p className="text-2xl font-bold font-mono" data-testid="text-total-steps">{totals.steps.length}</p>
         </div>
       </div>
-      <div className="overflow-x-auto">
+
+      <div className="overflow-x-auto mb-5">
         <Table>
           <TableHeader>
             <TableRow>
               {totals.steps.map((s) => (
-                <TableHead key={`overall-step-${s.stepNumber}`} className="text-center min-w-[100px]">
+                <TableHead key={`sum-${s.stepNumber}-${s.stepName}`} className="text-center min-w-[100px]">
                   <div className="flex flex-col items-center">
                     <span className="text-xs font-semibold">Step {s.stepNumber}</span>
                     <span className="text-xs text-muted-foreground font-normal">{s.stepName}</span>
@@ -177,7 +567,7 @@ function OverallSummary({ dateRange }: { dateRange: DateRange | undefined }) {
           <TableBody>
             <TableRow>
               {totals.steps.map((s) => (
-                <TableCell key={`overall-val-${s.stepNumber}`} className="text-center">
+                <TableCell key={`sumv-${s.stepNumber}-${s.stepName}`} className="text-center">
                   <div className="space-y-0.5">
                     <p className="font-mono text-sm font-semibold">{s.completions.toLocaleString()}</p>
                     <p className={`font-mono text-xs ${s.conversionFromPrev < 50 && s.conversionFromPrev > 0 ? "text-destructive" : "text-muted-foreground"}`}>
@@ -193,252 +583,42 @@ function OverallSummary({ dateRange }: { dateRange: DateRange | undefined }) {
           </TableBody>
         </Table>
       </div>
-    </Card>
-  );
-}
 
-function DimensionSection({ dimension, dateRange }: {
-  dimension: typeof DIMENSION_OPTIONS[number];
-  dateRange: DateRange | undefined;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const Icon = dimension.icon;
-
-  const query = buildDrilldownQuery(dateRange, dimension.value);
-
-  const { data, isLoading } = useQuery<DrilldownResult>({
-    queryKey: ["/api/analytics/drilldown", dimension.value, query],
-    queryFn: async () => {
-      const res = await fetch(`/api/analytics/drilldown?${query}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch drilldown");
-      return res.json();
-    },
-    enabled: expanded,
-  });
-
-  return (
-    <Card className="overflow-hidden" data-testid={`card-dimension-${dimension.value}`}>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-3 w-full text-left px-5 py-4"
-        data-testid={`button-expand-${dimension.value}`}
-      >
-        {expanded ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
-        <Icon className="w-4 h-4 shrink-0 text-muted-foreground" />
-        <span className="font-semibold text-sm">{dimension.label}</span>
-        {data && (
-          <Badge variant="secondary" className="ml-auto text-xs">{data.rows.length} values</Badge>
-        )}
-      </button>
-
-      {expanded && (
-        <div className="border-t">
-          {isLoading ? (
-            <div className="p-5 space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
+      <div className="border-t pt-4 space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-semibold">Drill down by</span>
+          <Select value={drillDimension} onValueChange={setDrillDimension}>
+            <SelectTrigger className="w-[180px]" data-testid="select-drill-dimension">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DRILL_DIMENSIONS.map((d) => (
+                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
               ))}
-            </div>
-          ) : data && data.rows.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8 pl-5" />
-                    <TableHead className="sticky left-0 bg-background z-10 min-w-[140px]">{dimension.label}</TableHead>
-                    <TableHead className="text-right min-w-[80px]">Sessions</TableHead>
-                    <TableHead className="text-right min-w-[80px]">Events</TableHead>
-                    {data.totals.steps.map((s) => (
-                      <TableHead key={`header-${dimension.value}-${s.stepNumber}`} className="text-center min-w-[90px]">
-                        <div className="flex flex-col items-center">
-                          <span className="text-xs font-semibold">{s.stepName}</span>
-                        </div>
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.rows.map((row) => (
-                    <ExpandableRow
-                      key={row.groupValue}
-                      row={row}
-                      dimension={dimension}
-                      dateRange={dateRange}
-                      allSteps={data.totals.steps}
-                    />
-                  ))}
-                  <TableRow className="bg-muted/50 font-semibold border-t-2" data-testid={`row-dimension-totals-${dimension.value}`}>
-                    <TableCell className="pl-5" />
-                    <TableCell className="sticky left-0 z-10 bg-muted/50 font-bold">Totals</TableCell>
-                    <TableCell className="text-right font-mono">{data.totals.uniqueViews.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono text-muted-foreground">{data.totals.grossViews.toLocaleString()}</TableCell>
-                    {data.totals.steps.map((step) => (
-                      <TableCell key={`totals-${dimension.value}-${step.stepNumber}`} className="text-center">
-                        <div className="space-y-0.5">
-                          <p className="font-mono text-xs font-semibold">{step.completions.toLocaleString()}</p>
-                          <p className="font-mono text-xs text-muted-foreground">{step.conversionFromInitial.toFixed(1)}%</p>
-                        </div>
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="p-5 text-center text-muted-foreground text-sm">
-              No data available for this dimension.
-            </div>
-          )}
+            </SelectContent>
+          </Select>
         </div>
-      )}
+        <div className="border rounded-md">
+          <DrilldownTable
+            parentFilters={{}}
+            dateRange={dateRange}
+            globalFilters={filters}
+            groupBy={drillDimension}
+            depth={1}
+            usedDimensions={[drillDimension]}
+          />
+        </div>
+      </div>
     </Card>
-  );
-}
-
-function ExpandableRow({ row, dimension, dateRange, allSteps }: {
-  row: DrilldownRow;
-  dimension: typeof DIMENSION_OPTIONS[number];
-  dateRange: DateRange | undefined;
-  allSteps: DrilldownStepData[];
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [subDimension, setSubDimension] = useState<string>("");
-
-  const availableDimensions = DIMENSION_OPTIONS.filter(d => d.value !== dimension.value);
-
-  const parentFilter = { key: dimension.value, value: row.groupValue };
-  const subQuery = subDimension ? buildDrilldownQuery(dateRange, subDimension, parentFilter) : "";
-
-  const subData = useQuery<DrilldownResult>({
-    queryKey: ["/api/analytics/drilldown", "sub", subDimension, subQuery],
-    queryFn: async () => {
-      const res = await fetch(`/api/analytics/drilldown?${subQuery}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch sub-drilldown");
-      return res.json();
-    },
-    enabled: expanded && !!subDimension,
-  });
-
-  return (
-    <>
-      <TableRow
-        className="cursor-pointer hover-elevate"
-        onClick={() => setExpanded(!expanded)}
-        data-testid={`row-dimension-${dimension.value}-${row.groupValue}`}
-      >
-        <TableCell className="pl-5 w-8">
-          {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        </TableCell>
-        <TableCell className="sticky left-0 z-10 bg-background font-medium">{row.groupValue}</TableCell>
-        <TableCell className="text-right font-mono">{row.uniqueViews.toLocaleString()}</TableCell>
-        <TableCell className="text-right font-mono text-muted-foreground">{row.grossViews.toLocaleString()}</TableCell>
-        {row.steps.map((step) => {
-          const isLowConv = step.conversionFromPrev < 50 && step.conversionFromPrev > 0;
-          return (
-            <TableCell key={`${row.groupValue}-step-${step.stepNumber}`} className="text-center">
-              <div className="space-y-0.5">
-                <p className="font-mono text-xs">{step.completions.toLocaleString()}</p>
-                <p className={`font-mono text-xs ${isLowConv ? "text-destructive" : "text-muted-foreground"}`}>
-                  {step.conversionFromInitial.toFixed(1)}%
-                </p>
-              </div>
-            </TableCell>
-          );
-        })}
-      </TableRow>
-
-      {expanded && (
-        <TableRow data-testid={`row-drilldown-expanded-${dimension.value}-${row.groupValue}`}>
-          <TableCell colSpan={4 + allSteps.length} className="p-0">
-            <div className="bg-muted/30 border-y px-5 py-4 space-y-4">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-sm font-medium">Drill down</span>
-                <Badge variant="outline" className="text-xs">{row.groupValue}</Badge>
-                <span className="text-sm text-muted-foreground">by</span>
-                <Select value={subDimension} onValueChange={setSubDimension}>
-                  <SelectTrigger className="w-[180px]" data-testid={`select-subdimension-${row.groupValue}`}>
-                    <SelectValue placeholder="Select metric..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableDimensions.map((d) => (
-                      <SelectItem key={d.value} value={d.value} data-testid={`option-sub-${d.value}`}>
-                        {d.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {subDimension && subData.isLoading && (
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-8 w-full" />
-                  ))}
-                </div>
-              )}
-
-              {subDimension && subData.data && subData.data.rows.length > 0 && (
-                <div className="overflow-x-auto border rounded-md bg-background">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="min-w-[120px]">
-                          {DIMENSION_OPTIONS.find(d => d.value === subDimension)?.label}
-                        </TableHead>
-                        <TableHead className="text-right min-w-[70px]">Sessions</TableHead>
-                        <TableHead className="text-right min-w-[70px]">Events</TableHead>
-                        {subData.data.totals.steps.map((s) => (
-                          <TableHead key={`sub-header-${s.stepNumber}`} className="text-center min-w-[80px]">
-                            <span className="text-xs">{s.stepName}</span>
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {subData.data.rows.map((subRow) => (
-                        <TableRow key={subRow.groupValue} data-testid={`row-sub-${subRow.groupValue}`}>
-                          <TableCell className="font-medium text-sm">{subRow.groupValue}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{subRow.uniqueViews.toLocaleString()}</TableCell>
-                          <TableCell className="text-right font-mono text-sm text-muted-foreground">{subRow.grossViews.toLocaleString()}</TableCell>
-                          {subRow.steps.map((step) => {
-                            const isLow = step.conversionFromPrev < 50 && step.conversionFromPrev > 0;
-                            return (
-                              <TableCell key={`sub-${subRow.groupValue}-${step.stepNumber}`} className="text-center">
-                                <div className="space-y-0.5">
-                                  <p className="font-mono text-xs">{step.completions.toLocaleString()}</p>
-                                  <p className={`font-mono text-xs ${isLow ? "text-destructive" : "text-muted-foreground"}`}>
-                                    {step.conversionFromInitial.toFixed(1)}%
-                                  </p>
-                                </div>
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-
-              {subDimension && subData.data && subData.data.rows.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No sub-breakdown data available.</p>
-              )}
-
-              {!subDimension && (
-                <p className="text-sm text-muted-foreground">Select a metric above to see a detailed breakdown for {row.groupValue}.</p>
-              )}
-            </div>
-          </TableCell>
-        </TableRow>
-      )}
-    </>
   );
 }
 
 function EventLogsSection({
   dateRange,
+  filters,
 }: {
   dateRange: DateRange | undefined;
+  filters: Filters;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [logPage, setLogPage] = useState(1);
@@ -454,11 +634,11 @@ function EventLogsSection({
     return () => clearTimeout(timer);
   }, [search]);
 
+  const logsQueryStr = buildLogsQuery(dateRange, filters, logPage, debouncedSearch);
   const logsQuery = useQuery<EventLogResult>({
-    queryKey: ["/api/analytics/logs", buildLogsQuery(dateRange, logPage, debouncedSearch)],
+    queryKey: ["/api/analytics/logs", logsQueryStr],
     queryFn: async () => {
-      const q = buildLogsQuery(dateRange, logPage, debouncedSearch);
-      const res = await fetch(`/api/analytics/logs?${q}`, { credentials: "include" });
+      const res = await fetch(`/api/analytics/logs?${logsQueryStr}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch logs");
       return res.json();
     },
@@ -543,43 +723,19 @@ function EventLogsSection({
                   Showing {((logsQuery.data.page - 1) * logsQuery.data.limit) + 1}-{Math.min(logsQuery.data.page * logsQuery.data.limit, logsQuery.data.total)} of {logsQuery.data.total.toLocaleString()} records
                 </p>
                 <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setLogPage(1)}
-                    disabled={logsQuery.data.page <= 1}
-                    data-testid="button-log-first"
-                  >
+                  <Button variant="outline" size="icon" onClick={() => setLogPage(1)} disabled={logsQuery.data.page <= 1} data-testid="button-log-first">
                     <ChevronsLeft className="w-4 h-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setLogPage(p => Math.max(1, p - 1))}
-                    disabled={logsQuery.data.page <= 1}
-                    data-testid="button-log-prev"
-                  >
+                  <Button variant="outline" size="icon" onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logsQuery.data.page <= 1} data-testid="button-log-prev">
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
                   <span className="px-3 text-sm font-mono">
                     {logsQuery.data.page} / {logsQuery.data.totalPages}
                   </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setLogPage(p => Math.min(logsQuery.data!.totalPages, p + 1))}
-                    disabled={logsQuery.data.page >= logsQuery.data.totalPages}
-                    data-testid="button-log-next"
-                  >
+                  <Button variant="outline" size="icon" onClick={() => setLogPage(p => Math.min(logsQuery.data!.totalPages, p + 1))} disabled={logsQuery.data.page >= logsQuery.data.totalPages} data-testid="button-log-next">
                     <ChevronRight className="w-4 h-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setLogPage(logsQuery.data!.totalPages)}
-                    disabled={logsQuery.data.page >= logsQuery.data.totalPages}
-                    data-testid="button-log-last"
-                  >
+                  <Button variant="outline" size="icon" onClick={() => setLogPage(logsQuery.data!.totalPages)} disabled={logsQuery.data.page >= logsQuery.data.totalPages} data-testid="button-log-last">
                     <ChevronsRight className="w-4 h-4" />
                   </Button>
                 </div>
@@ -587,7 +743,7 @@ function EventLogsSection({
             </>
           ) : (
             <div className="py-8 text-center text-muted-foreground text-sm">
-              {debouncedSearch ? "No records match your search." : "No event logs found for the selected date range."}
+              {debouncedSearch ? "No records match your search." : "No event logs found for the selected filters."}
             </div>
           )}
         </div>
@@ -671,69 +827,70 @@ function DetailField({ label, value }: { label: string; value: string }) {
 }
 
 export default function ReportsPage() {
-  const { user, isLoading: authLoading } = useAuth();
-  const { toast } = useToast();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [filters, setFilters] = useState<Filters>(emptyFilters);
+
+  const { data: filterOptions } = useQuery<FilterOptions>({
+    queryKey: ["/api/analytics/filter-options"],
+    queryFn: async () => {
+      const res = await fetch("/api/analytics/filter-options", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch filter options");
+      return res.json();
+    },
+  });
 
   return (
     <div className="px-4 sm:px-6 py-6 space-y-5">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-reports-title">
           <BarChart3 className="w-6 h-6" />
-          Drill-Down Reports
+          Funnel Reports
         </h1>
-        <p className="text-sm text-muted-foreground">Expand any dimension to see its breakdown, then drill further into individual rows</p>
+        <p className="text-sm text-muted-foreground">One report, drill down up to 3 levels deep</p>
       </div>
 
-      <Card className="p-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" data-testid="button-date-range">
-                <CalendarIcon className="w-4 h-4 mr-2" />
-                {dateRange?.from ? (
-                  dateRange.to ? (
-                    <span className="text-sm">
-                      {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
-                    </span>
-                  ) : (
-                    <span className="text-sm">{format(dateRange.from, "MMM d, yyyy")}</span>
-                  )
+      <div className="flex items-center gap-3 flex-wrap">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" data-testid="button-date-range">
+              <CalendarIcon className="w-4 h-4 mr-2" />
+              {dateRange?.from ? (
+                dateRange.to ? (
+                  <span className="text-sm">
+                    {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
+                  </span>
                 ) : (
-                  <span className="text-sm">All Time</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="range"
-                selected={dateRange}
-                onSelect={setDateRange}
-                numberOfMonths={2}
-                data-testid="calendar-date-range"
-              />
-              {dateRange && (
-                <div className="p-2 border-t flex justify-end">
-                  <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)} data-testid="button-clear-dates">
-                    Clear
-                  </Button>
-                </div>
+                  <span className="text-sm">{format(dateRange.from, "MMM d, yyyy")}</span>
+                )
+              ) : (
+                <span className="text-sm">All Time</span>
               )}
-            </PopoverContent>
-          </Popover>
-        </div>
-      </Card>
-
-      <OverallSummary dateRange={dateRange} />
-
-      <div className="space-y-3">
-        <h2 className="text-lg font-semibold" data-testid="text-dimensions-heading">Breakdown by Dimension</h2>
-        {DIMENSION_OPTIONS.map((dim) => (
-          <DimensionSection key={dim.value} dimension={dim} dateRange={dateRange} />
-        ))}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="range"
+              selected={dateRange}
+              onSelect={setDateRange}
+              numberOfMonths={2}
+              data-testid="calendar-date-range"
+            />
+            {dateRange && (
+              <div className="p-2 border-t flex justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)} data-testid="button-clear-dates">
+                  Clear
+                </Button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
 
-      <EventLogsSection dateRange={dateRange} />
+      <FilterBar filters={filters} onChange={setFilters} filterOptions={filterOptions} />
+
+      <FunnelReport dateRange={dateRange} filters={filters} />
+
+      <EventLogsSection dateRange={dateRange} filters={filters} />
     </div>
   );
 }
