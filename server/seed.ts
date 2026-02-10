@@ -61,9 +61,11 @@ function makeEvent(base: {
   sessionId: string;
   eventType: string;
   eventTimestamp: Date;
+  timeOnStep?: number | null;
 }, ctx: SessionContext) {
   return {
     ...base,
+    timeOnStep: base.timeOnStep ?? null,
     userAgent: "Mozilla/5.0 (Seed Data)",
     utmSource: ctx.utmSource,
     utmCampaign: ctx.utmCampaign,
@@ -72,6 +74,24 @@ function makeEvent(base: {
     deviceType: ctx.deviceType,
     referrer: ctx.referrer,
   };
+}
+
+function randomTimeOnStep(stepName: string): number {
+  const baseTimes: Record<string, [number, number]> = {
+    "State": [3, 15],
+    "Age": [2, 10],
+    "Income": [4, 20],
+    "Budget": [5, 25],
+    "Beneficiary": [4, 18],
+    "Purpose": [5, 22],
+    "Name": [8, 35],
+    "Email": [6, 30],
+    "Phone": [8, 40],
+    "Call CTA": [2, 8],
+    "Thank You": [1, 5],
+  };
+  const [min, max] = baseTimes[stepName] || [3, 15];
+  return Math.floor(min + Math.random() * (max - min));
 }
 
 function generateLeadSession(page: string, domain: string, baseTime: Date) {
@@ -105,6 +125,7 @@ function generateLeadSession(page: string, domain: string, baseTime: Date) {
       page, pageType: "lead", domain, stepNumber: step.number, stepName: step.name,
       selectedValue: step.values ? pickRandom(step.values) : null,
       sessionId, eventType: "step_complete", eventTimestamp: ts,
+      timeOnStep: randomTimeOnStep(step.name),
     }, ctx));
   }
 
@@ -147,6 +168,7 @@ function generateCallSession(page: string, domain: string, baseTime: Date) {
       page, pageType: "call", domain, stepNumber: step.number, stepName: step.name,
       selectedValue: step.values ? pickRandom(step.values) : null,
       sessionId, eventType: "step_complete", eventTimestamp: ts,
+      timeOnStep: randomTimeOnStep(step.name),
     }, ctx));
   }
 

@@ -22,6 +22,7 @@ export const trackingEvents = pgTable("tracking_events", {
   utmContent: varchar("utm_content", { length: 200 }),
   deviceType: varchar("device_type", { length: 20 }),
   referrer: text("referrer"),
+  timeOnStep: integer("time_on_step"),
   eventTimestamp: timestamp("event_timestamp").notNull().defaultNow(),
   receivedAt: timestamp("received_at").notNull().defaultNow(),
 }, (table) => [
@@ -57,6 +58,7 @@ export const trackingEventApiSchema = z.object({
   utm_content: z.string().max(200).optional(),
   device_type: z.enum(["mobile", "desktop", "tablet"]).optional(),
   referrer: z.string().optional(),
+  time_on_step: z.number().int().min(0).max(3600).optional(),
 });
 
 export type InsertTrackingEvent = z.infer<typeof insertTrackingEventSchema>;

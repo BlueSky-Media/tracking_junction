@@ -80,6 +80,7 @@ export async function registerRoutes(
         utmContent: data.utm_content || null,
         deviceType: data.device_type || null,
         referrer: data.referrer || null,
+        timeOnStep: data.time_on_step ?? null,
         eventTimestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
       });
 

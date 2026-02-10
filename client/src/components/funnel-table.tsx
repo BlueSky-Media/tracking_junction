@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowDown, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowDown, TrendingDown, TrendingUp, Clock } from "lucide-react";
 
 interface FunnelStep {
   stepNumber: number;
@@ -10,11 +10,20 @@ interface FunnelStep {
   uniqueVisitors: number;
   conversionRate: number;
   dropOffRate: number;
+  avgTimeOnStep: number | null;
 }
 
 interface FunnelTableProps {
   data: FunnelStep[] | undefined;
   isLoading: boolean;
+}
+
+function formatTime(seconds: number | null): string {
+  if (seconds === null || seconds === undefined) return "—";
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
 }
 
 export function FunnelTable({ data, isLoading }: FunnelTableProps) {
@@ -41,6 +50,8 @@ export function FunnelTable({ data, isLoading }: FunnelTableProps) {
   }
 
   const maxVisitors = data[0]?.uniqueVisitors || 1;
+  const avgTimes = data.map(s => s.avgTimeOnStep).filter((t): t is number => t !== null);
+  const medianTime = avgTimes.length > 0 ? avgTimes.sort((a, b) => a - b)[Math.floor(avgTimes.length / 2)] : 0;
 
   return (
     <Card className="p-5">
@@ -54,6 +65,7 @@ export function FunnelTable({ data, isLoading }: FunnelTableProps) {
               <TableHead className="text-right">Visitors</TableHead>
               <TableHead className="text-right">% of Total</TableHead>
               <TableHead className="text-right">Drop-off</TableHead>
+              <TableHead className="text-right">Avg Time</TableHead>
               <TableHead className="w-[200px]">Progress</TableHead>
             </TableRow>
           </TableHeader>
@@ -62,6 +74,7 @@ export function FunnelTable({ data, isLoading }: FunnelTableProps) {
               const pctOfTotal = (step.uniqueVisitors / maxVisitors) * 100;
               const isLast = idx === data.length - 1;
               const isHighDropOff = step.dropOffRate > 30;
+              const isSlowStep = step.avgTimeOnStep !== null && medianTime > 0 && step.avgTimeOnStep > medianTime * 1.5;
 
               return (
                 <TableRow key={`${step.stepNumber}-${step.stepName}`} data-testid={`row-step-${step.stepNumber}-${step.stepName}`}>
@@ -86,6 +99,14 @@ export function FunnelTable({ data, isLoading }: FunnelTableProps) {
                         </Badge>
                       </div>
                     )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {isSlowStep && <Clock className="w-3.5 h-3.5 text-amber-500" />}
+                      <span className={`font-mono text-sm ${isSlowStep ? "text-amber-500 font-semibold" : "text-muted-foreground"}`} data-testid={`text-time-step-${step.stepNumber}-${step.stepName}`}>
+                        {formatTime(step.avgTimeOnStep)}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

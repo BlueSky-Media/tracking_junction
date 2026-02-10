@@ -4,7 +4,7 @@ import {
   type TrackingEvent,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, sql, count, countDistinct, desc, isNotNull, ne } from "drizzle-orm";
+import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne } from "drizzle-orm";
 
 export interface AnalyticsFilters {
   page?: string;
@@ -25,6 +25,7 @@ interface FunnelStep {
   uniqueVisitors: number;
   conversionRate: number;
   dropOffRate: number;
+  avgTimeOnStep: number | null;
 }
 
 interface StepOption {
@@ -206,6 +207,7 @@ class DatabaseStorage implements IStorage {
         stepNumber: trackingEvents.stepNumber,
         stepName: trackingEvents.stepName,
         uniqueVisitors: countDistinct(trackingEvents.sessionId),
+        avgTime: avg(trackingEvents.timeOnStep),
       })
       .from(trackingEvents)
       .where(and(where, stepCompleteCondition()))
@@ -230,6 +232,7 @@ class DatabaseStorage implements IStorage {
         uniqueVisitors: visitors,
         conversionRate,
         dropOffRate,
+        avgTimeOnStep: step.avgTime ? Math.round(Number(step.avgTime)) : null,
       };
     });
 
@@ -517,7 +520,7 @@ class DatabaseStorage implements IStorage {
 
     const headers = [
       "id", "session_id", "event_type", "page", "page_type", "domain",
-      "step_number", "step_name", "selected_value",
+      "step_number", "step_name", "selected_value", "time_on_step",
       "utm_source", "utm_campaign", "utm_medium", "utm_content",
       "device_type", "referrer", "event_timestamp"
     ];
@@ -535,6 +538,7 @@ class DatabaseStorage implements IStorage {
         row.stepNumber,
         `"${(row.stepName || '').replace(/"/g, '""')}"`,
         `"${(row.selectedValue || '').replace(/"/g, '""')}"`,
+        row.timeOnStep ?? "",
         row.utmSource || "",
         `"${(row.utmCampaign || '').replace(/"/g, '""')}"`,
         row.utmMedium || "",
