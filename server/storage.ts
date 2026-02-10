@@ -140,6 +140,7 @@ export interface IStorage {
   exportCsv(filters: AnalyticsFilters): Promise<string>;
   getDrilldown(filters: AnalyticsFilters, groupBy: string): Promise<DrilldownResult>;
   getEventLogs(filters: AnalyticsFilters, page: number, limit: number, search?: string): Promise<EventLogResult>;
+  deleteAllEvents(): Promise<void>;
 }
 
 function buildConditions(filters: AnalyticsFilters) {
@@ -777,6 +778,10 @@ class DatabaseStorage implements IStorage {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async deleteAllEvents(): Promise<void> {
+    await db.delete(trackingEvents);
   }
 }
 

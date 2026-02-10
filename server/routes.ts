@@ -231,6 +231,16 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/analytics/all-events", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteAllEvents();
+      res.json({ message: "All events deleted" });
+    } catch (error) {
+      console.error("Error deleting events:", error);
+      res.status(500).json({ message: "Failed to delete events" });
+    }
+  });
+
   app.get("/api/analytics/export", isAuthenticated, async (req, res) => {
     try {
       const filters = parseFilters(req.query);
