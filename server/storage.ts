@@ -66,13 +66,13 @@ function buildConditions(filters: AnalyticsFilters) {
 
 class DatabaseStorage implements IStorage {
   async insertEvent(event: InsertTrackingEvent): Promise<TrackingEvent> {
-    const [result] = await db.insert(trackingEvents).values(event).returning();
+    const [result] = await db.insert(trackingEvents).values(event as any).returning();
     return result;
   }
 
   async insertEventsBatch(events: InsertTrackingEvent[]): Promise<void> {
     if (events.length === 0) return;
-    await db.insert(trackingEvents).values(events);
+    await db.insert(trackingEvents).values(events as any);
   }
 
   async getStats(filters: AnalyticsFilters): Promise<StatsData> {
