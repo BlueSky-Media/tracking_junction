@@ -10,7 +10,8 @@ import { DashboardFilters, type Filters } from "@/components/dashboard-filters";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { BarChart3, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
+import logoImg from "@assets/TrackingJunctionLogo_1770758622147.png";
 import { isUnauthorizedError } from "@/lib/auth-utils";
 import { format } from "date-fns";
 
@@ -86,9 +87,7 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center animate-pulse">
-            <BarChart3 className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <img src={logoImg} alt="TrackingJunction" className="h-8 animate-pulse" />
           <p className="text-sm text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
@@ -102,10 +101,7 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-lg hidden sm:block" data-testid="text-dashboard-logo">TrackingJunction</span>
+            <img src={logoImg} alt="TrackingJunction" className="h-7" data-testid="text-dashboard-logo" />
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />

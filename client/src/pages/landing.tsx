@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BarChart3, Shield, Zap, TrendingUp, Activity, Eye } from "lucide-react";
+import logoImg from "@assets/TrackingJunctionLogo_1770758622147.png";
 
 const features = [
   {
@@ -41,10 +42,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-background/80 border-b">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-lg" data-testid="text-logo">TrackingJunction</span>
+            <img src={logoImg} alt="TrackingJunction" className="h-7" data-testid="text-logo" />
           </div>
           <a href="/api/login">
             <Button data-testid="button-login">Sign In</Button>
