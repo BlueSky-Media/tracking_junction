@@ -200,6 +200,37 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/analytics/drilldown", isAuthenticated, async (req, res) => {
+    try {
+      const filters = parseFilters(req.query);
+      const groupBy = (req.query.groupBy as string) || "domain";
+      const validGroups = ["domain", "deviceType", "utmSource", "utmCampaign", "utmMedium", "page"];
+      if (!validGroups.includes(groupBy)) {
+        return res.status(400).json({ message: "Invalid groupBy parameter" });
+      }
+      const drilldown = await storage.getDrilldown(filters, groupBy);
+      res.json(drilldown);
+    } catch (error) {
+      console.error("Error fetching drilldown:", error);
+      res.status(500).json({ message: "Failed to fetch drilldown data" });
+    }
+  });
+
+  app.get("/api/analytics/logs", isAuthenticated, async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
+      const search = req.query.search as string | undefined;
+      const filters = parseFilters(req.query);
+      filters.page = req.query.audience as string | undefined;
+      const logs = await storage.getEventLogs(filters, page, limit, search);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching event logs:", error);
+      res.status(500).json({ message: "Failed to fetch event logs" });
+    }
+  });
+
   app.get("/api/analytics/export", isAuthenticated, async (req, res) => {
     try {
       const filters = parseFilters(req.query);

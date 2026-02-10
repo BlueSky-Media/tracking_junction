@@ -16,7 +16,7 @@ import { CsvExportButton } from "@/components/csv-export-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LogOut, FileText } from "lucide-react";
+import { LogOut, FileText, BarChart3 } from "lucide-react";
 import { Link } from "wouter";
 import logoImg from "@assets/TrackingJunctionLogo_1770758622147.png";
 import { isUnauthorizedError } from "@/lib/auth-utils";
@@ -149,6 +149,11 @@ export default function DashboardPage() {
             <img src={logoImg} alt="TrackingJunction" className="h-7" data-testid="text-dashboard-logo" />
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/reports">
+              <Button variant="ghost" size="icon" data-testid="button-reports">
+                <BarChart3 className="w-4 h-4" />
+              </Button>
+            </Link>
             <Link href="/docs">
               <Button variant="ghost" size="icon" data-testid="button-api-docs">
                 <FileText className="w-4 h-4" />

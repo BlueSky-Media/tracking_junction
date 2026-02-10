@@ -95,6 +95,35 @@ interface ReferrerRow {
   conversionRate: number;
 }
 
+interface DrilldownStepData {
+  stepNumber: number;
+  stepName: string;
+  completions: number;
+  conversionFromPrev: number;
+  conversionFromInitial: number;
+}
+
+interface DrilldownRow {
+  groupValue: string;
+  uniqueViews: number;
+  grossViews: number;
+  steps: DrilldownStepData[];
+}
+
+interface DrilldownResult {
+  rows: DrilldownRow[];
+  totals: DrilldownRow;
+  groupBy: string;
+}
+
+interface EventLogResult {
+  events: TrackingEvent[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface IStorage {
   insertEvent(event: InsertTrackingEvent): Promise<TrackingEvent>;
   insertEventsBatch(events: InsertTrackingEvent[]): Promise<void>;
@@ -109,6 +138,8 @@ export interface IStorage {
   getReferrerBreakdown(filters: AnalyticsFilters): Promise<ReferrerRow[]>;
   getFilterOptions(): Promise<{ utmSources: string[]; utmCampaigns: string[]; utmMediums: string[] }>;
   exportCsv(filters: AnalyticsFilters): Promise<string>;
+  getDrilldown(filters: AnalyticsFilters, groupBy: string): Promise<DrilldownResult>;
+  getEventLogs(filters: AnalyticsFilters, page: number, limit: number, search?: string): Promise<EventLogResult>;
 }
 
 function buildConditions(filters: AnalyticsFilters) {
@@ -551,6 +582,201 @@ class DatabaseStorage implements IStorage {
     }
 
     return csvRows.join("\n");
+  }
+
+  async getDrilldown(filters: AnalyticsFilters, groupBy: string): Promise<DrilldownResult> {
+    const where = buildConditions(filters);
+
+    const groupColumn: Record<string, any> = {
+      domain: sql`COALESCE(${trackingEvents.domain}, '(unknown)')`,
+      deviceType: sql`COALESCE(${trackingEvents.deviceType}, '(unknown)')`,
+      utmSource: sql`COALESCE(${trackingEvents.utmSource}, '(none)')`,
+      utmCampaign: sql`COALESCE(${trackingEvents.utmCampaign}, '(none)')`,
+      utmMedium: sql`COALESCE(${trackingEvents.utmMedium}, '(none)')`,
+      page: sql`COALESCE(${trackingEvents.page}, '(unknown)')`,
+    };
+
+    const groupCol = groupColumn[groupBy] || groupColumn.domain;
+
+    const rows = await db.execute(sql`
+      WITH grouped_steps AS (
+        SELECT
+          ${groupCol} as group_value,
+          ${trackingEvents.sessionId},
+          ${trackingEvents.stepNumber},
+          ${trackingEvents.stepName},
+          ${trackingEvents.eventType}
+        FROM ${trackingEvents}
+        ${where ? sql`WHERE ${where}` : sql``}
+      ),
+      group_views AS (
+        SELECT
+          group_value,
+          COUNT(DISTINCT session_id) as unique_views,
+          COUNT(*) as gross_views
+        FROM grouped_steps
+        GROUP BY group_value
+      ),
+      step_completions AS (
+        SELECT
+          group_value,
+          step_number,
+          MIN(step_name) as step_name,
+          COUNT(DISTINCT session_id) as completions
+        FROM grouped_steps
+        WHERE event_type = 'step_complete' OR event_type IS NULL
+        GROUP BY group_value, step_number
+      )
+      SELECT
+        gv.group_value,
+        gv.unique_views,
+        gv.gross_views,
+        sc.step_number,
+        sc.step_name,
+        sc.completions
+      FROM group_views gv
+      LEFT JOIN step_completions sc ON gv.group_value = sc.group_value
+      ORDER BY gv.unique_views DESC, gv.group_value, sc.step_number
+    `);
+
+    const results = (rows as any).rows || [];
+
+    const groupMap = new Map<string, { uniqueViews: number; grossViews: number; stepsMap: Map<number, { stepName: string; completions: number }> }>();
+
+    for (const r of results) {
+      const gv = r.group_value as string;
+      if (!groupMap.has(gv)) {
+        groupMap.set(gv, {
+          uniqueViews: Number(r.unique_views),
+          grossViews: Number(r.gross_views),
+          stepsMap: new Map(),
+        });
+      }
+      if (r.step_number !== null && r.step_number !== undefined) {
+        groupMap.get(gv)!.stepsMap.set(Number(r.step_number), {
+          stepName: r.step_name as string,
+          completions: Number(r.completions),
+        });
+      }
+    }
+
+    const allStepNumbers = new Set<number>();
+    Array.from(groupMap.values()).forEach(g => {
+      Array.from(g.stepsMap.keys()).forEach(sn => allStepNumbers.add(sn));
+    });
+    const sortedSteps = Array.from(allStepNumbers).sort((a, b) => a - b);
+
+    function buildSteps(uniqueViews: number, stepsMap: Map<number, { stepName: string; completions: number }>): DrilldownStepData[] {
+      let prevCount = uniqueViews;
+      return sortedSteps.map((sn) => {
+        const stepData = stepsMap.get(sn);
+        const completions = stepData?.completions || 0;
+        const convFromPrev = prevCount > 0 ? (completions / prevCount) * 100 : 0;
+        const convFromInitial = uniqueViews > 0 ? (completions / uniqueViews) * 100 : 0;
+        prevCount = completions;
+        return {
+          stepNumber: sn,
+          stepName: stepData?.stepName || `Step ${sn}`,
+          completions,
+          conversionFromPrev: Math.round(convFromPrev * 10) / 10,
+          conversionFromInitial: Math.round(convFromInitial * 10) / 10,
+        };
+      });
+    }
+
+    const drilldownRows: DrilldownRow[] = [];
+    Array.from(groupMap.entries()).forEach(([gv, data]) => {
+      drilldownRows.push({
+        groupValue: gv,
+        uniqueViews: data.uniqueViews,
+        grossViews: data.grossViews,
+        steps: buildSteps(data.uniqueViews, data.stepsMap),
+      });
+    });
+
+    drilldownRows.sort((a, b) => b.uniqueViews - a.uniqueViews);
+
+    const totalUniqueViews = drilldownRows.reduce((s, r) => s + r.uniqueViews, 0);
+    const totalGrossViews = drilldownRows.reduce((s, r) => s + r.grossViews, 0);
+    const totalsStepsMap = new Map<number, { stepName: string; completions: number }>();
+    for (const row of drilldownRows) {
+      for (const step of row.steps) {
+        const existing = totalsStepsMap.get(step.stepNumber);
+        if (existing) {
+          existing.completions += step.completions;
+        } else {
+          totalsStepsMap.set(step.stepNumber, { stepName: step.stepName, completions: step.completions });
+        }
+      }
+    }
+
+    const totals: DrilldownRow = {
+      groupValue: "Totals",
+      uniqueViews: totalUniqueViews,
+      grossViews: totalGrossViews,
+      steps: buildSteps(totalUniqueViews, totalsStepsMap),
+    };
+
+    return { rows: drilldownRows, totals, groupBy };
+  }
+
+  async getEventLogs(filters: AnalyticsFilters, page: number, limit: number, search?: string): Promise<EventLogResult> {
+    const conditions = [];
+    if (filters.page) conditions.push(eq(trackingEvents.page, filters.page));
+    if (filters.pageType) conditions.push(eq(trackingEvents.pageType, filters.pageType));
+    if (filters.domain) conditions.push(eq(trackingEvents.domain, filters.domain));
+    if (filters.startDate) conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      conditions.push(lte(trackingEvents.eventTimestamp, end));
+    }
+    if (filters.utmSource) conditions.push(eq(trackingEvents.utmSource, filters.utmSource));
+    if (filters.utmCampaign) conditions.push(eq(trackingEvents.utmCampaign, filters.utmCampaign));
+    if (filters.utmMedium) conditions.push(eq(trackingEvents.utmMedium, filters.utmMedium));
+    if (filters.deviceType) conditions.push(eq(trackingEvents.deviceType, filters.deviceType));
+
+    if (search && search.trim()) {
+      const searchTerm = `%${search.trim().toLowerCase()}%`;
+      conditions.push(sql`(
+        LOWER(${trackingEvents.sessionId}) LIKE ${searchTerm}
+        OR LOWER(COALESCE(${trackingEvents.page}, '')) LIKE ${searchTerm}
+        OR LOWER(COALESCE(${trackingEvents.stepName}, '')) LIKE ${searchTerm}
+        OR LOWER(COALESCE(${trackingEvents.selectedValue}, '')) LIKE ${searchTerm}
+        OR LOWER(COALESCE(${trackingEvents.utmCampaign}, '')) LIKE ${searchTerm}
+        OR LOWER(COALESCE(${trackingEvents.utmSource}, '')) LIKE ${searchTerm}
+        OR LOWER(COALESCE(${trackingEvents.domain}, '')) LIKE ${searchTerm}
+        OR LOWER(COALESCE(${trackingEvents.eventType}, '')) LIKE ${searchTerm}
+        OR LOWER(COALESCE(${trackingEvents.referrer}, '')) LIKE ${searchTerm}
+        OR CAST(${trackingEvents.id} AS TEXT) LIKE ${searchTerm}
+      )`);
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [countResult] = await db
+      .select({ total: count() })
+      .from(trackingEvents)
+      .where(where);
+
+    const total = Number(countResult?.total || 0);
+    const offset = (page - 1) * limit;
+
+    const events = await db
+      .select()
+      .from(trackingEvents)
+      .where(where)
+      .orderBy(desc(trackingEvents.eventTimestamp))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      events,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }
 
