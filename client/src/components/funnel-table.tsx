@@ -64,7 +64,7 @@ export function FunnelTable({ data, isLoading }: FunnelTableProps) {
               const isHighDropOff = step.dropOffRate > 30;
 
               return (
-                <TableRow key={step.stepNumber} data-testid={`row-step-${step.stepNumber}`}>
+                <TableRow key={`${step.stepNumber}-${step.stepName}`} data-testid={`row-step-${step.stepNumber}-${step.stepName}`}>
                   <TableCell className="font-mono text-muted-foreground">{step.stepNumber}</TableCell>
                   <TableCell className="font-medium">{step.stepName}</TableCell>
                   <TableCell className="text-right font-mono">{step.uniqueVisitors.toLocaleString()}</TableCell>

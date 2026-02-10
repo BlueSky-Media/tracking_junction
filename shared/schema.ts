@@ -15,6 +15,13 @@ export const trackingEvents = pgTable("tracking_events", {
   selectedValue: text("selected_value"),
   sessionId: varchar("session_id", { length: 64 }).notNull(),
   userAgent: text("user_agent"),
+  eventType: varchar("event_type", { length: 30 }).default("step_complete"),
+  utmSource: varchar("utm_source", { length: 200 }),
+  utmCampaign: varchar("utm_campaign", { length: 200 }),
+  utmMedium: varchar("utm_medium", { length: 100 }),
+  utmContent: varchar("utm_content", { length: 200 }),
+  deviceType: varchar("device_type", { length: 20 }),
+  referrer: text("referrer"),
   eventTimestamp: timestamp("event_timestamp").notNull().defaultNow(),
   receivedAt: timestamp("received_at").notNull().defaultNow(),
 }, (table) => [
@@ -23,23 +30,33 @@ export const trackingEvents = pgTable("tracking_events", {
   index("idx_events_domain").on(table.domain),
   index("idx_events_timestamp").on(table.eventTimestamp),
   index("idx_events_step").on(table.page, table.pageType, table.stepNumber),
+  index("idx_events_event_type").on(table.eventType),
+  index("idx_events_utm_campaign").on(table.utmCampaign),
+  index("idx_events_device_type").on(table.deviceType),
 ]);
 
 export const insertTrackingEventSchema = createInsertSchema(trackingEvents).omit({
-  id: true,
-  receivedAt: true,
+  id: true as const,
+  receivedAt: true as const,
 });
 
 export const trackingEventApiSchema = z.object({
   page: z.enum(["seniors", "veterans", "first-responders"]),
   page_type: z.enum(["lead", "call"]),
   domain: z.enum(["blueskylife.net", "blueskylife.io"]),
-  step_number: z.number().int().min(1).max(20),
+  step_number: z.number().int().min(0).max(20),
   step_name: z.string().min(1).max(100),
   selected_value: z.string().optional(),
   session_id: z.string().uuid(),
   timestamp: z.string().optional(),
   user_agent: z.string().optional(),
+  event_type: z.enum(["page_land", "step_complete", "form_complete"]).optional(),
+  utm_source: z.string().max(200).optional(),
+  utm_campaign: z.string().max(200).optional(),
+  utm_medium: z.string().max(100).optional(),
+  utm_content: z.string().max(200).optional(),
+  device_type: z.enum(["mobile", "desktop", "tablet"]).optional(),
+  referrer: z.string().optional(),
 });
 
 export type InsertTrackingEvent = z.infer<typeof insertTrackingEventSchema>;

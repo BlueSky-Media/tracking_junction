@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { Users, MousePointerClick, TrendingUp, Percent } from "lucide-react";
+import { Users, MousePointerClick, TrendingUp, Percent, ArrowDownRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface StatsData {
@@ -7,6 +7,7 @@ interface StatsData {
   totalEvents: number;
   overallConversion: number;
   avgStepsCompleted: number;
+  bounceRate: number;
 }
 
 interface StatsCardsProps {
@@ -40,8 +41,16 @@ const stats = [
     bgColor: "bg-chart-3/10",
   },
   {
+    key: "bounceRate" as const,
+    label: "Bounce Rate",
+    icon: ArrowDownRight,
+    format: (v: number) => `${v.toFixed(1)}%`,
+    color: "text-chart-5",
+    bgColor: "bg-chart-5/10",
+  },
+  {
     key: "avgStepsCompleted" as const,
-    label: "Avg Steps Completed",
+    label: "Avg Steps",
     icon: TrendingUp,
     format: (v: number) => v.toFixed(1),
     color: "text-chart-4",
@@ -51,7 +60,7 @@ const stats = [
 
 export function StatsCards({ data, isLoading }: StatsCardsProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
       {stats.map((stat) => (
         <Card key={stat.key} className="p-5">
           <div className="flex items-center justify-between gap-4 mb-3">
@@ -64,7 +73,7 @@ export function StatsCards({ data, isLoading }: StatsCardsProps) {
             <Skeleton className="h-8 w-24" />
           ) : (
             <span className="text-2xl font-bold" data-testid={`text-stat-${stat.key}`}>
-              {data ? stat.format(data[stat.key]) : "—"}
+              {data ? stat.format(data[stat.key]) : "\u2014"}
             </span>
           )}
         </Card>

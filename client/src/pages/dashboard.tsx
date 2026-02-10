@@ -7,6 +7,12 @@ import { FunnelChart } from "@/components/funnel-chart";
 import { FunnelTable } from "@/components/funnel-table";
 import { StepBreakdown } from "@/components/step-breakdown";
 import { DashboardFilters, type Filters } from "@/components/dashboard-filters";
+import { CampaignTable } from "@/components/campaign-table";
+import { DeviceBreakdown } from "@/components/device-breakdown";
+import { TimeHeatmap } from "@/components/time-heatmap";
+import { ContactFunnel } from "@/components/contact-funnel";
+import { ReferrerBreakdown } from "@/components/referrer-breakdown";
+import { CsvExportButton } from "@/components/csv-export-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -22,6 +28,10 @@ function buildQuery(filters: Filters): string {
   if (filters.domain !== "all") params.set("domain", filters.domain);
   if (filters.dateRange?.from) params.set("startDate", format(filters.dateRange.from, "yyyy-MM-dd"));
   if (filters.dateRange?.to) params.set("endDate", format(filters.dateRange.to, "yyyy-MM-dd"));
+  if (filters.utmSource !== "all") params.set("utmSource", filters.utmSource);
+  if (filters.utmCampaign !== "all") params.set("utmCampaign", filters.utmCampaign);
+  if (filters.utmMedium !== "all") params.set("utmMedium", filters.utmMedium);
+  if (filters.deviceType !== "all") params.set("deviceType", filters.deviceType);
   return params.toString();
 }
 
@@ -34,6 +44,10 @@ export default function DashboardPage() {
     pageType: "all",
     domain: "all",
     dateRange: undefined,
+    utmSource: "all",
+    utmCampaign: "all",
+    utmMedium: "all",
+    deviceType: "all",
   });
 
   const query = buildQuery(filters);
@@ -63,6 +77,36 @@ export default function DashboardPage() {
   const breakdownQuery = useQuery({
     queryKey: ["/api/analytics/breakdown", query],
     queryFn: () => fetchWithQuery("/api/analytics/breakdown"),
+    enabled: !authLoading,
+  });
+
+  const campaignsQuery = useQuery({
+    queryKey: ["/api/analytics/campaigns", query],
+    queryFn: () => fetchWithQuery("/api/analytics/campaigns"),
+    enabled: !authLoading,
+  });
+
+  const devicesQuery = useQuery({
+    queryKey: ["/api/analytics/devices", query],
+    queryFn: () => fetchWithQuery("/api/analytics/devices"),
+    enabled: !authLoading,
+  });
+
+  const heatmapQuery = useQuery({
+    queryKey: ["/api/analytics/heatmap", query],
+    queryFn: () => fetchWithQuery("/api/analytics/heatmap"),
+    enabled: !authLoading,
+  });
+
+  const contactFunnelQuery = useQuery({
+    queryKey: ["/api/analytics/contact-funnel", query],
+    queryFn: () => fetchWithQuery("/api/analytics/contact-funnel"),
+    enabled: !authLoading,
+  });
+
+  const referrersQuery = useQuery({
+    queryKey: ["/api/analytics/referrers", query],
+    queryFn: () => fetchWithQuery("/api/analytics/referrers"),
     enabled: !authLoading,
   });
 
@@ -104,6 +148,7 @@ export default function DashboardPage() {
             <img src={logoImg} alt="TrackingJunction" className="h-7" data-testid="text-dashboard-logo" />
           </div>
           <div className="flex items-center gap-2">
+            <CsvExportButton query={query} />
             <ThemeToggle />
             <div className="flex items-center gap-2 pl-2 border-l">
               <Avatar className="w-8 h-8">
@@ -134,6 +179,18 @@ export default function DashboardPage() {
         <FunnelChart data={(funnelQuery.data as any)?.steps} isLoading={funnelQuery.isLoading} />
 
         <FunnelTable data={(funnelQuery.data as any)?.steps} isLoading={funnelQuery.isLoading} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ContactFunnel data={contactFunnelQuery.data as any} isLoading={contactFunnelQuery.isLoading} />
+          <DeviceBreakdown data={devicesQuery.data as any} isLoading={devicesQuery.isLoading} />
+        </div>
+
+        <CampaignTable data={campaignsQuery.data as any} isLoading={campaignsQuery.isLoading} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ReferrerBreakdown data={referrersQuery.data as any} isLoading={referrersQuery.isLoading} />
+          <TimeHeatmap data={heatmapQuery.data as any} isLoading={heatmapQuery.isLoading} />
+        </div>
 
         <StepBreakdown data={breakdownQuery.data as any} isLoading={breakdownQuery.isLoading} />
       </main>

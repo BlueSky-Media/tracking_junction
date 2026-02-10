@@ -1,0 +1,35 @@
+1. Additional event fields to accept in POST /api/events:
+
+Add these optional fields to the event schema (all optional so existing events still work):
+
+utm_source (string) — e.g., "facebook", "google"
+utm_campaign (string) — ad campaign name
+utm_medium (string) — e.g., "cpc", "social"
+utm_content (string) — ad creative identifier
+device_type (string) — "mobile", "desktop", or "tablet"
+referrer (string) — the referring URL
+event_type (string) — defaults to "step_complete", but can also be "page_land" (visitor loaded the page) or "form_complete" (full submission completed)
+2. New dashboard features:
+
+Bounce rate view — show visitors who triggered a "page_land" event but never completed any quiz step. Display as a percentage of total visitors.
+Campaign-level filtering — filter all dashboard views by UTM source, campaign, medium, and content. Show a campaign comparison table with conversion rates per campaign.
+Device breakdown — show mobile vs. desktop vs. tablet split with conversion rates for each.
+Time-of-day heatmap — show which hours and days of the week have the highest traffic and best conversion rates.
+Contact form funnel — specifically track the Name → Email → Phone micro-steps to show where leads drop off in the contact flow. Show this as a separate mini-funnel within the main funnel view.
+CSV export — add a button to export filtered event data as a CSV file for offline analysis.
+Referrer breakdown — show top referral sources and their conversion rates.
+3. The landing pages will send these event types:
+
+page_land — fired when a visitor first loads the page (before any clicks)
+step_complete — fired each time a visitor selects an option in the quiz
+form_complete — fired when a visitor fully submits the contact form (phone step)
+4. The landing page quiz steps for reference:
+
+Lead-gen pages (8 quiz steps + contact): State → Age → Income → Budget → Beneficiary/Purpose → Name (contact) → Email (contact) → Phone (contact) → Thank You
+
+Call-in pages (5 quiz steps): State → Age → Income → Budget → Purpose → Call CTA
+
+Each step has multiple choice options. The selectedValue field captures which option was clicked.
+
+5. CORS:
+Keep CORS locked to blueskylife.net and blueskylife.io origins only.
