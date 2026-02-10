@@ -1,9 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
-  LogOut, BarChart3, ChevronDown, ChevronRight, Search,
-  CalendarIcon, ChevronLeft, ChevronsLeft, ChevronsRight, ArrowLeft,
+  BarChart3, ChevronDown, ChevronRight, Search,
+  CalendarIcon, ChevronLeft, ChevronsLeft, ChevronsRight,
 } from "lucide-react";
-import { Link } from "wouter";
-import logoImg from "@assets/TrackingJunctionLogo_1770758622147.png";
 import { isUnauthorizedError } from "@/lib/auth-utils";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -446,7 +442,7 @@ function DetailField({ label, value }: { label: string; value: string }) {
 }
 
 export default function ReportsPage() {
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -465,132 +461,80 @@ export default function ReportsPage() {
   });
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-      setTimeout(() => { window.location.href = "/api/login"; }, 500);
-    }
-  }, [user, authLoading]);
-
-  useEffect(() => {
     if (drilldownQuery.error && isUnauthorizedError(drilldownQuery.error as Error)) {
       toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
       setTimeout(() => { window.location.href = "/api/login"; }, 500);
     }
   }, [drilldownQuery.error]);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <img src={logoImg} alt="TrackingJunction" className="h-8 animate-pulse" />
-          <p className="text-sm text-muted-foreground">Loading reports...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("") || "U";
-
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <img src={logoImg} alt="TrackingJunction" className="h-7" />
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <div className="flex items-center gap-2 pl-2 border-l">
-              <Avatar className="w-8 h-8">
-                <AvatarImage src={user?.profileImageUrl || undefined} alt={user?.firstName || "User"} />
-                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-              </Avatar>
-              <span className="text-sm hidden sm:block">
-                {user?.firstName} {user?.lastName}
-              </span>
-              <Button variant="ghost" size="icon" onClick={() => logout()} data-testid="button-logout">
-                <LogOut className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="px-4 sm:px-6 py-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-reports-title">
+          <BarChart3 className="w-6 h-6" />
+          Drill-Down Reports
+        </h1>
+        <p className="text-sm text-muted-foreground">Detailed conversion analysis by dimension</p>
+      </div>
 
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back-dashboard">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-reports-title">
-              <BarChart3 className="w-6 h-6" />
-              Drill-Down Reports
-            </h1>
-            <p className="text-sm text-muted-foreground">Detailed conversion analysis by dimension</p>
-          </div>
-        </div>
-
-        <Card className="p-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" data-testid="button-date-range">
-                  <CalendarIcon className="w-4 h-4 mr-2" />
-                  {dateRange?.from ? (
-                    dateRange.to ? (
-                      <span className="text-sm">
-                        {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
-                      </span>
-                    ) : (
-                      <span className="text-sm">{format(dateRange.from, "MMM d, yyyy")}</span>
-                    )
+      <Card className="p-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" data-testid="button-date-range">
+                <CalendarIcon className="w-4 h-4 mr-2" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <span className="text-sm">
+                      {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
+                    </span>
                   ) : (
-                    <span className="text-sm">All Time</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="range"
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  numberOfMonths={2}
-                  data-testid="calendar-date-range"
-                />
-                {dateRange && (
-                  <div className="p-2 border-t flex justify-end">
-                    <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)} data-testid="button-clear-dates">
-                      Clear
-                    </Button>
-                  </div>
+                    <span className="text-sm">{format(dateRange.from, "MMM d, yyyy")}</span>
+                  )
+                ) : (
+                  <span className="text-sm">All Time</span>
                 )}
-              </PopoverContent>
-            </Popover>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+                data-testid="calendar-date-range"
+              />
+              {dateRange && (
+                <div className="p-2 border-t flex justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)} data-testid="button-clear-dates">
+                    Clear
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
 
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Group by:</span>
-              <Select value={groupBy} onValueChange={setGroupBy}>
-                <SelectTrigger className="w-[160px]" data-testid="select-group-by">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GROUP_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} data-testid={`option-group-${opt.value}`}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Group by:</span>
+            <Select value={groupBy} onValueChange={setGroupBy}>
+              <SelectTrigger className="w-[160px]" data-testid="select-group-by">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GROUP_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} data-testid={`option-group-${opt.value}`}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </Card>
+        </div>
+      </Card>
 
-        <DrilldownSummaryTable data={drilldownQuery.data} isLoading={drilldownQuery.isLoading} />
+      <DrilldownSummaryTable data={drilldownQuery.data} isLoading={drilldownQuery.isLoading} />
 
-        <EventLogsSection dateRange={dateRange} />
-      </main>
+      <EventLogsSection dateRange={dateRange} />
     </div>
   );
 }

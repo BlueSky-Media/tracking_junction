@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BarChart3, Shield, Zap, TrendingUp, Activity, Eye } from "lucide-react";
-import logoImg from "@assets/TrackingJunctionLogo_1770758622147.png";
+import logoImg from "@/assets/images/logo-full.png";
 
 const features = [
   {

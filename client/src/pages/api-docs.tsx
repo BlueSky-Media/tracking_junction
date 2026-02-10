@@ -1,14 +1,10 @@
-import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
-import { useLocation, Link } from "wouter";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { LogOut, ArrowLeft, Copy, Check, ExternalLink } from "lucide-react";
-import logoImg from "@assets/TrackingJunctionLogo_1770758622147.png";
+import { Button } from "@/components/ui/button";
+import { Copy, Check } from "lucide-react";
 import { useState } from "react";
 
 function CopyButton({ text }: { text: string }) {
@@ -148,9 +144,8 @@ const FILTER_PARAMS = [
 ];
 
 export default function ApiDocsPage() {
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [, navigate] = useLocation();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -159,92 +154,48 @@ export default function ApiDocsPage() {
     }
   }, [user, authLoading]);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <img src={logoImg} alt="TrackingJunction" className="h-8 animate-pulse" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("") || "U";
-
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4 flex-wrap">
+    <div className="px-4 sm:px-6 py-6 space-y-6 max-w-4xl">
+      <div>
+        <h1 className="text-2xl font-bold" data-testid="text-api-docs-title">API Documentation</h1>
+        <p className="text-sm text-muted-foreground">Integrate your landing pages with TrackingJunction</p>
+      </div>
+
+      <Card className="p-5">
+        <h2 className="font-semibold mb-2" data-testid="text-overview-title">Overview</h2>
+        <p className="text-sm text-muted-foreground mb-3">
+          TrackingJunction provides a REST API for ingesting anonymous tracking events from your landing pages
+          and retrieving aggregated analytics. Events are sent from blueskylife.net and blueskylife.io via
+          client-side JavaScript.
+        </p>
+        <div className="flex flex-col gap-2 text-sm">
           <div className="flex items-center gap-2">
-            <img src={logoImg} alt="TrackingJunction" className="h-7" />
+            <Badge variant="secondary" className="font-mono text-xs">Base URL</Badge>
+            <code className="text-xs font-mono">https://trackingjunction.com</code>
           </div>
           <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <div className="flex items-center gap-2 pl-2 border-l">
-              <Avatar className="w-8 h-8">
-                <AvatarImage src={user?.profileImageUrl || undefined} alt={user?.firstName || "User"} />
-                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-              </Avatar>
-              <span className="text-sm hidden sm:block">
-                {user?.firstName} {user?.lastName}
-              </span>
-              <Button variant="ghost" size="icon" onClick={() => logout()} data-testid="button-logout">
-                <LogOut className="w-4 h-4" />
-              </Button>
-            </div>
+            <Badge variant="secondary" className="font-mono text-xs">Format</Badge>
+            <span className="text-xs">JSON request/response (application/json)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="font-mono text-xs">CORS</Badge>
+            <span className="text-xs">Enabled for blueskylife.net and blueskylife.io only</span>
           </div>
         </div>
-      </header>
+      </Card>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back-dashboard">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold" data-testid="text-api-docs-title">API Documentation</h1>
-            <p className="text-sm text-muted-foreground">Integrate your landing pages with TrackingJunction</p>
-          </div>
-        </div>
+      <div>
+        <h2 className="text-lg font-semibold mb-1" data-testid="text-section-event-ingestion">Event Ingestion</h2>
+        <p className="text-sm text-muted-foreground mb-4">Send tracking events from your landing pages. No authentication required -- events are accepted from allowed origins.</p>
+      </div>
 
-        <Card className="p-5">
-          <h2 className="font-semibold mb-2" data-testid="text-overview-title">Overview</h2>
-          <p className="text-sm text-muted-foreground mb-3">
-            TrackingJunction provides a REST API for ingesting anonymous tracking events from your landing pages
-            and retrieving aggregated analytics. Events are sent from blueskylife.net and blueskylife.io via
-            client-side JavaScript.
-          </p>
-          <div className="flex flex-col gap-2 text-sm">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="font-mono text-xs">Base URL</Badge>
-              <code className="text-xs font-mono">https://trackingjunction.com</code>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="font-mono text-xs">Format</Badge>
-              <span className="text-xs">JSON request/response (application/json)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="font-mono text-xs">CORS</Badge>
-              <span className="text-xs">Enabled for blueskylife.net and blueskylife.io only</span>
-            </div>
-          </div>
-        </Card>
-
-        <div>
-          <h2 className="text-lg font-semibold mb-1" data-testid="text-section-event-ingestion">Event Ingestion</h2>
-          <p className="text-sm text-muted-foreground mb-4">Send tracking events from your landing pages. No authentication required -- events are accepted from allowed origins.</p>
-        </div>
-
-        <EndpointSection
-          testId="endpoint-post-events"
-          method="POST"
-          path="/api/events"
-          description="Record a tracking event. Called from your landing page JavaScript when a visitor lands, completes a quiz step, or submits a form."
-          auth={false}
-          requestBody={`{
+      <EndpointSection
+        testId="endpoint-post-events"
+        method="POST"
+        path="/api/events"
+        description="Record a tracking event. Called from your landing page JavaScript when a visitor lands, completes a quiz step, or submits a form."
+        auth={false}
+        requestBody={`{
   "page": "seniors",
   "page_type": "lead",
   "domain": "blueskylife.net",
@@ -261,178 +212,178 @@ export default function ApiDocsPage() {
   "device_type": "mobile",
   "referrer": "https://google.com/search?q=..."
 }`}
-          responseExample={`{ "ok": true }`}
-          notes={[
-            'CORS is restricted to origins: blueskylife.net and blueskylife.io (with/without www prefix).',
-            'page: Audience name -- "seniors", "veterans", or "first-responders".',
-            'page_type: "lead" for lead-gen funnels (9 steps) or "call" for call-in funnels (6 steps).',
-            'event_type: "page_land" when visitor first arrives, "step_complete" after each quiz answer, "form_complete" for final submission.',
-            'time_on_step: Seconds (0-3600) the visitor spent on this step before clicking. Optional.',
-            'session_id: A UUID v4 generated client-side per visitor session.',
-            'selected_value: The option the visitor chose at this step (e.g., "California", "66-70").',
-            'UTM fields, device_type, and referrer are all optional.',
-          ]}
-        />
+        responseExample={`{ "ok": true }`}
+        notes={[
+          'CORS is restricted to origins: blueskylife.net and blueskylife.io (with/without www prefix).',
+          'page: Audience name -- "seniors", "veterans", or "first-responders".',
+          'page_type: "lead" for lead-gen funnels (9 steps) or "call" for call-in funnels (6 steps).',
+          'event_type: "page_land" when visitor first arrives, "step_complete" after each quiz answer, "form_complete" for final submission.',
+          'time_on_step: Seconds (0-3600) the visitor spent on this step before clicking. Optional.',
+          'session_id: A UUID v4 generated client-side per visitor session.',
+          'selected_value: The option the visitor chose at this step (e.g., "California", "66-70").',
+          'UTM fields, device_type, and referrer are all optional.',
+        ]}
+      />
 
-        <div className="border-t pt-6">
-          <h2 className="text-lg font-semibold mb-1" data-testid="text-section-event-schema">Event Schema Reference</h2>
-          <p className="text-sm text-muted-foreground mb-4">Complete field reference for the event payload.</p>
+      <div className="border-t pt-6">
+        <h2 className="text-lg font-semibold mb-1" data-testid="text-section-event-schema">Event Schema Reference</h2>
+        <p className="text-sm text-muted-foreground mb-4">Complete field reference for the event payload.</p>
+      </div>
+
+      <Card className="p-5">
+        <div className="border rounded-md overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="text-left px-3 py-2 font-medium">Field</th>
+                <th className="text-left px-3 py-2 font-medium">Type</th>
+                <th className="text-left px-3 py-2 font-medium">Required</th>
+                <th className="text-left px-3 py-2 font-medium">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { field: "page", type: "string", required: "Yes", desc: 'Audience: "seniors", "veterans", or "first-responders"' },
+                { field: "page_type", type: "string", required: "Yes", desc: '"lead" or "call"' },
+                { field: "domain", type: "string", required: "Yes", desc: '"blueskylife.net" or "blueskylife.io"' },
+                { field: "step_number", type: "integer", required: "Yes", desc: "Step index (0-20)" },
+                { field: "step_name", type: "string", required: "Yes", desc: 'Step label (e.g., "State", "Age", "Email")' },
+                { field: "selected_value", type: "string", required: "No", desc: "Visitor's choice at this step" },
+                { field: "session_id", type: "string (UUID)", required: "Yes", desc: "UUID v4 per visitor session" },
+                { field: "event_type", type: "string", required: "No", desc: '"page_land", "step_complete", or "form_complete". Defaults to "step_complete"' },
+                { field: "time_on_step", type: "integer", required: "No", desc: "Seconds spent on step (0-3600)" },
+                { field: "timestamp", type: "string (ISO)", required: "No", desc: "Event timestamp. Defaults to server receive time" },
+                { field: "user_agent", type: "string", required: "No", desc: "Browser user agent. Auto-detected if omitted" },
+                { field: "utm_source", type: "string", required: "No", desc: "UTM source parameter" },
+                { field: "utm_campaign", type: "string", required: "No", desc: "UTM campaign parameter" },
+                { field: "utm_medium", type: "string", required: "No", desc: "UTM medium parameter" },
+                { field: "utm_content", type: "string", required: "No", desc: "UTM content parameter" },
+                { field: "device_type", type: "string", required: "No", desc: '"mobile", "desktop", or "tablet"' },
+                { field: "referrer", type: "string", required: "No", desc: "Full referrer URL" },
+              ].map((row) => (
+                <tr key={row.field} className="border-t">
+                  <td className="px-3 py-2 font-mono text-xs">{row.field}</td>
+                  <td className="px-3 py-2 text-muted-foreground text-xs">{row.type}</td>
+                  <td className="px-3 py-2 text-xs">
+                    {row.required === "Yes" ? (
+                      <Badge variant="default" className="text-xs">Required</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Optional</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-xs">{row.desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+      </Card>
 
+      <div className="border-t pt-6">
+        <h2 className="text-lg font-semibold mb-1" data-testid="text-section-funnel-steps">Funnel Step Definitions</h2>
+        <p className="text-sm text-muted-foreground mb-4">The expected step sequences for each funnel type.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="p-5">
-          <div className="border rounded-md overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/50">
-                  <th className="text-left px-3 py-2 font-medium">Field</th>
-                  <th className="text-left px-3 py-2 font-medium">Type</th>
-                  <th className="text-left px-3 py-2 font-medium">Required</th>
-                  <th className="text-left px-3 py-2 font-medium">Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { field: "page", type: "string", required: "Yes", desc: 'Audience: "seniors", "veterans", or "first-responders"' },
-                  { field: "page_type", type: "string", required: "Yes", desc: '"lead" or "call"' },
-                  { field: "domain", type: "string", required: "Yes", desc: '"blueskylife.net" or "blueskylife.io"' },
-                  { field: "step_number", type: "integer", required: "Yes", desc: "Step index (0-20)" },
-                  { field: "step_name", type: "string", required: "Yes", desc: 'Step label (e.g., "State", "Age", "Email")' },
-                  { field: "selected_value", type: "string", required: "No", desc: "Visitor's choice at this step" },
-                  { field: "session_id", type: "string (UUID)", required: "Yes", desc: "UUID v4 per visitor session" },
-                  { field: "event_type", type: "string", required: "No", desc: '"page_land", "step_complete", or "form_complete". Defaults to "step_complete"' },
-                  { field: "time_on_step", type: "integer", required: "No", desc: "Seconds spent on step (0-3600)" },
-                  { field: "timestamp", type: "string (ISO)", required: "No", desc: "Event timestamp. Defaults to server receive time" },
-                  { field: "user_agent", type: "string", required: "No", desc: "Browser user agent. Auto-detected if omitted" },
-                  { field: "utm_source", type: "string", required: "No", desc: "UTM source parameter" },
-                  { field: "utm_campaign", type: "string", required: "No", desc: "UTM campaign parameter" },
-                  { field: "utm_medium", type: "string", required: "No", desc: "UTM medium parameter" },
-                  { field: "utm_content", type: "string", required: "No", desc: "UTM content parameter" },
-                  { field: "device_type", type: "string", required: "No", desc: '"mobile", "desktop", or "tablet"' },
-                  { field: "referrer", type: "string", required: "No", desc: "Full referrer URL" },
-                ].map((row) => (
-                  <tr key={row.field} className="border-t">
-                    <td className="px-3 py-2 font-mono text-xs">{row.field}</td>
-                    <td className="px-3 py-2 text-muted-foreground text-xs">{row.type}</td>
-                    <td className="px-3 py-2 text-xs">
-                      {row.required === "Yes" ? (
-                        <Badge variant="default" className="text-xs">Required</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Optional</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-xs">{row.desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            Lead-Gen Funnel
+            <Badge variant="secondary" className="text-xs">9 steps</Badge>
+          </h3>
+          <ol className="space-y-1.5 text-sm">
+            {[
+              { n: 1, name: "State" },
+              { n: 2, name: "Age" },
+              { n: 3, name: "Income" },
+              { n: 4, name: "Budget" },
+              { n: 5, name: "Beneficiary" },
+              { n: 6, name: "Name" },
+              { n: 7, name: "Email" },
+              { n: 8, name: "Phone" },
+              { n: 9, name: "Thank You" },
+            ].map((s) => (
+              <li key={s.n} className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{s.n}</span>
+                <span>{s.name}</span>
+              </li>
+            ))}
+          </ol>
         </Card>
-
-        <div className="border-t pt-6">
-          <h2 className="text-lg font-semibold mb-1" data-testid="text-section-funnel-steps">Funnel Step Definitions</h2>
-          <p className="text-sm text-muted-foreground mb-4">The expected step sequences for each funnel type.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="p-5">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              Lead-Gen Funnel
-              <Badge variant="secondary" className="text-xs">9 steps</Badge>
-            </h3>
-            <ol className="space-y-1.5 text-sm">
-              {[
-                { n: 1, name: "State" },
-                { n: 2, name: "Age" },
-                { n: 3, name: "Income" },
-                { n: 4, name: "Budget" },
-                { n: 5, name: "Beneficiary" },
-                { n: 6, name: "Name" },
-                { n: 7, name: "Email" },
-                { n: 8, name: "Phone" },
-                { n: 9, name: "Thank You" },
-              ].map((s) => (
-                <li key={s.n} className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{s.n}</span>
-                  <span>{s.name}</span>
-                </li>
-              ))}
-            </ol>
-          </Card>
-          <Card className="p-5">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              Call-In Funnel
-              <Badge variant="secondary" className="text-xs">6 steps</Badge>
-            </h3>
-            <ol className="space-y-1.5 text-sm">
-              {[
-                { n: 1, name: "State" },
-                { n: 2, name: "Age" },
-                { n: 3, name: "Income" },
-                { n: 4, name: "Budget" },
-                { n: 5, name: "Purpose" },
-                { n: 6, name: "Call CTA" },
-              ].map((s) => (
-                <li key={s.n} className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{s.n}</span>
-                  <span>{s.name}</span>
-                </li>
-              ))}
-            </ol>
-          </Card>
-        </div>
-
-        <div className="border-t pt-6">
-          <h2 className="text-lg font-semibold mb-1" data-testid="text-section-analytics">Analytics Endpoints</h2>
-          <p className="text-sm text-muted-foreground mb-4">Authenticated endpoints for retrieving aggregated analytics. All accept the same optional filter query parameters.</p>
-        </div>
-
-        <Card className="p-5 mb-4">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Common Filter Parameters</h4>
-          <p className="text-xs text-muted-foreground mb-3">All analytics endpoints accept these optional query parameters to filter results.</p>
-          <div className="border rounded-md overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/50">
-                  <th className="text-left px-3 py-2 font-medium">Name</th>
-                  <th className="text-left px-3 py-2 font-medium">Type</th>
-                  <th className="text-left px-3 py-2 font-medium">Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                {FILTER_PARAMS.map((p) => (
-                  <tr key={p.name} className="border-t">
-                    <td className="px-3 py-2 font-mono text-xs">{p.name}</td>
-                    <td className="px-3 py-2 text-muted-foreground text-xs">{p.type}</td>
-                    <td className="px-3 py-2 text-xs">{p.description}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <Card className="p-5">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            Call-In Funnel
+            <Badge variant="secondary" className="text-xs">6 steps</Badge>
+          </h3>
+          <ol className="space-y-1.5 text-sm">
+            {[
+              { n: 1, name: "State" },
+              { n: 2, name: "Age" },
+              { n: 3, name: "Income" },
+              { n: 4, name: "Budget" },
+              { n: 5, name: "Purpose" },
+              { n: 6, name: "Call CTA" },
+            ].map((s) => (
+              <li key={s.n} className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{s.n}</span>
+                <span>{s.name}</span>
+              </li>
+            ))}
+          </ol>
         </Card>
+      </div>
 
-        <EndpointSection
-          testId="endpoint-get-stats"
-          method="GET"
-          path="/api/analytics/stats"
-          description="Returns aggregate statistics: total sessions, total events, completion rate, bounce rate, and average steps per session."
-          auth={true}
-          responseExample={`{
+      <div className="border-t pt-6">
+        <h2 className="text-lg font-semibold mb-1" data-testid="text-section-analytics">Analytics Endpoints</h2>
+        <p className="text-sm text-muted-foreground mb-4">Authenticated endpoints for retrieving aggregated analytics. All accept the same optional filter query parameters.</p>
+      </div>
+
+      <Card className="p-5 mb-4">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Common Filter Parameters</h4>
+        <p className="text-xs text-muted-foreground mb-3">All analytics endpoints accept these optional query parameters to filter results.</p>
+        <div className="border rounded-md overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="text-left px-3 py-2 font-medium">Name</th>
+                <th className="text-left px-3 py-2 font-medium">Type</th>
+                <th className="text-left px-3 py-2 font-medium">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {FILTER_PARAMS.map((p) => (
+                <tr key={p.name} className="border-t">
+                  <td className="px-3 py-2 font-mono text-xs">{p.name}</td>
+                  <td className="px-3 py-2 text-muted-foreground text-xs">{p.type}</td>
+                  <td className="px-3 py-2 text-xs">{p.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <EndpointSection
+        testId="endpoint-get-stats"
+        method="GET"
+        path="/api/analytics/stats"
+        description="Returns aggregate statistics: total sessions, total events, completion rate, bounce rate, and average steps per session."
+        auth={true}
+        responseExample={`{
   "totalSessions": 1920,
   "totalEvents": 10850,
   "completionRate": 21.2,
   "bounceRate": 15.5,
   "avgSteps": 5.3
 }`}
-        />
+      />
 
-        <EndpointSection
-          testId="endpoint-get-funnel"
-          method="GET"
-          path="/api/analytics/funnel"
-          description="Returns funnel step data with visitor counts, conversion/drop-off rates, and average time spent per step."
-          auth={true}
-          responseExample={`{
+      <EndpointSection
+        testId="endpoint-get-funnel"
+        method="GET"
+        path="/api/analytics/funnel"
+        description="Returns funnel step data with visitor counts, conversion/drop-off rates, and average time spent per step."
+        auth={true}
+        responseExample={`{
   "steps": [
     {
       "stepNumber": 1,
@@ -452,18 +403,18 @@ export default function ApiDocsPage() {
     }
   ]
 }`}
-          notes={[
-            "avgTimeOnStep is in seconds. Null if no time data recorded for that step.",
-          ]}
-        />
+        notes={[
+          "avgTimeOnStep is in seconds. Null if no time data recorded for that step.",
+        ]}
+      />
 
-        <EndpointSection
-          testId="endpoint-get-breakdown"
-          method="GET"
-          path="/api/analytics/breakdown"
-          description="Returns the distribution of selected values for each funnel step (e.g., which states or age ranges visitors chose)."
-          auth={true}
-          responseExample={`[
+      <EndpointSection
+        testId="endpoint-get-breakdown"
+        method="GET"
+        path="/api/analytics/breakdown"
+        description="Returns the distribution of selected values for each funnel step (e.g., which states or age ranges visitors chose)."
+        auth={true}
+        responseExample={`[
   {
     "stepNumber": 1,
     "stepName": "State",
@@ -474,15 +425,15 @@ export default function ApiDocsPage() {
     ]
   }
 ]`}
-        />
+      />
 
-        <EndpointSection
-          testId="endpoint-get-campaigns"
-          method="GET"
-          path="/api/analytics/campaigns"
-          description="Returns campaign-level performance comparison with sessions, events, and completion rates per UTM campaign."
-          auth={true}
-          responseExample={`[
+      <EndpointSection
+        testId="endpoint-get-campaigns"
+        method="GET"
+        path="/api/analytics/campaigns"
+        description="Returns campaign-level performance comparison with sessions, events, and completion rates per UTM campaign."
+        auth={true}
+        responseExample={`[
   {
     "campaign": "spring-2025",
     "sessions": 580,
@@ -490,71 +441,71 @@ export default function ApiDocsPage() {
     "completionRate": 23.1
   }
 ]`}
-        />
+      />
 
-        <EndpointSection
-          testId="endpoint-get-devices"
-          method="GET"
-          path="/api/analytics/devices"
-          description="Returns visitor breakdown by device type (mobile, desktop, tablet)."
-          auth={true}
-          responseExample={`[
+      <EndpointSection
+        testId="endpoint-get-devices"
+        method="GET"
+        path="/api/analytics/devices"
+        description="Returns visitor breakdown by device type (mobile, desktop, tablet)."
+        auth={true}
+        responseExample={`[
   { "deviceType": "mobile", "count": 1150 },
   { "deviceType": "desktop", "count": 620 },
   { "deviceType": "tablet", "count": 150 }
 ]`}
-        />
+      />
 
-        <EndpointSection
-          testId="endpoint-get-heatmap"
-          method="GET"
-          path="/api/analytics/heatmap"
-          description="Returns session counts grouped by day of week and hour of day for activity pattern analysis."
-          auth={true}
-          responseExample={`[
+      <EndpointSection
+        testId="endpoint-get-heatmap"
+        method="GET"
+        path="/api/analytics/heatmap"
+        description="Returns session counts grouped by day of week and hour of day for activity pattern analysis."
+        auth={true}
+        responseExample={`[
   { "day": 0, "hour": 9, "count": 42 },
   { "day": 0, "hour": 10, "count": 58 },
   { "day": 1, "hour": 14, "count": 35 }
 ]`}
-          notes={[
-            "day: 0 = Sunday, 6 = Saturday.",
-            "hour: 0-23 in UTC.",
-          ]}
-        />
+        notes={[
+          "day: 0 = Sunday, 6 = Saturday.",
+          "hour: 0-23 in UTC.",
+        ]}
+      />
 
-        <EndpointSection
-          testId="endpoint-get-contact-funnel"
-          method="GET"
-          path="/api/analytics/contact-funnel"
-          description="Returns a mini-funnel for the contact form steps (Name, Email, Phone) showing conversion through the form submission process."
-          auth={true}
-          responseExample={`[
+      <EndpointSection
+        testId="endpoint-get-contact-funnel"
+        method="GET"
+        path="/api/analytics/contact-funnel"
+        description="Returns a mini-funnel for the contact form steps (Name, Email, Phone) showing conversion through the form submission process."
+        auth={true}
+        responseExample={`[
   { "stepName": "Name", "count": 520 },
   { "stepName": "Email", "count": 445 },
   { "stepName": "Phone", "count": 380 }
 ]`}
-        />
+      />
 
-        <EndpointSection
-          testId="endpoint-get-referrers"
-          method="GET"
-          path="/api/analytics/referrers"
-          description="Returns top referrer URLs ranked by session count."
-          auth={true}
-          responseExample={`[
+      <EndpointSection
+        testId="endpoint-get-referrers"
+        method="GET"
+        path="/api/analytics/referrers"
+        description="Returns top referrer URLs ranked by session count."
+        auth={true}
+        responseExample={`[
   { "referrer": "https://google.com", "count": 850 },
   { "referrer": "https://facebook.com", "count": 320 },
   { "referrer": "(direct)", "count": 280 }
 ]`}
-        />
+      />
 
-        <EndpointSection
-          testId="endpoint-get-filter-options"
-          method="GET"
-          path="/api/analytics/filter-options"
-          description="Returns the available filter values for the dashboard dropdowns, based on existing data."
-          auth={true}
-          responseExample={`{
+      <EndpointSection
+        testId="endpoint-get-filter-options"
+        method="GET"
+        path="/api/analytics/filter-options"
+        description="Returns the available filter values for the dashboard dropdowns, based on existing data."
+        auth={true}
+        responseExample={`{
   "pages": ["seniors", "veterans", "first-responders"],
   "pageTypes": ["lead", "call"],
   "domains": ["blueskylife.net", "blueskylife.io"],
@@ -563,15 +514,15 @@ export default function ApiDocsPage() {
   "utmMediums": ["cpc", "organic", "email"],
   "deviceTypes": ["mobile", "desktop", "tablet"]
 }`}
-        />
+      />
 
-        <EndpointSection
-          testId="endpoint-get-export"
-          method="GET"
-          path="/api/analytics/export"
-          description="Downloads raw event data as a CSV file (up to 10,000 most recent events matching filters)."
-          auth={true}
-          responseExample={`id,session_id,event_type,page,page_type,domain,
+      <EndpointSection
+        testId="endpoint-get-export"
+        method="GET"
+        path="/api/analytics/export"
+        description="Downloads raw event data as a CSV file (up to 10,000 most recent events matching filters)."
+        auth={true}
+        responseExample={`id,session_id,event_type,page,page_type,domain,
 step_number,step_name,selected_value,time_on_step,
 utm_source,utm_campaign,utm_medium,utm_content,
 device_type,referrer,event_timestamp
@@ -579,22 +530,22 @@ device_type,referrer,event_timestamp
 "blueskylife.net",2,"Age","66-70",8,"google",
 "spring-2025","cpc","hero","mobile",
 "https://google.com","2025-02-10T12:00:00Z"`}
-          notes={[
-            "Response Content-Type is text/csv.",
-            "Maximum 10,000 rows returned, ordered by most recent first.",
-          ]}
-        />
+        notes={[
+          "Response Content-Type is text/csv.",
+          "Maximum 10,000 rows returned, ordered by most recent first.",
+        ]}
+      />
 
-        <div className="border-t pt-6">
-          <h2 className="text-lg font-semibold mb-1" data-testid="text-section-errors">Error Handling</h2>
-          <p className="text-sm text-muted-foreground mb-4">Standard error response format.</p>
-        </div>
+      <div className="border-t pt-6">
+        <h2 className="text-lg font-semibold mb-1" data-testid="text-section-errors">Error Handling</h2>
+        <p className="text-sm text-muted-foreground mb-4">Standard error response format.</p>
+      </div>
 
-        <Card className="p-5">
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-sm font-medium mb-2">Event Ingestion Errors</h4>
-              <CodeBlock code={`// 400 Bad Request - Invalid payload
+      <Card className="p-5">
+        <div className="space-y-4">
+          <div>
+            <h4 className="text-sm font-medium mb-2">Event Ingestion Errors</h4>
+            <CodeBlock code={`// 400 Bad Request - Invalid payload
 { "ok": false, "error": "Invalid event data" }
 
 // 403 Forbidden - Origin not allowed
@@ -602,25 +553,25 @@ device_type,referrer,event_timestamp
 
 // 500 Internal Server Error
 { "ok": false, "error": "Failed to process event" }`} />
-            </div>
-            <div>
-              <h4 className="text-sm font-medium mb-2">Analytics Endpoint Errors</h4>
-              <CodeBlock code={`// 401 Unauthorized - Not logged in
+          </div>
+          <div>
+            <h4 className="text-sm font-medium mb-2">Analytics Endpoint Errors</h4>
+            <CodeBlock code={`// 401 Unauthorized - Not logged in
 // (Redirect to login)
 
 // 500 Internal Server Error
 { "message": "Failed to fetch stats" }`} />
-            </div>
           </div>
-        </Card>
-
-        <div className="border-t pt-6">
-          <h2 className="text-lg font-semibold mb-1" data-testid="text-section-integration">Integration Example</h2>
-          <p className="text-sm text-muted-foreground mb-4">Minimal JavaScript snippet for your landing page.</p>
         </div>
+      </Card>
 
-        <Card className="p-5">
-          <CodeBlock language="javascript" code={`// Generate a session ID once per visitor
+      <div className="border-t pt-6">
+        <h2 className="text-lg font-semibold mb-1" data-testid="text-section-integration">Integration Example</h2>
+        <p className="text-sm text-muted-foreground mb-4">Minimal JavaScript snippet for your landing page.</p>
+      </div>
+
+      <Card className="p-5">
+        <CodeBlock language="javascript" code={`// Generate a session ID once per visitor
 const SESSION_ID = crypto.randomUUID();
 
 // Helper to send a tracking event
@@ -667,10 +618,9 @@ function onStepComplete(stepNumber, stepName, selectedValue) {
   });
   stepStart = Date.now(); // reset for next step
 }`} />
-        </Card>
+      </Card>
 
-        <div className="h-12" />
-      </main>
+      <div className="h-12" />
     </div>
   );
 }
