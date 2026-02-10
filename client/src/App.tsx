@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { useAuth } from "@/hooks/use-auth";
 import LandingPage from "@/pages/landing";
 import DashboardPage from "@/pages/dashboard";
+import ApiDocsPage from "@/pages/api-docs";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -19,6 +20,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={user ? DashboardPage : LandingPage} />
+      <Route path="/docs" component={user ? ApiDocsPage : LandingPage} />
       <Route component={NotFound} />
     </Switch>
   );
