@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import {
   CalendarIcon, ChevronLeft, ChevronsLeft, ChevronsRight,
   Filter, X, RefreshCw, Trash2,
   Play, Pause, Download, Ban, Phone, FileText, Clock,
-  MinusCircle, Save,
+  MinusCircle, Save, Columns,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
@@ -93,6 +93,11 @@ interface EventLog {
   fbc: string | null;
   fbp: string | null;
   quizAnswers: Record<string, string> | null;
+  pageUrl: string | null;
+  screenResolution: string | null;
+  viewport: string | null;
+  language: string | null;
+  selectedState: string | null;
 }
 
 interface EventLogResult {
@@ -118,6 +123,16 @@ interface SessionLogEntry {
   deviceType: string | null;
   os: string | null;
   browser: string | null;
+  utmSource: string | null;
+  utmCampaign: string | null;
+  utmMedium: string | null;
+  geoState: string | null;
+  referrer: string | null;
+  pageUrl: string | null;
+  screenResolution: string | null;
+  viewport: string | null;
+  language: string | null;
+  selectedState: string | null;
 }
 
 interface SessionLogResult {
@@ -172,10 +187,10 @@ function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, ex
   return params.toString();
 }
 
-function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logPage: number, search: string): string {
+function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logPage: number, search: string, logLimit: number = 25): string {
   const params = new URLSearchParams();
   params.set("page", logPage.toString());
-  params.set("limit", "50");
+  params.set("limit", logLimit.toString());
   if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
   if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
   if (filters.domain && filters.domain !== ALL_FILTER) params.set("domain", filters.domain);
@@ -609,6 +624,14 @@ function FunnelReport({
   const finalCount = totals.formCompletions > 0 ? totals.formCompletions : (lastStep?.completions || 0);
   const overallConversion = pageLands > 0 ? (finalCount / pageLands) * 100 : 0;
 
+  const stepsWithDropOff = totals.steps.map((step, idx) => {
+    const prevCount = idx === 0 ? pageLands : totals.steps[idx - 1].completions;
+    const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
+    const landCvr = pageLands > 0 ? (step.completions / pageLands) * 100 : 0;
+    const stepCvr = prevCount > 0 ? (step.completions / prevCount) * 100 : 0;
+    return { ...step, dropOff, landCvr, stepCvr, prevCount };
+  });
+
   return (
     <div data-testid="card-funnel-report">
       <h3 className="text-[11px] font-semibold mb-1" data-testid="text-funnel-title">Funnel Summary</h3>
@@ -634,6 +657,69 @@ function FunnelReport({
           </TableBody>
         </Table>
       </div>
+
+      {stepsWithDropOff.length > 0 && (
+        <div className="overflow-x-auto border rounded-md mb-2">
+          <Table>
+            <TableHeader>
+              <TableRow className="h-5">
+                <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Step</TableHead>
+                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Count</TableHead>
+                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Step CVR</TableHead>
+                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Drop-off</TableHead>
+                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Land CVR</TableHead>
+                <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Drop-off Visual</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow className="h-5 bg-muted/20">
+                <TableCell className="font-mono text-[9px] px-1.5 py-0">0. Landing</TableCell>
+                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">{pageLands.toLocaleString()}</TableCell>
+                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
+                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
+                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">100.0%</TableCell>
+                <TableCell className="px-1.5 py-0">
+                  <div className="w-full bg-muted rounded-sm h-2.5">
+                    <div className="h-2.5 rounded-sm bg-primary" style={{ width: "100%" }} />
+                  </div>
+                </TableCell>
+              </TableRow>
+              {stepsWithDropOff.map((step) => {
+                const barWidth = pageLands > 0 ? Math.max(1, (step.completions / pageLands) * 100) : 0;
+                const isHighDropOff = step.dropOff > 50;
+                const isMedDropOff = step.dropOff > 30;
+                return (
+                  <TableRow key={step.stepNumber} className="h-5" data-testid={`row-funnel-step-${step.stepNumber}`}>
+                    <TableCell className="font-mono text-[9px] px-1.5 py-0 whitespace-nowrap">
+                      {step.stepNumber}. {step.stepName}
+                    </TableCell>
+                    <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">
+                      {step.completions.toLocaleString()}
+                    </TableCell>
+                    <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.stepCvr < 50 ? "text-red-500" : step.stepCvr < 70 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
+                      {step.stepCvr.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${isHighDropOff ? "text-red-500 font-bold" : isMedDropOff ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}`}>
+                      {step.dropOff.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right text-muted-foreground">
+                      {step.landCvr.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className="px-1.5 py-0">
+                      <div className="w-full bg-muted rounded-sm h-2.5">
+                        <div
+                          className={`h-2.5 rounded-sm ${isHighDropOff ? "bg-red-500" : isMedDropOff ? "bg-yellow-500" : "bg-primary"}`}
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <div className="border-t pt-2 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
@@ -665,8 +751,8 @@ function FunnelReport({
 }
 
 const DEFAULT_COL_WIDTHS: Record<string, number> = {
-  checkbox: 28,
-  expand: 24,
+  checkbox: 20,
+  expand: 20,
   lastActivity: 140,
   sessionId: 110,
   events: 50,
@@ -678,7 +764,105 @@ const DEFAULT_COL_WIDTHS: Record<string, number> = {
   device: 70,
   os: 70,
   browser: 70,
+  utmSource: 90,
+  utmCampaign: 120,
+  utmMedium: 90,
+  geoState: 90,
+  referrer: 160,
+  pageUrl: 160,
+  screenRes: 90,
+  viewport: 90,
+  language: 90,
+  selectedState: 120,
 };
+
+const COL_VISIBILITY_KEY = "trackingjunction_col_visibility";
+
+function loadColVisibility(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(COL_VISIBILITY_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  const defaults: Record<string, boolean> = {};
+  for (const col of SESSION_COLUMNS) {
+    if (col.key === "checkbox" || col.key === "expand") continue;
+    defaults[col.key] = col.optional ? (col.defaultVisible ?? true) : true;
+  }
+  return defaults;
+}
+
+function saveColVisibility(vis: Record<string, boolean>) {
+  try {
+    localStorage.setItem(COL_VISIBILITY_KEY, JSON.stringify(vis));
+  } catch {}
+}
+
+function getCellRenderer(key: string, session: SessionLogEntry, colWidths: Record<string, number>): ReactNode {
+  const w = colWidths[key] || 80;
+  const style = { width: `${w}px` };
+  const cls = "text-[10px] px-1 py-0 overflow-hidden text-ellipsis";
+
+  switch (key) {
+    case "lastActivity": {
+      const ts = new Date(session.lastEventAt);
+      return <td key={key} className={`${cls} font-mono whitespace-nowrap`} style={style}>{format(ts, "MMM d h:mm:ss a")}</td>;
+    }
+    case "sessionId":
+      return <td key={key} className={`${cls} font-mono truncate`} style={style} title={session.sessionId}>{session.sessionId.substring(0, 10)}...</td>;
+    case "events":
+      return <td key={key} className={`${cls} font-mono text-center`} style={style}><Badge variant="outline" className="text-[9px] py-0">{session.eventCount}</Badge></td>;
+    case "furthestStep":
+      return <td key={key} className={`${cls} font-mono`} style={style}>{session.maxStep}. {session.maxStepName}</td>;
+    case "status": {
+      const statusBadge = session.maxEventType === "form_complete"
+        ? <Badge variant="secondary" className="text-[9px] py-0 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30">Complete</Badge>
+        : session.maxStep === 0
+        ? <Badge variant="secondary" className="text-[9px] py-0 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30">Landed</Badge>
+        : <Badge variant="secondary" className="text-[9px] py-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">Step {session.maxStep}</Badge>;
+      return <td key={key} className="px-1 py-0 overflow-hidden" style={style}>{statusBadge}</td>;
+    }
+    case "calls": {
+      const hasPhone = session.events.some(e => e.eventType === "form_complete" && e.phone);
+      return (
+        <td key={key} className="px-1 py-0 overflow-hidden text-center" style={style} data-testid={`cell-calls-${session.sessionId}`}>
+          {hasPhone ? <Phone className="w-3 h-3 text-green-600 dark:text-green-400 inline-block" /> : <span className="text-[9px] text-muted-foreground">{"\u2014"}</span>}
+        </td>
+      );
+    }
+    case "audience":
+      return <td key={key} className={cls} style={style}>{session.page}</td>;
+    case "domain":
+      return <td key={key} className={cls} style={style}>{session.domain}</td>;
+    case "device":
+      return <td key={key} className={cls} style={style}>{session.deviceType || "\u2014"}</td>;
+    case "os":
+      return <td key={key} className={cls} style={style}>{session.os || "\u2014"}</td>;
+    case "browser":
+      return <td key={key} className={cls} style={style}>{session.browser || "\u2014"}</td>;
+    case "utmSource":
+      return <td key={key} className={cls} style={style}>{session.utmSource || "\u2014"}</td>;
+    case "utmCampaign":
+      return <td key={key} className={cls} style={style}>{session.utmCampaign || "\u2014"}</td>;
+    case "utmMedium":
+      return <td key={key} className={cls} style={style}>{session.utmMedium || "\u2014"}</td>;
+    case "geoState":
+      return <td key={key} className={cls} style={style}>{session.geoState || "\u2014"}</td>;
+    case "referrer":
+      return <td key={key} className={`${cls} truncate`} style={style} title={session.referrer || ""}>{session.referrer || "\u2014"}</td>;
+    case "pageUrl":
+      return <td key={key} className={`${cls} truncate`} style={style} title={session.pageUrl || ""}>{session.pageUrl || "\u2014"}</td>;
+    case "screenRes":
+      return <td key={key} className={cls} style={style}>{session.screenResolution || "\u2014"}</td>;
+    case "viewport":
+      return <td key={key} className={cls} style={style}>{session.viewport || "\u2014"}</td>;
+    case "language":
+      return <td key={key} className={cls} style={style}>{session.language || "\u2014"}</td>;
+    case "selectedState":
+      return <td key={key} className={cls} style={style}>{session.selectedState || "\u2014"}</td>;
+    default:
+      return <td key={key} className={cls} style={style}>{"\u2014"}</td>;
+  }
+}
 
 const STORAGE_KEY = "trackingjunction_view_state";
 
@@ -706,7 +890,15 @@ function saveViewState(state: SavedViewState) {
   } catch {}
 }
 
-const SESSION_COLUMNS = [
+interface SessionColumn {
+  key: string;
+  label: string;
+  resizable: boolean;
+  optional?: boolean;
+  defaultVisible?: boolean;
+}
+
+const SESSION_COLUMNS: SessionColumn[] = [
   { key: "checkbox", label: "", resizable: false },
   { key: "expand", label: "", resizable: false },
   { key: "lastActivity", label: "Last Activity", resizable: true },
@@ -720,6 +912,16 @@ const SESSION_COLUMNS = [
   { key: "device", label: "Device", resizable: true },
   { key: "os", label: "OS", resizable: true },
   { key: "browser", label: "Browser", resizable: true },
+  { key: "utmSource", label: "UTM Source", resizable: true, optional: true, defaultVisible: false },
+  { key: "utmCampaign", label: "UTM Campaign", resizable: true, optional: true, defaultVisible: false },
+  { key: "utmMedium", label: "UTM Medium", resizable: true, optional: true, defaultVisible: false },
+  { key: "geoState", label: "Geo State", resizable: true, optional: true, defaultVisible: false },
+  { key: "referrer", label: "Referrer", resizable: true, optional: true, defaultVisible: false },
+  { key: "pageUrl", label: "Page URL", resizable: true, optional: true, defaultVisible: false },
+  { key: "screenRes", label: "Screen", resizable: true, optional: true, defaultVisible: false },
+  { key: "viewport", label: "Viewport", resizable: true, optional: true, defaultVisible: false },
+  { key: "language", label: "Language", resizable: true, optional: true, defaultVisible: false },
+  { key: "selectedState", label: "Selected State", resizable: true, optional: true, defaultVisible: false },
 ];
 
 function ResizableHeader({
@@ -792,11 +994,14 @@ function EventLogsSection({
   onToggleExpanded: () => void;
 }) {
   const [logPage, setLogPage] = useState(1);
+  const [logLimit, setLogLimit] = useState(25);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const [colWidths, setColWidths] = useState<Record<string, number>>({ ...DEFAULT_COL_WIDTHS });
+  const [colVisibility, setColVisibility] = useState<Record<string, boolean>>(loadColVisibility);
+  const [colSelectorOpen, setColSelectorOpen] = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [deletingSession, setDeletingSession] = useState<string | null>(null);
@@ -817,7 +1022,7 @@ function EventLogsSection({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const logsQueryStr = buildLogsQuery(dateRange, filters, logPage, debouncedSearch);
+  const logsQueryStr = buildLogsQuery(dateRange, filters, logPage, debouncedSearch, logLimit);
   const sessionsQuery = useQuery<SessionLogResult>({
     queryKey: ["/api/analytics/sessions", logsQueryStr],
     queryFn: async () => {
@@ -873,6 +1078,21 @@ function EventLogsSection({
     });
   };
 
+  const toggleColVisibility = useCallback((key: string) => {
+    setColVisibility(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      saveColVisibility(next);
+      return next;
+    });
+  }, []);
+
+  const visibleColumns = SESSION_COLUMNS.filter(col => {
+    if (col.key === "checkbox" || col.key === "expand") return true;
+    return colVisibility[col.key] !== false;
+  });
+
+  const visibleColumnKeys = visibleColumns.map(c => c.key);
+
   const handleResizeCol = useCallback((key: string, width: number) => {
     setColWidths(prev => ({ ...prev, [key]: width }));
   }, []);
@@ -917,22 +1137,50 @@ function EventLogsSection({
     }
   };
 
-  const totalCols = SESSION_COLUMNS.length;
+  const totalCols = visibleColumns.length;
 
   return (
     <div className="border-t pt-2" data-testid="card-event-logs">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <button
-          onClick={onToggleExpanded}
-          className="flex items-center gap-1.5 text-left"
-          data-testid="button-toggle-logs"
-        >
-          {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          <h3 className="text-[11px] font-semibold">Session Logs</h3>
-          {sessionsQuery.data && (
-            <Badge variant="secondary" className="text-[9px] py-0 ml-1">{sessionsQuery.data.total.toLocaleString()} sessions</Badge>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onToggleExpanded}
+            className="flex items-center gap-1.5 text-left"
+            data-testid="button-toggle-logs"
+          >
+            {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            <h3 className="text-[11px] font-semibold">Session Logs</h3>
+            {sessionsQuery.data && (
+              <Badge variant="secondary" className="text-[9px] py-0 ml-1">{sessionsQuery.data.total.toLocaleString()} sessions</Badge>
+            )}
+          </button>
+          {expanded && (
+            <Popover open={colSelectorOpen} onOpenChange={setColSelectorOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid="button-column-selector">
+                  <Columns className="w-3.5 h-3.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[180px] p-1.5" align="start" data-testid="popover-column-selector">
+                <p className="text-[10px] font-semibold text-muted-foreground px-1 mb-1">Toggle Columns</p>
+                {SESSION_COLUMNS.filter(c => c.optional).map(col => (
+                  <label
+                    key={col.key}
+                    className="flex items-center gap-1.5 px-1 py-0.5 rounded-md hover-elevate cursor-pointer"
+                    data-testid={`toggle-col-${col.key}`}
+                  >
+                    <Checkbox
+                      checked={colVisibility[col.key] ?? col.defaultVisible ?? true}
+                      onCheckedChange={() => toggleColVisibility(col.key)}
+                      className="h-3 w-3"
+                    />
+                    <span className="text-[10px]">{col.label}</span>
+                  </label>
+                ))}
+              </PopoverContent>
+            </Popover>
           )}
-        </button>
+        </div>
         {expanded && someSelected && (
           confirmBulkDelete ? (
             <div className="flex items-center gap-1.5">
@@ -976,33 +1224,30 @@ function EventLogsSection({
           ) : sessionsQuery.data && sessionsQuery.data.sessions.length > 0 ? (
             <>
               <div className="overflow-x-auto border rounded-md">
-                <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%", minWidth: `${Object.values(colWidths).reduce((a, b) => a + b, 0)}px` }}>
+                <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%", minWidth: `${visibleColumns.reduce((a, c) => a + (colWidths[c.key] || 80), 0)}px` }}>
                   <thead>
                     <tr className="h-6 border-b bg-muted/50">
                       <th
-                        className="px-0.5 py-0 whitespace-nowrap"
-                        style={{ width: "80px", minWidth: "80px" }}
+                        className="px-0.5 py-0"
+                        style={{ width: "20px", minWidth: "20px" }}
                       >
-                        <div className="flex items-center gap-1">
-                          <Checkbox
+                        <Checkbox
                             checked={allSelected}
                             onCheckedChange={toggleSelectAll}
                             className="h-3 w-3"
                             data-testid="checkbox-select-all"
                           />
-                          <span className="text-[9px] text-muted-foreground font-medium">Select All</span>
-                        </div>
                       </th>
                       <th
                         className="px-0.5 py-0"
                         style={{ width: `${colWidths.expand}px`, minWidth: `${colWidths.expand}px` }}
                       />
-                      {SESSION_COLUMNS.slice(2).map(col => (
+                      {visibleColumns.filter(c => c.key !== "checkbox" && c.key !== "expand").map(col => (
                         <ResizableHeader
                           key={col.key}
                           colKey={col.key}
                           label={col.label}
-                          width={colWidths[col.key]}
+                          width={colWidths[col.key] || 80}
                           resizable={col.resizable}
                           onResize={handleResizeCol}
                         />
@@ -1022,6 +1267,7 @@ function EventLogsSection({
                         isDeletingSession={deletingSession === session.sessionId}
                         colWidths={colWidths}
                         totalCols={totalCols}
+                        visibleColumnKeys={visibleColumnKeys}
                       />
                     ))}
                   </tbody>
@@ -1029,9 +1275,23 @@ function EventLogsSection({
               </div>
 
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="text-[10px] text-muted-foreground">
-                  {((sessionsQuery.data.page - 1) * sessionsQuery.data.limit) + 1}-{Math.min(sessionsQuery.data.page * sessionsQuery.data.limit, sessionsQuery.data.total)} of {sessionsQuery.data.total.toLocaleString()} sessions
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] text-muted-foreground">
+                    {((sessionsQuery.data.page - 1) * sessionsQuery.data.limit) + 1}-{Math.min(sessionsQuery.data.page * sessionsQuery.data.limit, sessionsQuery.data.total)} of {sessionsQuery.data.total.toLocaleString()} sessions
+                  </p>
+                  <Select value={logLimit.toString()} onValueChange={(v) => { setLogLimit(parseInt(v)); setLogPage(1); }}>
+                    <SelectTrigger className="h-6 w-[70px] text-[10px]" data-testid="select-page-size">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                      <SelectItem value="200">200</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-[9px] text-muted-foreground">per page</span>
+                </div>
                 <div className="flex items-center gap-0.5">
                   <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(1)} disabled={sessionsQuery.data.page <= 1} data-testid="button-log-first">
                     <ChevronsLeft className="w-3 h-3" />
@@ -1072,6 +1332,7 @@ function SessionLogRow({
   isDeletingSession,
   colWidths,
   totalCols,
+  visibleColumnKeys,
 }: {
   session: SessionLogEntry;
   isExpanded: boolean;
@@ -1082,18 +1343,9 @@ function SessionLogRow({
   isDeletingSession: boolean;
   colWidths: Record<string, number>;
   totalCols: number;
+  visibleColumnKeys: string[];
 }) {
-  const ts = new Date(session.lastEventAt);
-  const formattedDate = format(ts, "MMM d h:mm:ss a");
-
-  const statusBadge = session.maxEventType === "form_complete"
-    ? <Badge variant="secondary" className="text-[9px] py-0 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30">Complete</Badge>
-    : session.maxStep === 0
-    ? <Badge variant="secondary" className="text-[9px] py-0 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30">Landed</Badge>
-    : <Badge variant="secondary" className="text-[9px] py-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">Step {session.maxStep}</Badge>;
-
-  const formCompleteEvent = session.events.find(e => e.eventType === "form_complete" && e.phone);
-  const hasPhone = !!formCompleteEvent;
+  const dataCols = visibleColumnKeys.filter(k => k !== "checkbox" && k !== "expand");
 
   return (
     <>
@@ -1102,7 +1354,7 @@ function SessionLogRow({
         onClick={onToggle}
         data-testid={`row-session-${session.sessionId}`}
       >
-        <td className="px-0.5 py-0" style={{ width: "80px" }} onClick={(e) => e.stopPropagation()}>
+        <td className="px-0.5 py-0" style={{ width: "20px" }} onClick={(e) => e.stopPropagation()}>
           <Checkbox
             checked={isSelected}
             onCheckedChange={onSelect}
@@ -1113,27 +1365,7 @@ function SessionLogRow({
         <td className="px-0.5 py-0" style={{ width: `${colWidths.expand}px` }}>
           {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         </td>
-        <td className="text-[10px] font-mono whitespace-nowrap px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.lastActivity}px` }}>{formattedDate}</td>
-        <td className="text-[10px] font-mono truncate px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.sessionId}px` }} title={session.sessionId}>
-          {session.sessionId.substring(0, 10)}...
-        </td>
-        <td className="text-[10px] font-mono px-1 py-0 text-center overflow-hidden" style={{ width: `${colWidths.events}px` }}>
-          <Badge variant="outline" className="text-[9px] py-0">{session.eventCount}</Badge>
-        </td>
-        <td className="text-[10px] font-mono px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.furthestStep}px` }}>{session.maxStep}. {session.maxStepName}</td>
-        <td className="px-1 py-0 overflow-hidden" style={{ width: `${colWidths.status}px` }}>{statusBadge}</td>
-        <td className="px-1 py-0 overflow-hidden text-center" style={{ width: `${colWidths.calls}px` }} data-testid={`cell-calls-${session.sessionId}`}>
-          {hasPhone ? (
-            <Phone className="w-3 h-3 text-green-600 dark:text-green-400 inline-block" />
-          ) : (
-            <span className="text-[9px] text-muted-foreground">{"\u2014"}</span>
-          )}
-        </td>
-        <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.audience}px` }}>{session.page}</td>
-        <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.domain}px` }}>{session.domain}</td>
-        <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.device}px` }}>{session.deviceType || "\u2014"}</td>
-        <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.os}px` }}>{session.os || "\u2014"}</td>
-        <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.browser}px` }}>{session.browser || "\u2014"}</td>
+        {dataCols.map(key => getCellRenderer(key, session, colWidths))}
       </tr>
       {isExpanded && (
         <tr data-testid={`row-session-detail-${session.sessionId}`}>
@@ -1163,6 +1395,11 @@ function SessionLogRow({
                     <DetailField label="Ad Name" value={session.events[0].adName || "\u2014"} />
                     <DetailField label="Adset Name" value={session.events[0].adsetName || "\u2014"} />
                     <DetailField label="Placement" value={session.events[0].placement || "\u2014"} />
+                    <DetailField label="Page URL" value={session.events[0].pageUrl || "\u2014"} />
+                    <DetailField label="Screen Resolution" value={session.events[0].screenResolution || "\u2014"} />
+                    <DetailField label="Viewport" value={session.events[0].viewport || "\u2014"} />
+                    <DetailField label="Language" value={session.events[0].language || "\u2014"} />
+                    <DetailField label="Selected State" value={session.events[0].selectedState || "\u2014"} />
                   </>
                 )}
               </div>

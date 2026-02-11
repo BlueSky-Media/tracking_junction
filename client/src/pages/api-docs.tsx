@@ -198,22 +198,29 @@ export default function ApiDocsPage() {
         requestBody={`{
   "session_id": "a50e8400-e29b-41d4-a716-446655440001",
   "event_id": "evt_1770771632583_3veonwsk5qt",
+  "event_type": "step_complete",
   "page": "seniors",
   "page_type": "lead",
   "domain": "blueskylife.net",
   "step_number": 3,
   "step_name": "Budget",
   "selected_value": "$50-$100/month",
-  "event_type": "step_complete",
   "time_on_step": 8,
   "device_type": "mobile",
   "os": "iOS",
   "browser": "Facebook",
   "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5...)",
   "referrer": "https://facebook.com",
+  "page_url": "https://blueskylife.net/seniors?utm_source=fb",
+  "screen_resolution": "390x844",
+  "viewport": "390x664",
+  "language": "en-US",
   "ip_address": "2600:387:15:401b::4",
-  "external_id": "extid_1770771927490_9kur...",
   "geo_state": "FL",
+  "selected_state": "FL",
+  "external_id": "extid_1770771927490_9kur...",
+  "fbc": "fb.1.1770771633796.IwZXh0bg...",
+  "fbp": "fb.1.1770771632669.73516071...",
   "utm_source": "fb",
   "utm_medium": "paid",
   "utm_campaign": "120240154423180716",
@@ -229,8 +236,6 @@ export default function ApiDocsPage() {
   "adset_name": "Test 2",
   "adset_id": "120240223154240716",
   "fbclid": "IwZXh0bgNhZW0BMABhZGlk...",
-  "fbc": "fb.1.1770771633796.IwZXh0bg...",
-  "fbp": "fb.1.1770771632669.73516071...",
   "quiz_answers": {
     "beneficiary": "Spouse",
     "state": "Florida",
@@ -250,83 +255,114 @@ export default function ApiDocsPage() {
           'quiz_answers: JSON object that accumulates quiz answers as user progresses. Lead keys: beneficiary, state, budget, age, income. Call keys: state, age, income, budget, purpose.',
           'PII fields (first_name, last_name, email, phone) are only stored when event_type is "form_complete". They are silently ignored for other event types.',
           'Facebook ad fields (campaign_name, campaign_id, ad_name, ad_id, adset_name, adset_id, media_type, fbclid, fbc, fbp) come from URL params or cookies -- absent for organic traffic.',
-          'All fields except page, page_type, domain, step_number, step_name, and session_id are optional.',
+          'Required fields: session_id, event_id, event_type, page, page_type, domain, step_number, step_name. All other fields are optional.',
         ]}
       />
 
       <div className="border-t pt-6">
         <h2 className="text-lg font-semibold mb-1" data-testid="text-section-event-schema">Event Schema Reference</h2>
-        <p className="text-sm text-muted-foreground mb-4">Complete field reference for the event payload.</p>
+        <p className="text-sm text-muted-foreground mb-4">Complete field reference for the <code className="text-xs font-mono">POST /api/events</code> payload, organized by group.</p>
       </div>
 
       <Card className="p-5">
         <div className="border rounded-md overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full" style={{ fontSize: "11px" }}>
             <thead>
               <tr className="bg-muted/50">
-                <th className="text-left px-3 py-2 font-medium">Field</th>
-                <th className="text-left px-3 py-2 font-medium">Type</th>
-                <th className="text-left px-3 py-2 font-medium">Required</th>
-                <th className="text-left px-3 py-2 font-medium">Description</th>
+                <th className="text-left px-2 py-1.5 font-medium">Field</th>
+                <th className="text-left px-2 py-1.5 font-medium">Type</th>
+                <th className="text-left px-2 py-1.5 font-medium">Req</th>
+                <th className="text-left px-2 py-1.5 font-medium">When Sent</th>
+                <th className="text-left px-2 py-1.5 font-medium">Description</th>
               </tr>
             </thead>
             <tbody>
               {[
-                { field: "page", type: "string", required: "Yes", desc: 'Audience: "seniors", "veterans", or "first-responders"' },
-                { field: "page_type", type: "string", required: "Yes", desc: '"lead" or "call"' },
-                { field: "domain", type: "string", required: "Yes", desc: '"blueskylife.net" or "blueskylife.io"' },
-                { field: "step_number", type: "integer", required: "Yes", desc: "Step index (0 = Landing, 1-8 for lead, 1-6 for call)" },
-                { field: "step_name", type: "string", required: "Yes", desc: 'Step label (e.g., "Landing", "State", "Age", "Phone")' },
-                { field: "selected_value", type: "string", required: "No", desc: "Visitor's choice at this step" },
-                { field: "session_id", type: "string (UUID)", required: "Yes", desc: "UUID v4 generated client-side per visitor session" },
-                { field: "event_type", type: "string", required: "No", desc: '"page_land", "step_complete", or "form_complete". Defaults to "step_complete"' },
-                { field: "time_on_step", type: "integer", required: "No", desc: "Seconds spent on step (0-3600)" },
-                { field: "timestamp", type: "string (ISO)", required: "No", desc: "Event timestamp. Defaults to server receive time" },
-                { field: "user_agent", type: "string", required: "No", desc: "Browser user agent. Auto-detected if omitted" },
-                { field: "utm_source", type: "string", required: "No", desc: "UTM source parameter" },
-                { field: "utm_campaign", type: "string", required: "No", desc: "UTM campaign parameter" },
-                { field: "utm_medium", type: "string", required: "No", desc: "UTM medium parameter" },
-                { field: "utm_content", type: "string", required: "No", desc: "UTM content parameter" },
-                { field: "device_type", type: "string", required: "No", desc: '"mobile", "desktop", or "tablet"' },
-                { field: "os", type: "string", required: "No", desc: '"Windows", "macOS", "iOS", "Android", "Linux", "ChromeOS", or "Unknown"' },
-                { field: "browser", type: "string", required: "No", desc: '"Chrome", "Safari", "Firefox", "Edge", "Opera", "Facebook", "Instagram", or "Unknown"' },
-                { field: "placement", type: "string", required: "No", desc: "Facebook ad placement (e.g., \"Facebook_Mobile_Feed\")" },
-                { field: "geo_state", type: "string", required: "No", desc: "2-letter US state code from geo-IP (e.g., \"FL\", \"CA\")" },
-                { field: "ip_address", type: "string", required: "No", desc: "Visitor IP address (IPv4 or IPv6)" },
-                { field: "referrer", type: "string", required: "No", desc: "Full referrer URL" },
-                { field: "event_id", type: "string", required: "No", desc: "Unique ID per event (e.g., \"evt_1770771632583_3veon...\")" },
-                { field: "external_id", type: "string", required: "No", desc: "External ID per session (raw, not hashed)" },
-                { field: "utm_term", type: "string", required: "No", desc: "UTM term parameter (maps to adset_id)" },
-                { field: "utm_id", type: "string", required: "No", desc: "UTM ID parameter (maps to campaign_id)" },
-                { field: "media_type", type: "string", required: "No", desc: "Media type (e.g., \"facebook\")" },
-                { field: "campaign_name", type: "string", required: "No", desc: "Facebook campaign name (e.g., \"Leads - ABO 1\")" },
-                { field: "campaign_id", type: "string", required: "No", desc: "Facebook campaign ID" },
-                { field: "ad_name", type: "string", required: "No", desc: "Facebook ad name (e.g., \"VFE080\")" },
-                { field: "ad_id", type: "string", required: "No", desc: "Facebook ad ID" },
-                { field: "adset_name", type: "string", required: "No", desc: "Facebook adset name (e.g., \"Test 2\")" },
-                { field: "adset_id", type: "string", required: "No", desc: "Facebook adset ID" },
-                { field: "fbclid", type: "string", required: "No", desc: "Facebook click ID from URL" },
-                { field: "fbc", type: "string", required: "No", desc: "Facebook _fbc cookie value" },
-                { field: "fbp", type: "string", required: "No", desc: "Facebook _fbp cookie value" },
-                { field: "quiz_answers", type: "object", required: "No", desc: "JSON object of quiz answers so far (e.g., {\"state\": \"Florida\", \"age\": \"66-70\"})" },
-                { field: "first_name", type: "string", required: "No", desc: "Lead first name (form_complete only)" },
-                { field: "last_name", type: "string", required: "No", desc: "Lead last name (form_complete only)" },
-                { field: "email", type: "string", required: "No", desc: "Lead email address (form_complete only)" },
-                { field: "phone", type: "string", required: "No", desc: "Lead phone number (form_complete only)" },
-              ].map((row) => (
-                <tr key={row.field} className="border-t">
-                  <td className="px-3 py-2 font-mono text-xs">{row.field}</td>
-                  <td className="px-3 py-2 text-muted-foreground text-xs">{row.type}</td>
-                  <td className="px-3 py-2 text-xs">
-                    {row.required === "Yes" ? (
-                      <Badge variant="default" className="text-xs">Required</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">Optional</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-xs">{row.desc}</td>
-                </tr>
-              ))}
+                { group: "Required Fields" },
+                { field: "session_id", type: "string", req: true, when: "Every event", desc: "UUID grouping all events from one visitor journey" },
+                { field: "event_id", type: "string", req: true, when: "Every event", desc: 'Unique ID per event, format: evt_{timestamp}_{random}' },
+                { field: "event_type", type: "string", req: true, when: "Every event", desc: 'One of: "page_land", "step_complete", "form_complete"' },
+                { field: "page", type: "string", req: true, when: "Every event", desc: 'Audience: "seniors", "veterans", or "first-responders"' },
+                { field: "page_type", type: "string", req: true, when: "Every event", desc: 'Funnel type: "lead" or "call"' },
+                { field: "domain", type: "string", req: true, when: "Every event", desc: '"blueskylife.net" or "blueskylife.io"' },
+                { field: "step_number", type: "integer", req: true, when: "Every event", desc: "0=Landing, 1-5=Quiz, 6=Name, 7=Email, 8=Phone" },
+                { field: "step_name", type: "string", req: true, when: "Every event", desc: 'Human-readable step name (e.g., "Landing", "State", "Phone")' },
+                { group: "Optional Core Fields" },
+                { field: "selected_value", type: "string", req: false, when: "When present", desc: "User's answer for this step" },
+                { field: "time_on_step", type: "integer", req: false, when: "When present", desc: "Seconds on previous step (0 for page_land)" },
+                { group: "Device & Visitor Fields" },
+                { field: "device_type", type: "string", req: false, when: "Every event", desc: '"mobile", "desktop", or "tablet"' },
+                { field: "os", type: "string", req: false, when: "Every event", desc: '"macOS", "Windows", "iOS", "Android", "Linux", "ChromeOS", "Unknown"' },
+                { field: "browser", type: "string", req: false, when: "Every event", desc: '"Chrome", "Safari", "Firefox", "Edge", "Opera", "Facebook", "Instagram", "Unknown"' },
+                { field: "user_agent", type: "string", req: false, when: "Every event", desc: "Full browser user agent string" },
+                { field: "referrer", type: "string", req: false, when: "When present", desc: "Referring URL" },
+                { field: "page_url", type: "string", req: false, when: "Every event", desc: "Full page URL with path and query params" },
+                { field: "screen_resolution", type: "string", req: false, when: "Every event", desc: 'Device screen size (e.g., "1920x1080")' },
+                { field: "viewport", type: "string", req: false, when: "Every event", desc: 'Browser viewport size (e.g., "412x915")' },
+                { field: "language", type: "string", req: false, when: "Every event", desc: 'Browser language (e.g., "en-US")' },
+                { field: "ip_address", type: "string", req: false, when: "Every event", desc: "Visitor's IP address" },
+                { field: "geo_state", type: "string", req: false, when: "When present", desc: 'Auto-detected US state code from IP (e.g., "FL")' },
+                { field: "selected_state", type: "string", req: false, when: "When present", desc: "State user manually selected in quiz" },
+                { group: "Identity / Tracking Fields" },
+                { field: "external_id", type: "string", req: false, when: "When present", desc: "Raw external ID for Meta matching" },
+                { field: "fbc", type: "string", req: false, when: "When present", desc: "Facebook click ID cookie (_fbc)" },
+                { field: "fbp", type: "string", req: false, when: "When present", desc: "Facebook browser ID cookie (_fbp)" },
+                { group: "UTM Fields" },
+                { field: "utm_source", type: "string", req: false, when: "When present", desc: "UTM source parameter" },
+                { field: "utm_medium", type: "string", req: false, when: "When present", desc: "UTM medium parameter" },
+                { field: "utm_campaign", type: "string", req: false, when: "When present", desc: "UTM campaign parameter" },
+                { field: "utm_content", type: "string", req: false, when: "When present", desc: "UTM content parameter" },
+                { field: "utm_term", type: "string", req: false, when: "When present", desc: "UTM term parameter" },
+                { field: "utm_id", type: "string", req: false, when: "When present", desc: "UTM ID parameter" },
+                { group: "Ad Attribution Fields" },
+                { field: "placement", type: "string", req: false, when: "When present", desc: 'Ad placement (e.g., "Facebook_Mobile_Feed")' },
+                { field: "media_type", type: "string", req: false, when: "When present", desc: 'Media type (e.g., "facebook")' },
+                { field: "campaign_name", type: "string", req: false, when: "When present", desc: 'Campaign name (e.g., "Leads - ABO 1")' },
+                { field: "campaign_id", type: "string", req: false, when: "When present", desc: "Campaign ID" },
+                { field: "ad_name", type: "string", req: false, when: "When present", desc: 'Ad name (e.g., "VFE080")' },
+                { field: "ad_id", type: "string", req: false, when: "When present", desc: "Ad ID" },
+                { field: "adset_name", type: "string", req: false, when: "When present", desc: 'Adset name (e.g., "Test 2")' },
+                { field: "adset_id", type: "string", req: false, when: "When present", desc: "Adset ID" },
+                { field: "fbclid", type: "string", req: false, when: "When present", desc: "Facebook click ID from URL" },
+                { group: "Quiz & PII Fields" },
+                { field: "quiz_answers", type: "object", req: false, when: "When present", desc: 'Accumulated key-value pairs of quiz answers (e.g., {"state":"Florida","age":"66-70"})' },
+                { field: "first_name", type: "string", req: false, when: "form_complete only", desc: "Lead first name" },
+                { field: "last_name", type: "string", req: false, when: "form_complete only", desc: "Lead last name" },
+                { field: "email", type: "string", req: false, when: "form_complete only", desc: "Lead email address" },
+                { field: "phone", type: "string", req: false, when: "form_complete only", desc: "Lead phone number" },
+              ].map((row, i) => {
+                if ("group" in row && !("field" in row)) {
+                  return (
+                    <tr key={`group-${i}`} className="border-t bg-muted/30">
+                      <td colSpan={5} className="px-2 py-1.5 font-semibold text-xs uppercase tracking-wider text-muted-foreground">{row.group}</td>
+                    </tr>
+                  );
+                }
+                const r = row as { field: string; type: string; req: boolean; when: string; desc: string };
+                return (
+                  <tr key={r.field} className="border-t">
+                    <td className="px-2 py-1 font-mono" style={{ fontSize: "10px" }}>{r.field}</td>
+                    <td className="px-2 py-1 text-muted-foreground" style={{ fontSize: "10px" }}>{r.type}</td>
+                    <td className="px-2 py-1" style={{ fontSize: "10px" }}>
+                      {r.req ? (
+                        <Badge variant="default" className="text-[10px] px-1.5 py-0">Yes</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">No</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1" style={{ fontSize: "10px" }}>
+                      {r.when === "form_complete only" ? (
+                        <span className="text-amber-600 dark:text-amber-400">{r.when}</span>
+                      ) : r.when === "When present" ? (
+                        <span className="text-muted-foreground">{r.when}</span>
+                      ) : (
+                        <span>{r.when}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1" style={{ fontSize: "10px" }}>{r.desc}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -709,6 +745,10 @@ async function trackEvent(data) {
       browser: detectBrowser(),
       user_agent: navigator.userAgent,
       referrer: document.referrer || undefined,
+      page_url: location.href,
+      screen_resolution: screen.width + "x" + screen.height,
+      viewport: window.innerWidth + "x" + window.innerHeight,
+      language: navigator.language || "Unknown",
       quiz_answers: { ...quizAnswers },
     }),
   });

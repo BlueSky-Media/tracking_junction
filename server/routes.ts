@@ -136,6 +136,11 @@ export async function registerRoutes(
         fbc: data.fbc || null,
         fbp: data.fbp || null,
         quizAnswers: data.quiz_answers || null,
+        pageUrl: data.page_url || null,
+        screenResolution: data.screen_resolution || null,
+        viewport: data.viewport || null,
+        language: data.language || null,
+        selectedState: data.selected_state || null,
       });
 
       const successResponse = { ok: true };
@@ -311,7 +316,7 @@ export async function registerRoutes(
   app.get("/api/analytics/sessions", isAuthenticated, async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 25));
       const search = req.query.search as string | undefined;
       const filters = parseFilters(req.query);
       filters.page = req.query.audience as string | undefined;

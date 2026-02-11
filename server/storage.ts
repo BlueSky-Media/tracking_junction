@@ -167,6 +167,16 @@ export interface IStorage {
       deviceType: string | null;
       os: string | null;
       browser: string | null;
+      utmSource: string | null;
+      utmCampaign: string | null;
+      utmMedium: string | null;
+      geoState: string | null;
+      referrer: string | null;
+      pageUrl: string | null;
+      screenResolution: string | null;
+      viewport: string | null;
+      language: string | null;
+      selectedState: string | null;
     }[];
     total: number;
     page: number;
@@ -984,6 +994,16 @@ class DatabaseStorage implements IStorage {
         deviceType: firstEvent.deviceType,
         os: firstEvent.os,
         browser: firstEvent.browser,
+        utmSource: firstEvent.utmSource,
+        utmCampaign: firstEvent.utmCampaign,
+        utmMedium: firstEvent.utmMedium,
+        geoState: firstEvent.geoState,
+        referrer: firstEvent.referrer,
+        pageUrl: firstEvent.pageUrl,
+        screenResolution: firstEvent.screenResolution,
+        viewport: firstEvent.viewport,
+        language: firstEvent.language,
+        selectedState: firstEvent.selectedState,
       };
     });
 

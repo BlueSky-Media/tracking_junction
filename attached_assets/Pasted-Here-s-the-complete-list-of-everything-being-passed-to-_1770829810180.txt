@@ -1,0 +1,141 @@
+Here's the complete list of everything being passed to TrackingJunction, along with a prompt you can send to the other AI:
+
+Complete TrackingJunction Event Payload:
+
+Field	Description	When Sent
+session_id	UUID grouping all events from one visitor journey	Every event
+event_id	Unique ID per event (for Meta deduplication)	Every event
+event_type	page_land, step_complete, or form_complete	Every event
+page	Audience: seniors, veterans, or first-responders	Every event
+page_type	Funnel type: lead or call	Every event
+domain	blueskylife.net or blueskylife.io	Every event
+step_number	0 = Landing, 1-5 = Quiz, 6 = Name, 7 = Email, 8 = Phone	Every event
+step_name	Human-readable step name (e.g., "Beneficiary", "State")	Every event
+selected_value	The user's answer for this step	Every event
+time_on_step	Seconds spent on the previous step	Every event
+device_type	mobile, desktop, or tablet	Every event
+os	macOS, Windows, iOS, Android, Linux, ChromeOS	Every event
+browser	Chrome, Safari, Firefox, Edge, Facebook, Instagram	Every event
+user_agent	Full browser user agent string	Every event
+referrer	Referring URL	Every event
+page_url	Full page URL with path and query params	Every event
+screen_resolution	Device screen size (e.g., "1920x1080")	Every event
+viewport	Browser window size (e.g., "412x915")	Every event
+language	Browser language (e.g., "en-US")	Every event
+ip_address	Visitor's IP address (from geo-IP)	Every event (after detection)
+geo_state	Auto-detected state from IP geolocation	Every event (after detection)
+selected_state	State the user manually selected in quiz	After State step onward
+external_id	Raw external ID for Meta matching	Every event (after generation)
+fbc	Facebook click ID cookie	When present
+fbp	Facebook browser ID cookie	When present
+utm_source	UTM source parameter	When present
+utm_medium	UTM medium parameter	When present
+utm_campaign	UTM campaign parameter	When present
+utm_content	UTM content parameter	When present
+utm_term	UTM term parameter	When present
+utm_id	UTM ID parameter	When present
+placement	Ad placement	When present
+media_type	Media type	When present
+campaign_name	Campaign name	When present
+campaign_id	Campaign ID	When present
+ad_name	Ad name	When present
+ad_id	Ad ID	When present
+adset_name	Ad set name	When present
+adset_id	Ad set ID	When present
+fbclid	Facebook click ID from URL	When present
+quiz_answers	Accumulated object of all quiz answers so far	When answers exist
+first_name	Lead's first name	form_complete only
+last_name	Lead's last name	form_complete only
+email	Lead's email	form_complete only
+phone	Lead's phone	form_complete only
+Prompt for the other AI:
+
+I need you to make the following updates to the TrackingJunction app:
+
+1. Update the API Documentation page to reflect the full event payload schema.
+
+The /api/events endpoint accepts POST requests with JSON body. Here is the complete list of fields that are sent:
+
+session_id (string, required) — UUID that groups all events from one visitor's journey. Use this to group events into sessions.
+event_id (string, required) — Unique ID per event, format: evt_{timestamp}_{random}. Used for Meta deduplication, NOT for grouping.
+event_type (string, required) — One of: page_land, step_complete, form_complete
+page (string, required) — Audience segment: seniors, veterans, or first-responders
+page_type (string, required) — Funnel type: lead or call
+domain (string, required) — Either blueskylife.net or blueskylife.io
+step_number (integer, required) — Step index: 0 = Landing, 1-5 = Quiz steps, 6 = Name, 7 = Email, 8 = Phone
+step_name (string, required) — Human-readable step name (e.g., "Beneficiary", "State", "Age", "Landing")
+selected_value (string, optional) — The user's selected answer for this step
+time_on_step (integer) — Seconds the user spent on the previous step (0 for page_land)
+device_type (string) — mobile, desktop, or tablet
+os (string) — Operating system: macOS, Windows, iOS, Android, Linux, ChromeOS, or Unknown
+browser (string) — Browser name: Chrome, Safari, Firefox, Edge, Opera, Facebook, Instagram, or Unknown
+user_agent (string) — Full browser user agent string
+referrer (string, optional) — The referring URL
+page_url (string) — Full page URL including path and query parameters
+screen_resolution (string) — Device screen dimensions (e.g., "1920x1080")
+viewport (string) — Browser viewport dimensions (e.g., "412x915")
+language (string, optional) — Browser language setting (e.g., "en-US")
+ip_address (string, optional) — Visitor's IP address from geo-IP detection
+geo_state (string, optional) — Auto-detected US state code from IP geolocation (e.g., "FL")
+selected_state (string, optional) — The state the user manually selected in the quiz (appears after the State step and persists for all subsequent events)
+external_id (string, optional) — Raw external ID for Meta CAPI matching, format: extid_{timestamp}_{random}
+fbc (string, optional) — Facebook click ID cookie value
+fbp (string, optional) — Facebook browser ID cookie value
+utm_source (string, optional) — UTM source parameter
+utm_medium (string, optional) — UTM medium parameter
+utm_campaign (string, optional) — UTM campaign parameter
+utm_content (string, optional) — UTM content parameter
+utm_term (string, optional) — UTM term parameter
+utm_id (string, optional) — UTM ID parameter
+placement (string, optional) — Ad placement value
+media_type (string, optional) — Media type value
+campaign_name (string, optional) — Campaign name
+campaign_id (string, optional) — Campaign ID
+ad_name (string, optional) — Ad creative name
+ad_id (string, optional) — Ad creative ID
+adset_name (string, optional) — Ad set name
+adset_id (string, optional) — Ad set ID
+fbclid (string, optional) — Facebook click ID from URL parameters
+quiz_answers (object, optional) — Accumulated key-value object of all quiz answers submitted so far (e.g., {"beneficiary": "Spouse", "state": "FL", "age": "50"})
+first_name (string, optional) — Lead's first name (only sent on form_complete events)
+last_name (string, optional) — Lead's last name (only sent on form_complete events)
+email (string, optional) — Lead's email (only sent on form_complete events)
+phone (string, optional) — Lead's phone number (only sent on form_complete events)
+2. Add filterable/sortable columns to the Session Logs section.
+
+At the top of the Session Logs section, add a column filter/selector that lets users choose which columns to display. The following columns should be available (some are already shown, add the missing ones):
+
+Already displayed: Last Activity, Session ID, Events, Furthest Step, Status, Audience, Domain, Device, OS, Browser
+
+Add these as toggleable columns:
+
+IP Address
+Geo State
+Selected State
+Funnel Type
+External ID
+Referrer
+Page URL
+Screen Resolution
+Viewport
+Language
+UTM Source
+UTM Medium
+UTM Campaign
+UTM Content
+UTM Term
+UTM ID
+Placement
+Media Type
+Campaign Name
+Campaign ID
+Ad Name
+Ad ID
+Adset Name
+Adset ID
+FBCLID
+FBC
+FBP
+The column filter should be a multi-select dropdown or checkbox list at the top of the Session Logs table, allowing users to show/hide any of these columns. Default visible columns should remain the ones currently shown. User column preferences should persist (localStorage).
+
+3. In the expanded session detail view, make sure all fields are displayed, including the new ones: selected_state, page_url, screen_resolution, viewport, and language.
