@@ -189,6 +189,7 @@ export interface IStorage {
   isPhoneBlocked(phone: string): Promise<boolean>;
   blockPhone(phone: string, reason?: string): Promise<BlockedNumber>;
   unblockPhone(phone: string): Promise<void>;
+  bulkUnblockPhones(phones: string[]): Promise<number>;
 }
 
 function buildConditions(filters: AnalyticsFilters) {
@@ -1100,6 +1101,12 @@ class DatabaseStorage implements IStorage {
 
   async unblockPhone(phone: string): Promise<void> {
     await db.delete(blockedNumbers).where(eq(blockedNumbers.phone, phone));
+  }
+
+  async bulkUnblockPhones(phones: string[]): Promise<number> {
+    if (phones.length === 0) return 0;
+    const result = await db.delete(blockedNumbers).where(inArray(blockedNumbers.phone, phones)).returning();
+    return result.length;
   }
 }
 

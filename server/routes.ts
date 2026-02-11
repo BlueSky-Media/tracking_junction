@@ -573,6 +573,20 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/retell/bulk-unblock", isAuthenticated, async (req, res) => {
+    try {
+      const { phones } = req.body;
+      if (!Array.isArray(phones) || phones.length === 0) {
+        return res.status(400).json({ message: "phones array required" });
+      }
+      const count = await storage.bulkUnblockPhones(phones);
+      res.json({ message: `Unblocked ${count} numbers`, count });
+    } catch (error) {
+      console.error("Error bulk unblocking:", error);
+      res.status(500).json({ message: "Failed to bulk unblock" });
+    }
+  });
+
   app.delete("/api/retell/block/:phone", isAuthenticated, async (req, res) => {
     try {
       await storage.unblockPhone(decodeURIComponent(req.params.phone));

@@ -1470,22 +1470,23 @@ function RetellCallSection({ phone }: { phone: string }) {
                   {call.recordingUrl ? (
                     <>
                       <Button
-                        size="icon"
-                        variant="ghost"
+                        size="sm"
+                        variant={playingId === call.callId ? "default" : "outline"}
                         onClick={(e) => { e.stopPropagation(); togglePlay(call); }}
                         data-testid={`button-play-${call.callId}`}
                       >
                         {playingId === call.callId
-                          ? <Pause className="w-3.5 h-3.5 text-green-500" />
-                          : <Play className="w-3.5 h-3.5 text-green-500" />}
+                          ? <><Pause className="w-3 h-3 mr-1" /><span className="text-[9px]">Pause</span></>
+                          : <><Play className="w-3 h-3 mr-1 text-green-500" /><span className="text-[9px]">Listen</span></>}
                       </Button>
                       <Button
-                        size="icon"
-                        variant="ghost"
+                        size="sm"
+                        variant="outline"
                         onClick={(e) => { e.stopPropagation(); downloadRecording(call); }}
                         data-testid={`button-download-${call.callId}`}
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Download className="w-3 h-3 mr-1" />
+                        <span className="text-[9px]">Download</span>
                       </Button>
                     </>
                   ) : (

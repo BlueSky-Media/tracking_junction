@@ -19,6 +19,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `client/src/pages/reports.tsx` - Funnel reports with drilldown + event logs
 - `client/src/pages/api-docs.tsx` - API documentation page
 - `client/src/pages/server-logs.tsx` - Stape-style server logs dashboard
+- `client/src/pages/block-list.tsx` - Block List management page
 - `client/src/pages/landing.tsx` - Landing/login page
 - `client/src/components/` - Dashboard components (filters, funnel chart, funnel table, step breakdown, stats cards, campaign table, device breakdown, time heatmap, contact funnel, referrer breakdown, csv export)
 
@@ -46,6 +47,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `GET /api/retell/recording/:callId` - Get Retell call recording/transcript (protected)
 - `GET /api/retell/blocked` - List blocked phone numbers (protected)
 - `POST /api/retell/block` - Block a phone number (protected, body: {phone, reason?})
+- `POST /api/retell/bulk-unblock` - Bulk unblock phone numbers (protected, body: {phones: string[]})
 - `DELETE /api/retell/block/:phone` - Unblock a phone number (protected)
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 
