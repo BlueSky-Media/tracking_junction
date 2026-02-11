@@ -850,7 +850,7 @@ function DrilldownRowComponent({
             <div className="border-y bg-muted/20 px-1 py-0.5">
               <div className="border rounded-md bg-background">
                 <DrilldownTable
-                  parentFilters={{ ...parentFilters, [groupBy]: row.groupValue }}
+                  parentFilters={{ ...parentFilters, [groupBy === "page" ? "audience" : groupBy]: row.groupValue }}
                   dateRange={dateRange}
                   globalFilters={globalFilters}
                   groupBy={selectedSubDim}
