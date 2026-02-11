@@ -1694,15 +1694,8 @@ function RetellCallSection({ phone }: { phone: string }) {
     );
   }
 
-  if (error) {
-    return (
-      <div className="space-y-1">
-        <h4 className="text-[10px] font-semibold flex items-center gap-1">
-          <Phone className="w-3 h-3" /> Retell Calls
-        </h4>
-        <p className="text-[10px] text-muted-foreground">{error}</p>
-      </div>
-    );
+  if (error || calls.length === 0) {
+    return null;
   }
 
   const formatDuration = (ms: number) => {
@@ -1735,10 +1728,7 @@ function RetellCallSection({ phone }: { phone: string }) {
         </Button>
       </div>
 
-      {calls.length === 0 ? (
-        <p className="text-[10px] text-muted-foreground">No Retell calls found for {phone}</p>
-      ) : (
-        <div className="space-y-1.5">
+      <div className="space-y-1.5">
           {calls.map((call) => (
             <div key={call.callId} className="border rounded-md p-2 bg-background/50 space-y-1" data-testid={`retell-call-${call.callId}`}>
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1841,7 +1831,6 @@ function RetellCallSection({ phone }: { phone: string }) {
             </div>
           ))}
         </div>
-      )}
     </div>
   );
 }
