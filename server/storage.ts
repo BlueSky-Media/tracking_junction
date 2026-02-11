@@ -748,7 +748,6 @@ class DatabaseStorage implements IStorage {
           group_value,
           COUNT(DISTINCT session_id) as completions
         FROM grouped_steps
-        WHERE event_type = 'page_land'
         GROUP BY group_value
       ),
       step_completions AS (
