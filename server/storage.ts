@@ -107,6 +107,8 @@ interface DrilldownRow {
   groupValue: string;
   uniqueViews: number;
   grossViews: number;
+  pageLands: number;
+  formCompletions: number;
   steps: DrilldownStepData[];
 }
 
@@ -205,9 +207,9 @@ class DatabaseStorage implements IStorage {
       .where(and(
         where,
         sql`(
-          (${trackingEvents.pageType} = 'lead' AND ${trackingEvents.stepNumber} = 9)
+          ${trackingEvents.eventType} = 'form_complete'
           OR
-          (${trackingEvents.pageType} = 'call' AND ${trackingEvents.stepNumber} = 6)
+          (${trackingEvents.pageType} = 'call' AND ${trackingEvents.stepNumber} >= 5)
         )`
       ));
 
@@ -359,8 +361,8 @@ class DatabaseStorage implements IStorage {
         COALESCE(${trackingEvents.utmMedium}, '(none)') as medium,
         COUNT(DISTINCT ${trackingEvents.sessionId}) as sessions,
         COUNT(DISTINCT CASE
-          WHEN (${trackingEvents.pageType} = 'lead' AND ${trackingEvents.stepNumber} = 9)
-            OR (${trackingEvents.pageType} = 'call' AND ${trackingEvents.stepNumber} = 6)
+          WHEN ${trackingEvents.eventType} = 'form_complete'
+            OR (${trackingEvents.pageType} = 'call' AND ${trackingEvents.stepNumber} >= 5)
           THEN ${trackingEvents.sessionId}
         END) as completions
       FROM ${trackingEvents}
@@ -393,8 +395,8 @@ class DatabaseStorage implements IStorage {
         COALESCE(${trackingEvents.deviceType}, 'unknown') as device_type,
         COUNT(DISTINCT ${trackingEvents.sessionId}) as sessions,
         COUNT(DISTINCT CASE
-          WHEN (${trackingEvents.pageType} = 'lead' AND ${trackingEvents.stepNumber} = 9)
-            OR (${trackingEvents.pageType} = 'call' AND ${trackingEvents.stepNumber} = 6)
+          WHEN ${trackingEvents.eventType} = 'form_complete'
+            OR (${trackingEvents.pageType} = 'call' AND ${trackingEvents.stepNumber} >= 5)
           THEN ${trackingEvents.sessionId}
         END) as completions
       FROM ${trackingEvents}
@@ -421,8 +423,8 @@ class DatabaseStorage implements IStorage {
         EXTRACT(HOUR FROM ${trackingEvents.eventTimestamp})::int as hour,
         COUNT(DISTINCT ${trackingEvents.sessionId}) as sessions,
         COUNT(DISTINCT CASE
-          WHEN (${trackingEvents.pageType} = 'lead' AND ${trackingEvents.stepNumber} = 9)
-            OR (${trackingEvents.pageType} = 'call' AND ${trackingEvents.stepNumber} = 6)
+          WHEN ${trackingEvents.eventType} = 'form_complete'
+            OR (${trackingEvents.pageType} = 'call' AND ${trackingEvents.stepNumber} >= 5)
           THEN ${trackingEvents.sessionId}
         END) as conversions
       FROM ${trackingEvents}
@@ -496,8 +498,8 @@ class DatabaseStorage implements IStorage {
         COALESCE(${trackingEvents.referrer}, '(direct)') as referrer,
         COUNT(DISTINCT ${trackingEvents.sessionId}) as sessions,
         COUNT(DISTINCT CASE
-          WHEN (${trackingEvents.pageType} = 'lead' AND ${trackingEvents.stepNumber} = 9)
-            OR (${trackingEvents.pageType} = 'call' AND ${trackingEvents.stepNumber} = 6)
+          WHEN ${trackingEvents.eventType} = 'form_complete'
+            OR (${trackingEvents.pageType} = 'call' AND ${trackingEvents.stepNumber} >= 5)
           THEN ${trackingEvents.sessionId}
         END) as completions
       FROM ${trackingEvents}
@@ -556,7 +558,8 @@ class DatabaseStorage implements IStorage {
       "id", "session_id", "event_type", "page", "page_type", "domain",
       "step_number", "step_name", "selected_value", "time_on_step",
       "utm_source", "utm_campaign", "utm_medium", "utm_content",
-      "device_type", "referrer", "event_timestamp"
+      "device_type", "os", "browser", "geo_state", "ip_address", "placement",
+      "referrer", "first_name", "last_name", "email", "phone", "event_timestamp"
     ];
 
     const csvRows = [headers.join(",")];
@@ -578,7 +581,16 @@ class DatabaseStorage implements IStorage {
         row.utmMedium || "",
         `"${(row.utmContent || '').replace(/"/g, '""')}"`,
         row.deviceType || "",
+        row.os || "",
+        row.browser || "",
+        row.geoState || "",
+        row.ipAddress || "",
+        `"${(row.placement || '').replace(/"/g, '""')}"`,
         `"${(row.referrer || '').replace(/"/g, '""')}"`,
+        `"${(row.firstName || '').replace(/"/g, '""')}"`,
+        `"${(row.lastName || '').replace(/"/g, '""')}"`,
+        `"${(row.email || '').replace(/"/g, '""')}"`,
+        row.phone || "",
         row.eventTimestamp?.toISOString() || "",
       ];
       csvRows.push(values.join(","));
@@ -620,6 +632,14 @@ class DatabaseStorage implements IStorage {
         FROM grouped_steps
         GROUP BY group_value
       ),
+      page_lands AS (
+        SELECT
+          group_value,
+          COUNT(DISTINCT session_id) as completions
+        FROM grouped_steps
+        WHERE event_type = 'page_land'
+        GROUP BY group_value
+      ),
       step_completions AS (
         SELECT
           group_value,
@@ -629,22 +649,34 @@ class DatabaseStorage implements IStorage {
         FROM grouped_steps
         WHERE event_type = 'step_complete' OR event_type IS NULL
         GROUP BY group_value, step_number
+      ),
+      form_completions AS (
+        SELECT
+          group_value,
+          COUNT(DISTINCT session_id) as completions
+        FROM grouped_steps
+        WHERE event_type = 'form_complete'
+        GROUP BY group_value
       )
       SELECT
         gv.group_value,
         gv.unique_views,
         gv.gross_views,
+        COALESCE(pl.completions, 0) as page_lands,
+        COALESCE(fc.completions, 0) as form_completions,
         sc.step_number,
         sc.step_name,
         sc.completions
       FROM group_views gv
+      LEFT JOIN page_lands pl ON gv.group_value = pl.group_value
+      LEFT JOIN form_completions fc ON gv.group_value = fc.group_value
       LEFT JOIN step_completions sc ON gv.group_value = sc.group_value
       ORDER BY gv.unique_views DESC, gv.group_value, sc.step_number
     `);
 
     const results = (rows as any).rows || [];
 
-    const groupMap = new Map<string, { uniqueViews: number; grossViews: number; stepsMap: Map<number, { stepName: string; completions: number }> }>();
+    const groupMap = new Map<string, { uniqueViews: number; grossViews: number; pageLands: number; formCompletions: number; stepsMap: Map<number, { stepName: string; completions: number }> }>();
 
     for (const r of results) {
       const gv = r.group_value as string;
@@ -652,6 +684,8 @@ class DatabaseStorage implements IStorage {
         groupMap.set(gv, {
           uniqueViews: Number(r.unique_views),
           grossViews: Number(r.gross_views),
+          pageLands: Number(r.page_lands || 0),
+          formCompletions: Number(r.form_completions || 0),
           stepsMap: new Map(),
         });
       }
@@ -689,11 +723,14 @@ class DatabaseStorage implements IStorage {
 
     const drilldownRows: DrilldownRow[] = [];
     Array.from(groupMap.entries()).forEach(([gv, data]) => {
+      const pageLandBase = data.pageLands || data.uniqueViews;
       drilldownRows.push({
         groupValue: gv,
         uniqueViews: data.uniqueViews,
         grossViews: data.grossViews,
-        steps: buildSteps(data.uniqueViews, data.stepsMap),
+        pageLands: data.pageLands,
+        formCompletions: data.formCompletions,
+        steps: buildSteps(pageLandBase, data.stepsMap),
       });
     });
 
@@ -701,6 +738,8 @@ class DatabaseStorage implements IStorage {
 
     const totalUniqueViews = drilldownRows.reduce((s, r) => s + r.uniqueViews, 0);
     const totalGrossViews = drilldownRows.reduce((s, r) => s + r.grossViews, 0);
+    const totalPageLands = drilldownRows.reduce((s, r) => s + r.pageLands, 0);
+    const totalFormCompletions = drilldownRows.reduce((s, r) => s + r.formCompletions, 0);
     const totalsStepsMap = new Map<number, { stepName: string; completions: number }>();
     for (const row of drilldownRows) {
       for (const step of row.steps) {
@@ -713,11 +752,14 @@ class DatabaseStorage implements IStorage {
       }
     }
 
+    const totalPageLandBase = totalPageLands || totalUniqueViews;
     const totals: DrilldownRow = {
       groupValue: "Totals",
       uniqueViews: totalUniqueViews,
       grossViews: totalGrossViews,
-      steps: buildSteps(totalUniqueViews, totalsStepsMap),
+      pageLands: totalPageLands,
+      formCompletions: totalFormCompletions,
+      steps: buildSteps(totalPageLandBase, totalsStepsMap),
     };
 
     return { rows: drilldownRows, totals, groupBy };

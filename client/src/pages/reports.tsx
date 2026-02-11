@@ -37,6 +37,8 @@ interface DrilldownRow {
   groupValue: string;
   uniqueViews: number;
   grossViews: number;
+  pageLands: number;
+  formCompletions: number;
   steps: DrilldownStepData[];
 }
 
@@ -64,6 +66,15 @@ interface EventLog {
   referrer: string | null;
   timeOnStep: number | null;
   eventTimestamp: string;
+  os: string | null;
+  browser: string | null;
+  placement: string | null;
+  geoState: string | null;
+  ipAddress: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
 }
 
 interface EventLogResult {
@@ -263,6 +274,21 @@ function FilterBar({
   );
 }
 
+function StepCvrCell({ completions, prevStepCvr, pageLandCvr, isHeader }: { completions: number; prevStepCvr: number; pageLandCvr: number; isHeader?: boolean }) {
+  const isLowStep = prevStepCvr < 50 && prevStepCvr > 0;
+  return (
+    <TableCell className="text-center px-1">
+      <p className={`font-mono text-[11px] ${isHeader ? "font-semibold" : ""}`}>{completions.toLocaleString()}</p>
+      <p className={`font-mono text-[10px] ${isLowStep ? "text-destructive" : "text-muted-foreground"}`}>
+        {prevStepCvr.toFixed(1)}%
+      </p>
+      <p className="font-mono text-[10px] text-muted-foreground">
+        {pageLandCvr.toFixed(1)}%
+      </p>
+    </TableCell>
+  );
+}
+
 function DrilldownTable({
   parentFilters,
   dateRange,
@@ -312,34 +338,43 @@ function DrilldownTable({
     return (
       <div className="space-y-2 p-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
+          <Skeleton key={i} className="h-8 w-full" />
         ))}
       </div>
     );
   }
 
   if (!data || data.rows.length === 0) {
-    return <p className="text-sm text-muted-foreground text-center py-4">No data available.</p>;
+    return <p className="text-[11px] text-muted-foreground text-center py-4">No data available.</p>;
   }
 
   const dimLabel = DRILL_DIMENSIONS.find(d => d.value === groupBy)?.label || groupBy;
+  const hasFormComplete = data.totals.formCompletions > 0 || data.rows.some(r => r.formCompletions > 0);
 
   return (
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            {depth < 3 && availableNextDimensions.length > 0 && <TableHead className="w-8" />}
-            <TableHead className="min-w-[120px]">{dimLabel}</TableHead>
-            <TableHead className="text-right min-w-[80px]">Sessions</TableHead>
-            <TableHead className="text-right min-w-[80px]">Events</TableHead>
+            {depth < 3 && availableNextDimensions.length > 0 && <TableHead className="w-6 px-1" />}
+            <TableHead className="text-[11px] min-w-[80px] px-1">{dimLabel}</TableHead>
+            <TableHead className="text-[11px] text-center px-1 min-w-[50px]">Lands</TableHead>
             {data.totals.steps.map((s) => (
-              <TableHead key={`h-${s.stepNumber}-${s.stepName}`} className="text-center min-w-[90px]">
-                <div className="flex flex-col items-center">
-                  <span className="text-xs font-semibold">{s.stepName}</span>
+              <TableHead key={`h-${s.stepNumber}-${s.stepName}`} className="text-center px-1 min-w-[55px]" colSpan={1}>
+                <div className="flex flex-col items-center leading-tight">
+                  <span className="text-[10px] font-semibold">S{s.stepNumber}</span>
+                  <span className="text-[9px] text-muted-foreground">{s.stepName}</span>
                 </div>
               </TableHead>
             ))}
+            {hasFormComplete && (
+              <TableHead className="text-center px-1 min-w-[55px]">
+                <div className="flex flex-col items-center leading-tight">
+                  <span className="text-[10px] font-semibold">Form</span>
+                  <span className="text-[9px] text-muted-foreground">Complete</span>
+                </div>
+              </TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -366,34 +401,59 @@ function DrilldownTable({
                 onToggle={() => toggleRowDrill(row.groupValue, availableNextDimensions[0]?.value || "")}
                 onChangeDim={(dim) => setRowDimension(row.groupValue, dim)}
                 dimLabel={dimLabel}
+                hasFormComplete={hasFormComplete}
               />
             );
           })}
-          <TableRow className="bg-muted/50 font-semibold border-t-2" data-testid={`row-totals-${groupBy}-depth${depth}`}>
-            {canDrillCell(depth, availableNextDimensions)}
-            <TableCell className="font-bold">Totals</TableCell>
-            <TableCell className="text-right font-mono">{data.totals.uniqueViews.toLocaleString()}</TableCell>
-            <TableCell className="text-right font-mono text-muted-foreground">{data.totals.grossViews.toLocaleString()}</TableCell>
-            {data.totals.steps.map((step) => (
-              <TableCell key={`tot-${step.stepNumber}-${step.stepName}`} className="text-center">
-                <div className="space-y-0.5">
-                  <p className="font-mono text-xs font-semibold">{step.completions.toLocaleString()}</p>
-                  <p className="font-mono text-xs text-muted-foreground">{step.conversionFromInitial.toFixed(1)}%</p>
-                </div>
-              </TableCell>
-            ))}
-          </TableRow>
+          <TotalsRow
+            totals={data.totals}
+            canDrill={depth < 3 && availableNextDimensions.length > 0}
+            groupBy={groupBy}
+            depth={depth}
+            hasFormComplete={hasFormComplete}
+          />
         </TableBody>
       </Table>
     </div>
   );
 }
 
-function canDrillCell(depth: number, availableNextDimensions: typeof DRILL_DIMENSIONS) {
-  if (depth < 3 && availableNextDimensions.length > 0) {
-    return <TableCell />;
-  }
-  return null;
+function TotalsRow({ totals, canDrill, groupBy, depth, hasFormComplete }: {
+  totals: DrilldownRow;
+  canDrill: boolean;
+  groupBy: string;
+  depth: number;
+  hasFormComplete: boolean;
+}) {
+  const pageLands = totals.pageLands || totals.uniqueViews;
+  return (
+    <TableRow className="bg-muted/50 font-semibold border-t-2" data-testid={`row-totals-${groupBy}-depth${depth}`}>
+      {canDrill && <TableCell className="px-1" />}
+      <TableCell className="text-[11px] font-bold px-1">Totals</TableCell>
+      <TableCell className="text-center font-mono text-[11px] px-1">{pageLands.toLocaleString()}</TableCell>
+      {totals.steps.map((step) => {
+        const plCvr = pageLands > 0 ? (step.completions / pageLands) * 100 : 0;
+        return (
+          <StepCvrCell
+            key={`tot-${step.stepNumber}-${step.stepName}`}
+            completions={step.completions}
+            prevStepCvr={step.conversionFromPrev}
+            pageLandCvr={plCvr}
+            isHeader
+          />
+        );
+      })}
+      {hasFormComplete && (
+        <StepCvrCell
+          completions={totals.formCompletions}
+          prevStepCvr={totals.steps.length > 0 && totals.steps[totals.steps.length - 1].completions > 0
+            ? (totals.formCompletions / totals.steps[totals.steps.length - 1].completions) * 100 : 0}
+          pageLandCvr={pageLands > 0 ? (totals.formCompletions / pageLands) * 100 : 0}
+          isHeader
+        />
+      )}
+    </TableRow>
+  );
 }
 
 function DrilldownRowComponent({
@@ -412,6 +472,7 @@ function DrilldownRowComponent({
   onToggle,
   onChangeDim,
   dimLabel,
+  hasFormComplete,
 }: {
   row: DrilldownRow;
   canDrill: boolean;
@@ -428,8 +489,10 @@ function DrilldownRowComponent({
   onToggle: () => void;
   onChangeDim: (dim: string) => void;
   dimLabel: string;
+  hasFormComplete: boolean;
 }) {
-  const colSpan = 3 + allSteps.length + (canDrill ? 1 : 0);
+  const colSpan = 2 + allSteps.length + (canDrill ? 1 : 0) + (hasFormComplete ? 1 : 0);
+  const pageLands = row.pageLands || row.uniqueViews;
 
   return (
     <>
@@ -439,36 +502,41 @@ function DrilldownRowComponent({
         data-testid={`row-drill-${groupBy}-${row.groupValue}`}
       >
         {canDrill && (
-          <TableCell className="w-8">
-            {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          <TableCell className="w-6 px-1">
+            {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           </TableCell>
         )}
-        <TableCell className="font-medium">{row.groupValue}</TableCell>
-        <TableCell className="text-right font-mono">{row.uniqueViews.toLocaleString()}</TableCell>
-        <TableCell className="text-right font-mono text-muted-foreground">{row.grossViews.toLocaleString()}</TableCell>
+        <TableCell className="text-[11px] font-medium px-1">{row.groupValue}</TableCell>
+        <TableCell className="text-center font-mono text-[11px] px-1">{pageLands.toLocaleString()}</TableCell>
         {row.steps.map((step) => {
-          const isLow = step.conversionFromPrev < 50 && step.conversionFromPrev > 0;
+          const plCvr = pageLands > 0 ? (step.completions / pageLands) * 100 : 0;
           return (
-            <TableCell key={`${row.groupValue}-${step.stepNumber}-${step.stepName}`} className="text-center">
-              <div className="space-y-0.5">
-                <p className="font-mono text-xs">{step.completions.toLocaleString()}</p>
-                <p className={`font-mono text-xs ${isLow ? "text-destructive" : "text-muted-foreground"}`}>
-                  {step.conversionFromInitial.toFixed(1)}%
-                </p>
-              </div>
-            </TableCell>
+            <StepCvrCell
+              key={`${row.groupValue}-${step.stepNumber}-${step.stepName}`}
+              completions={step.completions}
+              prevStepCvr={step.conversionFromPrev}
+              pageLandCvr={plCvr}
+            />
           );
         })}
+        {hasFormComplete && (
+          <StepCvrCell
+            completions={row.formCompletions}
+            prevStepCvr={row.steps.length > 0 && row.steps[row.steps.length - 1].completions > 0
+              ? (row.formCompletions / row.steps[row.steps.length - 1].completions) * 100 : 0}
+            pageLandCvr={pageLands > 0 ? (row.formCompletions / pageLands) * 100 : 0}
+          />
+        )}
       </TableRow>
       {isExpanded && canDrill && (
         <TableRow data-testid={`row-drilldown-${groupBy}-${row.groupValue}`}>
           <TableCell colSpan={colSpan} className="p-0">
-            <div className="border-y bg-muted/20 px-4 py-3 space-y-3">
-              <div className="flex items-center gap-3 flex-wrap">
-                <Badge variant="outline" className="text-xs">{dimLabel}: {row.groupValue}</Badge>
-                <span className="text-sm text-muted-foreground">drill down by</span>
+            <div className="border-y bg-muted/20 px-3 py-2 space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="text-[10px]">{dimLabel}: {row.groupValue}</Badge>
+                <span className="text-[11px] text-muted-foreground">drill down by</span>
                 <Select value={selectedSubDim} onValueChange={onChangeDim}>
-                  <SelectTrigger className="w-[180px]" data-testid={`select-subdim-${groupBy}-${row.groupValue}`}>
+                  <SelectTrigger className="w-[160px]" data-testid={`select-subdim-${groupBy}-${row.groupValue}`}>
                     <SelectValue placeholder="Select dimension..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -533,16 +601,19 @@ function FunnelReport({
   if (!summaryData) return null;
 
   const totals = summaryData.totals;
+  const pageLands = totals.pageLands || totals.uniqueViews;
   const lastStep = totals.steps[totals.steps.length - 1];
-  const overallConversion = lastStep ? lastStep.conversionFromInitial : 0;
+  const hasFormComplete = totals.formCompletions > 0;
+  const finalCount = hasFormComplete ? totals.formCompletions : (lastStep?.completions || 0);
+  const overallConversion = pageLands > 0 ? (finalCount / pageLands) * 100 : 0;
 
   return (
     <Card className="p-5" data-testid="card-funnel-report">
       <h3 className="font-semibold mb-4" data-testid="text-funnel-title">Funnel Summary</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Total Sessions</p>
-          <p className="text-2xl font-bold font-mono" data-testid="text-total-sessions">{totals.uniqueViews.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground">Page Lands</p>
+          <p className="text-2xl font-bold font-mono" data-testid="text-page-lands">{pageLands.toLocaleString()}</p>
         </div>
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Total Events</p>
@@ -562,31 +633,57 @@ function FunnelReport({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="text-center px-1 min-w-[55px]">
+                <div className="flex flex-col items-center leading-tight">
+                  <span className="text-[10px] font-semibold">Lands</span>
+                  <span className="text-[9px] text-muted-foreground">Step 0</span>
+                </div>
+              </TableHead>
               {totals.steps.map((s) => (
-                <TableHead key={`sum-${s.stepNumber}-${s.stepName}`} className="text-center min-w-[100px]">
-                  <div className="flex flex-col items-center">
-                    <span className="text-xs font-semibold">Step {s.stepNumber}</span>
-                    <span className="text-xs text-muted-foreground font-normal">{s.stepName}</span>
+                <TableHead key={`sum-${s.stepNumber}-${s.stepName}`} className="text-center px-1 min-w-[55px]">
+                  <div className="flex flex-col items-center leading-tight">
+                    <span className="text-[10px] font-semibold">S{s.stepNumber}</span>
+                    <span className="text-[9px] text-muted-foreground">{s.stepName}</span>
                   </div>
                 </TableHead>
               ))}
+              {hasFormComplete && (
+                <TableHead className="text-center px-1 min-w-[55px]">
+                  <div className="flex flex-col items-center leading-tight">
+                    <span className="text-[10px] font-semibold">Form</span>
+                    <span className="text-[9px] text-muted-foreground">Complete</span>
+                  </div>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow>
-              {totals.steps.map((s) => (
-                <TableCell key={`sumv-${s.stepNumber}-${s.stepName}`} className="text-center">
-                  <div className="space-y-0.5">
-                    <p className="font-mono text-sm font-semibold">{s.completions.toLocaleString()}</p>
-                    <p className={`font-mono text-xs ${s.conversionFromPrev < 50 && s.conversionFromPrev > 0 ? "text-destructive" : "text-muted-foreground"}`}>
-                      {s.conversionFromPrev.toFixed(1)}% step
-                    </p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {s.conversionFromInitial.toFixed(1)}% overall
-                    </p>
-                  </div>
-                </TableCell>
-              ))}
+              <TableCell className="text-center px-1">
+                <p className="font-mono text-[11px] font-semibold">{pageLands.toLocaleString()}</p>
+                <p className="font-mono text-[10px] text-muted-foreground">&mdash;</p>
+                <p className="font-mono text-[10px] text-muted-foreground">100.0%</p>
+              </TableCell>
+              {totals.steps.map((s) => {
+                const plCvr = pageLands > 0 ? (s.completions / pageLands) * 100 : 0;
+                return (
+                  <StepCvrCell
+                    key={`sumv-${s.stepNumber}-${s.stepName}`}
+                    completions={s.completions}
+                    prevStepCvr={s.conversionFromPrev}
+                    pageLandCvr={plCvr}
+                    isHeader
+                  />
+                );
+              })}
+              {hasFormComplete && (
+                <StepCvrCell
+                  completions={totals.formCompletions}
+                  prevStepCvr={lastStep && lastStep.completions > 0 ? (totals.formCompletions / lastStep.completions) * 100 : 0}
+                  pageLandCvr={pageLands > 0 ? (totals.formCompletions / pageLands) * 100 : 0}
+                  isHeader
+                />
+              )}
             </TableRow>
           </TableBody>
         </Table>
@@ -791,6 +888,8 @@ function EventLogsSection({
                       <TableHead className="text-xs">Step</TableHead>
                       <TableHead className="text-xs">Value</TableHead>
                       <TableHead className="text-xs">Device</TableHead>
+                      <TableHead className="text-xs">OS</TableHead>
+                      <TableHead className="text-xs">Browser</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -888,10 +987,12 @@ function EventLogRow({
           {event.selectedValue || "\u2014"}
         </TableCell>
         <TableCell className="text-xs">{event.deviceType || "\u2014"}</TableCell>
+        <TableCell className="text-xs">{event.os || "\u2014"}</TableCell>
+        <TableCell className="text-xs">{event.browser || "\u2014"}</TableCell>
       </TableRow>
       {isExpanded && (
         <TableRow data-testid={`row-log-detail-${event.id}`}>
-          <TableCell colSpan={9}>
+          <TableCell colSpan={11}>
             <div className="bg-muted/50 rounded-md p-4 space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-xs">
                 <DetailField label="ID" value={String(event.id)} />
@@ -904,12 +1005,25 @@ function EventLogRow({
                 <DetailField label="Selected Value" value={event.selectedValue || "\u2014"} />
                 <DetailField label="Time on Step" value={event.timeOnStep !== null ? `${event.timeOnStep}s` : "\u2014"} />
                 <DetailField label="Device" value={event.deviceType || "\u2014"} />
+                <DetailField label="OS" value={event.os || "\u2014"} />
+                <DetailField label="Browser" value={event.browser || "\u2014"} />
+                <DetailField label="Geo State" value={event.geoState || "\u2014"} />
+                <DetailField label="IP Address" value={event.ipAddress || "\u2014"} />
+                <DetailField label="Placement" value={event.placement || "\u2014"} />
                 <DetailField label="UTM Source" value={event.utmSource || "\u2014"} />
                 <DetailField label="UTM Campaign" value={event.utmCampaign || "\u2014"} />
                 <DetailField label="UTM Medium" value={event.utmMedium || "\u2014"} />
                 <DetailField label="UTM Content" value={event.utmContent || "\u2014"} />
                 <DetailField label="Referrer" value={event.referrer || "\u2014"} />
                 <DetailField label="Timestamp" value={formattedDate} />
+                {event.eventType === "form_complete" && (
+                  <>
+                    <DetailField label="First Name" value={event.firstName || "\u2014"} />
+                    <DetailField label="Last Name" value={event.lastName || "\u2014"} />
+                    <DetailField label="Email" value={event.email || "\u2014"} />
+                    <DetailField label="Phone" value={event.phone || "\u2014"} />
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-2 pt-1 border-t border-border/50">
                 <Button

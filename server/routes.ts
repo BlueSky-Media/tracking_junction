@@ -64,6 +64,8 @@ export async function registerRoutes(
 
       const data = parsed.data;
 
+      const isFormComplete = data.event_type === "form_complete";
+
       const event = await storage.insertEvent({
         page: data.page,
         pageType: data.page_type,
@@ -82,6 +84,15 @@ export async function registerRoutes(
         referrer: data.referrer || null,
         timeOnStep: data.time_on_step ?? null,
         eventTimestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
+        os: data.os || null,
+        browser: data.browser || null,
+        placement: data.placement || null,
+        geoState: data.geo_state || null,
+        ipAddress: data.ip_address || null,
+        firstName: isFormComplete ? (data.first_name || null) : null,
+        lastName: isFormComplete ? (data.last_name || null) : null,
+        email: isFormComplete ? (data.email || null) : null,
+        phone: isFormComplete ? (data.phone || null) : null,
       });
 
       res.status(200).json({ ok: true });

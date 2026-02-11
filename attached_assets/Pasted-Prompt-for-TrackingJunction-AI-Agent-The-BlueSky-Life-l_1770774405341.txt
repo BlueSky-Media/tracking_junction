@@ -1,0 +1,52 @@
+Prompt for TrackingJunction AI Agent:
+
+The BlueSky Life landing pages are now sending 3 types of events to POST /api/events. Currently only page_land events are being stored. Update the API to accept and store ALL event types. Here is the complete payload structure:
+
+Common fields (sent on ALL events):
+
+{
+  "session_id": "uuid-string",
+  "page": "seniors" | "veterans" | "first-responders",
+  "page_type": "lead" | "call",
+  "domain": "blueskylife.net" | "blueskylife.io",
+  "step_number": 0-8,
+  "step_name": "Landing" | "Beneficiary" | "State" | "Budget" | "Age" | "Income" | "Name" | "Email" | "Phone" | "Purpose",
+  "selected_value": "string or undefined (the user's answer for this step)",
+  "event_type": "page_land" | "step_complete" | "form_complete",
+  "time_on_step": 0-3600 (seconds spent on this step, 0 for page_land),
+  "device_type": "mobile" | "desktop" | "tablet",
+  "os": "Windows" | "macOS" | "iOS" | "Android" | "Linux" | "ChromeOS" | "Unknown",
+  "browser": "Chrome" | "Safari" | "Firefox" | "Edge" | "Opera" | "Facebook" | "Instagram" | "Unknown",
+  "referrer": "string or undefined",
+  "utm_source": "string (optional)",
+  "utm_campaign": "string (optional)",
+  "utm_medium": "string (optional)",
+  "utm_content": "string (optional)",
+  "placement": "string (optional, Facebook ad placement)",
+  "ip_address": "string (optional, visitor IP)",
+  "geo_state": "string (optional, 2-letter state code from geo-IP)"
+}
+Additional fields ONLY on form_complete events:
+
+{
+  "first_name": "string",
+  "last_name": "string",
+  "email": "string",
+  "phone": "string (digits only)"
+}
+Event flow per session:
+
+page_land (step 0, "Landing") - fires once on page load
+step_complete (steps 1-5 for call funnels, steps 1-7 for lead funnels) - fires after each quiz answer
+form_complete (step 8 for lead funnels) - fires on final form submission with lead PII
+Key requirements:
+
+All 3 event types must be stored in the events table
+The step_number + step_name combo shows the user's progression through the funnel
+A single session will have multiple events (one page_land + multiple step_completes + optionally one form_complete)
+The selected_value field captures what the user chose at each step (e.g., "Florida" for State, "45-50" for Age)
+Lead PII fields (first_name, last_name, email, phone) should ONLY be stored when event_type === 'form_complete' - ignore them on other event types
+The os and browser fields are new - add columns if they don't exist
+The placement and geo_state fields are new - add columns if they don't exist
+The ip_address field is new - add a column if it doesn't exist
+Make sure the dashboard's Event Logs view shows the step progression correctly (Step 0 Landing, Step 1 Beneficiary, Step 2 State, etc.) grouped by session
