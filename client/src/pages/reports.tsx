@@ -978,15 +978,18 @@ function EventLogsSection({
                   <thead>
                     <tr className="h-6 border-b bg-muted/50">
                       <th
-                        className="px-0.5 py-0"
-                        style={{ width: `${colWidths.checkbox}px`, minWidth: `${colWidths.checkbox}px` }}
+                        className="px-0.5 py-0 whitespace-nowrap"
+                        style={{ width: "80px", minWidth: "80px" }}
                       >
-                        <Checkbox
-                          checked={allSelected}
-                          onCheckedChange={toggleSelectAll}
-                          className="h-3 w-3"
-                          data-testid="checkbox-select-all"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Checkbox
+                            checked={allSelected}
+                            onCheckedChange={toggleSelectAll}
+                            className="h-3 w-3"
+                            data-testid="checkbox-select-all"
+                          />
+                          <span className="text-[9px] text-muted-foreground font-medium">Select All</span>
+                        </div>
                       </th>
                       <th
                         className="px-0.5 py-0"
@@ -1094,7 +1097,7 @@ function SessionLogRow({
         onClick={onToggle}
         data-testid={`row-session-${session.sessionId}`}
       >
-        <td className="px-0.5 py-0" style={{ width: `${colWidths.checkbox}px` }} onClick={(e) => e.stopPropagation()}>
+        <td className="px-0.5 py-0" style={{ width: "80px" }} onClick={(e) => e.stopPropagation()}>
           <Checkbox
             checked={isSelected}
             onCheckedChange={onSelect}

@@ -348,18 +348,6 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/analytics/events/:id", isAuthenticated, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id as string);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid event ID" });
-      await storage.deleteEvent(id);
-      res.json({ message: "Event deleted" });
-    } catch (error) {
-      console.error("Error deleting event:", error);
-      res.status(500).json({ message: "Failed to delete event" });
-    }
-  });
-
   app.delete("/api/analytics/events/sessions", isAuthenticated, async (req, res) => {
     try {
       const { sessionIds } = req.body;
@@ -381,6 +369,18 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting session events:", error);
       res.status(500).json({ message: "Failed to delete session events" });
+    }
+  });
+
+  app.delete("/api/analytics/events/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid event ID" });
+      await storage.deleteEvent(id);
+      res.json({ message: "Event deleted" });
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      res.status(500).json({ message: "Failed to delete event" });
     }
   });
 

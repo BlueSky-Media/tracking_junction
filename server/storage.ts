@@ -9,7 +9,7 @@ import {
   type BlockedNumber,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or } from "drizzle-orm";
+import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or, inArray } from "drizzle-orm";
 
 export interface AnalyticsFilters {
   page?: string;
@@ -902,7 +902,7 @@ class DatabaseStorage implements IStorage {
   async deleteEventsBySessions(sessionIds: string[]): Promise<number> {
     if (sessionIds.length === 0) return 0;
     const result = await db.delete(trackingEvents).where(
-      sql`${trackingEvents.sessionId} IN (${sql.join(sessionIds.map(id => sql`${id}`), sql`, `)})`
+      inArray(trackingEvents.sessionId, sessionIds)
     ).returning({ id: trackingEvents.id });
     return result.length;
   }
