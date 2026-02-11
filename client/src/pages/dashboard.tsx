@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { StatsCards } from "@/components/stats-cards";
 import { FunnelChart } from "@/components/funnel-chart";
@@ -13,7 +13,17 @@ import { TimeHeatmap } from "@/components/time-heatmap";
 import { ContactFunnel } from "@/components/contact-funnel";
 import { ReferrerBreakdown } from "@/components/referrer-breakdown";
 import { isUnauthorizedError } from "@/lib/auth-utils";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RefreshCw } from "lucide-react";
+
+const REFRESH_INTERVALS: { label: string; value: number }[] = [
+  { label: "Off", value: 0 },
+  { label: "30s", value: 30000 },
+  { label: "1m", value: 60000 },
+  { label: "5m", value: 300000 },
+];
 
 function buildQuery(filters: Filters): string {
   const params = new URLSearchParams();
@@ -32,6 +42,10 @@ function buildQuery(filters: Filters): string {
 export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [refreshInterval, setRefreshInterval] = useState<number>(0);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [filters, setFilters] = useState<Filters>({
     page: "all",
@@ -43,6 +57,23 @@ export default function DashboardPage() {
     utmMedium: "all",
     deviceType: "all",
   });
+
+  const refreshAll = useCallback(async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ["/api/analytics"] });
+    setLastUpdated(new Date());
+    setIsRefreshing(false);
+  }, [queryClient]);
+
+  useEffect(() => {
+    setLastUpdated(new Date());
+  }, []);
+
+  useEffect(() => {
+    if (refreshInterval === 0) return;
+    const timer = setInterval(refreshAll, refreshInterval);
+    return () => clearInterval(timer);
+  }, [refreshInterval, refreshAll]);
 
   const query = buildQuery(filters);
 
@@ -114,11 +145,48 @@ export default function DashboardPage() {
     });
   }, [statsQuery.error, funnelQuery.error, breakdownQuery.error]);
 
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 10000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="px-4 sm:px-6 py-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold mb-1" data-testid="text-dashboard-title">Analytics Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Track visitor behavior across your landing page funnels</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold mb-1" data-testid="text-dashboard-title">Analytics Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Track visitor behavior across your landing page funnels</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {lastUpdated && (
+            <span className="text-xs text-muted-foreground" data-testid="text-last-updated">
+              {isRefreshing ? "Refreshing..." : `Updated ${formatDistanceToNow(lastUpdated, { addSuffix: true })}`}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshAll}
+            disabled={isRefreshing}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Select value={String(refreshInterval)} onValueChange={(v) => setRefreshInterval(Number(v))}>
+            <SelectTrigger className="w-[100px]" data-testid="select-auto-refresh">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {REFRESH_INTERVALS.map((opt) => (
+                <SelectItem key={opt.value} value={String(opt.value)}>
+                  {opt.label === "Off" ? "Auto: Off" : `Auto: ${opt.label}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <DashboardFilters filters={filters} onFiltersChange={setFilters} />
