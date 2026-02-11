@@ -9,6 +9,7 @@ import LandingPage from "@/pages/landing";
 import DashboardPage from "@/pages/dashboard";
 import ApiDocsPage from "@/pages/api-docs";
 import ReportsPage from "@/pages/reports";
+import ServerLogsPage from "@/pages/server-logs";
 import NotFound from "@/pages/not-found";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -38,6 +39,7 @@ function AuthenticatedLayout() {
               <Route path="/" component={DashboardPage} />
               <Route path="/reports" component={ReportsPage} />
               <Route path="/docs" component={ApiDocsPage} />
+              <Route path="/logs" component={ServerLogsPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

@@ -4,6 +4,17 @@ import { storage } from "./storage";
 import { trackingEventApiSchema } from "@shared/schema";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 
+const PII_FIELDS = ["first_name", "last_name", "email", "phone", "firstName", "lastName"];
+
+function redactPii(body: any): any {
+  if (!body || typeof body !== "object") return body;
+  const redacted = { ...body };
+  for (const field of PII_FIELDS) {
+    if (redacted[field]) redacted[field] = "[REDACTED]";
+  }
+  return redacted;
+}
+
 const ALLOWED_ORIGINS = [
   "https://blueskylife.net",
   "https://www.blueskylife.net",
@@ -50,11 +61,33 @@ export async function registerRoutes(
     res.header("Access-Control-Allow-Headers", "Content-Type");
     res.header("Vary", "Origin");
 
+    const startTime = Date.now();
+    const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "";
+
     try {
       const parsed = trackingEventApiSchema.safeParse(req.body);
       if (!parsed.success) {
         console.error("Event validation failed:", JSON.stringify(parsed.error.issues), "Body:", JSON.stringify(req.body).substring(0, 500));
-        return res.status(400).json({ ok: false, error: "Invalid event data", details: parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`) });
+        const responseBody = { ok: false, error: "Invalid event data", details: parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`) };
+
+        storage.insertRequestLog({
+          method: req.method,
+          path: req.path,
+          statusCode: 400,
+          requestBody: redactPii(req.body),
+          responseBody,
+          ipAddress: clientIp,
+          userAgent: req.headers["user-agent"] || null,
+          origin: (req.headers.origin as string) || null,
+          contentType: (req.headers["content-type"] as string) || null,
+          durationMs: Date.now() - startTime,
+          errorMessage: parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "),
+          eventType: req.body?.event_type || null,
+          domain: req.body?.domain || null,
+          sessionId: req.body?.session_id || null,
+        }).catch(e => console.error("Failed to log request:", e));
+
+        return res.status(400).json(responseBody);
       }
 
       const data = parsed.data;
@@ -105,10 +138,48 @@ export async function registerRoutes(
         quizAnswers: data.quiz_answers || null,
       });
 
-      res.status(200).json({ ok: true });
+      const successResponse = { ok: true };
+
+      storage.insertRequestLog({
+        method: req.method,
+        path: req.path,
+        statusCode: 200,
+        requestBody: redactPii(req.body),
+        responseBody: successResponse,
+        ipAddress: clientIp,
+        userAgent: req.headers["user-agent"] || null,
+        origin: (req.headers.origin as string) || null,
+        contentType: (req.headers["content-type"] as string) || null,
+        durationMs: Date.now() - startTime,
+        errorMessage: null,
+        eventType: data.event_type || null,
+        domain: data.domain || null,
+        sessionId: data.session_id || null,
+      }).catch(e => console.error("Failed to log request:", e));
+
+      res.status(200).json(successResponse);
     } catch (error) {
       console.error("Error inserting event:", error);
-      res.status(500).json({ ok: false, error: "Failed to process event" });
+      const errorResponse = { ok: false, error: "Failed to process event" };
+
+      storage.insertRequestLog({
+        method: req.method,
+        path: req.path,
+        statusCode: 500,
+        requestBody: redactPii(req.body),
+        responseBody: errorResponse,
+        ipAddress: clientIp,
+        userAgent: req.headers["user-agent"] || null,
+        origin: (req.headers.origin as string) || null,
+        contentType: (req.headers["content-type"] as string) || null,
+        durationMs: Date.now() - startTime,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        eventType: req.body?.event_type || null,
+        domain: req.body?.domain || null,
+        sessionId: req.body?.session_id || null,
+      }).catch(e => console.error("Failed to log request:", e));
+
+      res.status(500).json(errorResponse);
     }
   });
 
@@ -294,6 +365,39 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error exporting CSV:", error);
       res.status(500).json({ message: "Failed to export data" });
+    }
+  });
+
+  app.get("/api/server-logs", isAuthenticated, async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+      const filters = {
+        startDate: req.query.startDate as string | undefined,
+        endDate: req.query.endDate as string | undefined,
+        startTime: req.query.startTime as string | undefined,
+        endTime: req.query.endTime as string | undefined,
+        statusCode: req.query.statusCode ? parseInt(req.query.statusCode as string) : undefined,
+        eventType: req.query.eventType as string | undefined,
+        domain: req.query.domain as string | undefined,
+        search: req.query.search as string | undefined,
+      };
+      const logs = await storage.getRequestLogs(filters, page, limit);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching server logs:", error);
+      res.status(500).json({ message: "Failed to fetch server logs" });
+    }
+  });
+
+  app.delete("/api/server-logs", isAuthenticated, async (req, res) => {
+    try {
+      const beforeDate = req.query.beforeDate as string | undefined;
+      const count = await storage.deleteRequestLogs(beforeDate);
+      res.json({ message: `Deleted ${count} log entries`, count });
+    } catch (error) {
+      console.error("Error deleting server logs:", error);
+      res.status(500).json({ message: "Failed to delete server logs" });
     }
   });
 

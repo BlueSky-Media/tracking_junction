@@ -1,6 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { LayoutDashboard, BarChart3, FileText, LogOut, GitBranch } from "lucide-react";
+import { LayoutDashboard, BarChart3, FileText, LogOut, GitBranch, Server } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,7 @@ const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard, testId: "nav-dashboard" },
   { title: "Reports", url: "/reports", icon: BarChart3, testId: "nav-reports" },
   { title: "API Docs", url: "/docs", icon: FileText, testId: "nav-api-docs" },
+  { title: "Server Logs", url: "/logs", icon: Server, testId: "nav-server-logs" },
 ];
 
 export function AppSidebar() {

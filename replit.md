@@ -18,6 +18,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `client/src/pages/dashboard.tsx` - Main dashboard page
 - `client/src/pages/reports.tsx` - Funnel reports with drilldown + event logs
 - `client/src/pages/api-docs.tsx` - API documentation page
+- `client/src/pages/server-logs.tsx` - Stape-style server logs dashboard
 - `client/src/pages/landing.tsx` - Landing/login page
 - `client/src/components/` - Dashboard components (filters, funnel chart, funnel table, step breakdown, stats cards, campaign table, device breakdown, time heatmap, contact funnel, referrer breakdown, csv export)
 
@@ -38,6 +39,8 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `DELETE /api/analytics/events/:id` - Delete single event (protected)
 - `DELETE /api/analytics/events/session/:sessionId` - Delete session events (protected)
 - `DELETE /api/analytics/all-events` - Delete all events (protected)
+- `GET /api/server-logs` - Paginated server request logs with filters (protected)
+- `DELETE /api/server-logs` - Clear all server logs (protected)
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 
 ## Event Schema Fields
