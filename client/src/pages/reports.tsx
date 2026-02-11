@@ -15,6 +15,7 @@ import {
   CalendarIcon, ChevronLeft, ChevronsLeft, ChevronsRight,
   Filter, X, RefreshCw, Trash2,
   Play, Pause, Download, Ban, Phone, FileText, Clock,
+  MinusCircle, Save,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
@@ -568,11 +569,14 @@ function DrilldownRowComponent({
 function FunnelReport({
   dateRange,
   filters,
+  drillDimension,
+  onDrillDimensionChange,
 }: {
   dateRange: DateRange | undefined;
   filters: Filters;
+  drillDimension: string;
+  onDrillDimensionChange: (d: string) => void;
 }) {
-  const [drillDimension, setDrillDimension] = useState<string>("domain");
 
   const summaryQuery = buildQueryParams(dateRange, filters, { groupBy: "domain" });
   const { data: summaryData, isLoading: summaryLoading } = useQuery<DrilldownResult>({
@@ -634,7 +638,7 @@ function FunnelReport({
       <div className="border-t pt-2 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] font-semibold">Drill down by</span>
-          <Select value={drillDimension} onValueChange={setDrillDimension}>
+          <Select value={drillDimension} onValueChange={onDrillDimensionChange}>
             <SelectTrigger className="w-[140px] h-6 text-[10px]" data-testid="select-drill-dimension">
               <SelectValue />
             </SelectTrigger>
@@ -665,15 +669,41 @@ const DEFAULT_COL_WIDTHS: Record<string, number> = {
   expand: 24,
   lastActivity: 140,
   sessionId: 110,
-  events: 60,
+  events: 50,
   furthestStep: 110,
   status: 80,
   audience: 80,
-  domain: 110,
-  device: 60,
-  os: 60,
-  browser: 60,
+  domain: 120,
+  device: 70,
+  os: 70,
+  browser: 70,
 };
+
+const STORAGE_KEY = "trackingjunction_view_state";
+
+interface SavedViewState {
+  filters: Filters;
+  drillDimension: string;
+  dateRange?: { from?: string; to?: string };
+  refreshInterval: number;
+  logsExpanded: boolean;
+}
+
+function loadSavedView(): Partial<SavedViewState> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function saveViewState(state: SavedViewState) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {}
+}
 
 const SESSION_COLUMNS = [
   { key: "checkbox", label: "", resizable: false },
@@ -747,11 +777,18 @@ function ResizableHeader({
 function EventLogsSection({
   dateRange,
   filters,
+  filterOptions,
+  onFiltersChange,
+  expanded,
+  onToggleExpanded,
 }: {
   dateRange: DateRange | undefined;
   filters: Filters;
+  filterOptions: FilterOptions | undefined;
+  onFiltersChange: (f: Filters) => void;
+  expanded: boolean;
+  onToggleExpanded: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [logPage, setLogPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -884,7 +921,7 @@ function EventLogsSection({
     <div className="border-t pt-2" data-testid="card-event-logs">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={onToggleExpanded}
           className="flex items-center gap-1.5 text-left"
           data-testid="button-toggle-logs"
         >
@@ -916,6 +953,7 @@ function EventLogsSection({
 
       {expanded && (
         <div className="mt-1.5 space-y-1.5">
+          <FilterBar filters={filters} onChange={onFiltersChange} filterOptions={filterOptions} />
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
             <Input
@@ -936,7 +974,7 @@ function EventLogsSection({
           ) : sessionsQuery.data && sessionsQuery.data.sessions.length > 0 ? (
             <>
               <div className="overflow-x-auto border rounded-md">
-                <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+                <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%", minWidth: `${Object.values(colWidths).reduce((a, b) => a + b, 0)}px` }}>
                   <thead>
                     <tr className="h-6 border-b bg-muted/50">
                       <th
@@ -1414,7 +1452,7 @@ function RetellCallSection({ phone }: { phone: string }) {
                   {call.agentName && <span className="text-muted-foreground">{call.agentName}</span>}
                 </div>
                 <div className="flex items-center gap-1">
-                  {call.recordingUrl && (
+                  {call.recordingUrl ? (
                     <>
                       <Button
                         size="icon"
@@ -1422,7 +1460,9 @@ function RetellCallSection({ phone }: { phone: string }) {
                         onClick={(e) => { e.stopPropagation(); togglePlay(call); }}
                         data-testid={`button-play-${call.callId}`}
                       >
-                        {playingId === call.callId ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                        {playingId === call.callId
+                          ? <Pause className="w-3.5 h-3.5 text-green-500" />
+                          : <Play className="w-3.5 h-3.5 text-green-500" />}
                       </Button>
                       <Button
                         size="icon"
@@ -1433,6 +1473,11 @@ function RetellCallSection({ phone }: { phone: string }) {
                         <Download className="w-3.5 h-3.5" />
                       </Button>
                     </>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[9px] text-muted-foreground" data-testid={`no-recording-${call.callId}`}>
+                      <MinusCircle className="w-3.5 h-3.5 text-red-500" />
+                      No recording
+                    </span>
                   )}
                   {call.transcript && (
                     <Button
@@ -1514,11 +1559,38 @@ function LastUpdatedIndicator({ lastUpdated, isRefreshing }: { lastUpdated: Date
 
 export default function ReportsPage() {
   const queryClient = useQueryClient();
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [filters, setFilters] = useState<Filters>(emptyFilters);
-  const [refreshInterval, setRefreshInterval] = useState<number>(0);
+  const savedView = useRef(loadSavedView());
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const sv = savedView.current;
+    if (sv.dateRange?.from) {
+      return {
+        from: new Date(sv.dateRange.from),
+        to: sv.dateRange.to ? new Date(sv.dateRange.to) : undefined,
+      };
+    }
+    return undefined;
+  });
+  const [filters, setFilters] = useState<Filters>(() => savedView.current.filters || emptyFilters);
+  const [drillDimension, setDrillDimension] = useState<string>(() => savedView.current.drillDimension || "domain");
+  const [refreshInterval, setRefreshInterval] = useState<number>(() => savedView.current.refreshInterval || 0);
+  const [logsExpanded, setLogsExpanded] = useState<boolean>(() => savedView.current.logsExpanded || false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    const state: SavedViewState = {
+      filters,
+      drillDimension,
+      dateRange: dateRange ? {
+        from: dateRange.from?.toISOString(),
+        to: dateRange.to?.toISOString(),
+      } : undefined,
+      refreshInterval,
+      logsExpanded,
+    };
+    saveViewState(state);
+  }, [filters, drillDimension, dateRange, refreshInterval, logsExpanded]);
 
   const { data: filterOptions } = useQuery<FilterOptions>({
     queryKey: ["/api/analytics/filter-options"],
@@ -1561,6 +1633,9 @@ export default function ReportsPage() {
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <LastUpdatedIndicator lastUpdated={lastUpdated} isRefreshing={isRefreshing} />
+          <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+            <Save className="w-2.5 h-2.5" /> Auto-saved
+          </span>
           <Button
             variant="outline"
             size="sm"
@@ -1625,9 +1700,16 @@ export default function ReportsPage() {
 
       <FilterBar filters={filters} onChange={setFilters} filterOptions={filterOptions} />
 
-      <FunnelReport dateRange={dateRange} filters={filters} />
+      <FunnelReport dateRange={dateRange} filters={filters} drillDimension={drillDimension} onDrillDimensionChange={setDrillDimension} />
 
-      <EventLogsSection dateRange={dateRange} filters={filters} />
+      <EventLogsSection
+        dateRange={dateRange}
+        filters={filters}
+        filterOptions={filterOptions}
+        onFiltersChange={setFilters}
+        expanded={logsExpanded}
+        onToggleExpanded={() => setLogsExpanded(prev => !prev)}
+      />
     </div>
   );
 }
