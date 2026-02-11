@@ -132,16 +132,19 @@ function EndpointSection({
 }
 
 const FILTER_PARAMS = [
-  { name: "page", type: "string", description: '"seniors", "veterans", or "first-responders"' },
-  { name: "pageType", type: "string", description: '"lead" or "call"' },
-  { name: "domain", type: "string", description: '"blueskylife.net" or "blueskylife.io"' },
+  { name: "audience", type: "string", description: '"seniors", "veterans", or "first-responders" (multi-select: comma-separated)' },
+  { name: "pageType", type: "string", description: '"lead" or "call" (multi-select: comma-separated)' },
+  { name: "domain", type: "string", description: '"blueskylife.net" or "blueskylife.io" (multi-select: comma-separated)' },
   { name: "startDate", type: "string", description: "Start date (YYYY-MM-DD)" },
   { name: "endDate", type: "string", description: "End date (YYYY-MM-DD)" },
-  { name: "utmSource", type: "string", description: "UTM source filter" },
-  { name: "utmCampaign", type: "string", description: "UTM campaign filter" },
-  { name: "utmMedium", type: "string", description: "UTM medium filter" },
-  { name: "utmContent", type: "string", description: "UTM content filter" },
-  { name: "deviceType", type: "string", description: '"mobile", "desktop", or "tablet"' },
+  { name: "utmSource", type: "string", description: "UTM source filter (multi-select: comma-separated)" },
+  { name: "utmCampaign", type: "string", description: "UTM campaign filter (multi-select: comma-separated)" },
+  { name: "utmMedium", type: "string", description: "UTM medium filter (multi-select: comma-separated)" },
+  { name: "utmContent", type: "string", description: "UTM content filter (multi-select: comma-separated)" },
+  { name: "deviceType", type: "string", description: '"mobile", "desktop", or "tablet" (multi-select: comma-separated)' },
+  { name: "os", type: "string", description: 'OS filter (multi-select: comma-separated). Values: Windows, macOS, iOS, Android, Linux, ChromeOS, Unknown' },
+  { name: "browser", type: "string", description: 'Browser filter (multi-select: comma-separated). Values: Chrome, Safari, Firefox, Edge, Opera, Facebook, Instagram, Unknown' },
+  { name: "geoState", type: "string", description: '2-letter US state code filter (multi-select: comma-separated)' },
 ];
 
 export default function ApiDocsPage() {
@@ -374,10 +377,10 @@ export default function ApiDocsPage() {
         <p className="text-sm text-muted-foreground mb-4">The expected step sequences for each funnel type.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <Card className="p-5">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            Lead-Gen Funnel
+          <h3 className="font-semibold mb-3 flex items-center gap-2 flex-wrap">
+            Lead-Gen: Seniors
             <Badge variant="secondary" className="text-xs">9 steps (0-8)</Badge>
           </h3>
           <ol className="space-y-1.5 text-sm">
@@ -385,9 +388,9 @@ export default function ApiDocsPage() {
               { n: 0, name: "Landing", type: "page_land" },
               { n: 1, name: "Beneficiary", type: "step_complete" },
               { n: 2, name: "State", type: "step_complete" },
-              { n: 3, name: "Budget", type: "step_complete" },
+              { n: 3, name: "Budget Affordability", type: "step_complete" },
               { n: 4, name: "Age", type: "step_complete" },
-              { n: 5, name: "Income", type: "step_complete" },
+              { n: 5, name: "Monthly Income", type: "step_complete" },
               { n: 6, name: "Name", type: "step_complete" },
               { n: 7, name: "Email", type: "step_complete" },
               { n: 8, name: "Phone", type: "form_complete" },
@@ -401,8 +404,34 @@ export default function ApiDocsPage() {
           </ol>
         </Card>
         <Card className="p-5">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            Call-In Funnel
+          <h3 className="font-semibold mb-3 flex items-center gap-2 flex-wrap">
+            Lead-Gen: Veterans / First Responders
+            <Badge variant="secondary" className="text-xs">10 steps (0-9)</Badge>
+          </h3>
+          <ol className="space-y-1.5 text-sm">
+            {[
+              { n: 0, name: "Landing", type: "page_land" },
+              { n: 1, name: "Military Branch / Agency", type: "step_complete" },
+              { n: 2, name: "State", type: "step_complete" },
+              { n: 3, name: "Beneficiary", type: "step_complete" },
+              { n: 4, name: "Budget Affordability", type: "step_complete" },
+              { n: 5, name: "Age", type: "step_complete" },
+              { n: 6, name: "Monthly Income", type: "step_complete" },
+              { n: 7, name: "Name", type: "step_complete" },
+              { n: 8, name: "Email", type: "step_complete" },
+              { n: 9, name: "Phone", type: "form_complete" },
+            ].map((s) => (
+              <li key={s.n} className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{s.n}</span>
+                <span>{s.name}</span>
+                <span className="text-xs text-muted-foreground">({s.type})</span>
+              </li>
+            ))}
+          </ol>
+        </Card>
+        <Card className="p-5">
+          <h3 className="font-semibold mb-3 flex items-center gap-2 flex-wrap">
+            Call-In: All Audiences
             <Badge variant="secondary" className="text-xs">7 steps (0-6)</Badge>
           </h3>
           <ol className="space-y-1.5 text-sm">
@@ -410,7 +439,7 @@ export default function ApiDocsPage() {
               { n: 0, name: "Landing", type: "page_land" },
               { n: 1, name: "State", type: "step_complete" },
               { n: 2, name: "Age", type: "step_complete" },
-              { n: 3, name: "Income", type: "step_complete" },
+              { n: 3, name: "Monthly Income", type: "step_complete" },
               { n: 4, name: "Budget", type: "step_complete" },
               { n: 5, name: "Purpose", type: "step_complete" },
               { n: 6, name: "Call CTA", type: "step_complete" },
@@ -633,6 +662,68 @@ referrer,first_name,last_name,email,phone,event_timestamp
       />
 
       <EndpointSection
+        testId="endpoint-get-bounce"
+        method="GET"
+        path="/api/analytics/bounce"
+        description="Returns the bounce rate percentage (sessions with only a page_land event and no further steps)."
+        auth={true}
+        responseExample={`{
+  "bounceRate": 15.5,
+  "bouncedSessions": 298,
+  "totalSessions": 1920
+}`}
+      />
+
+      <EndpointSection
+        testId="endpoint-get-sessions"
+        method="GET"
+        path="/api/analytics/sessions"
+        description="Returns paginated session-grouped event logs. Each session includes all its events, furthest step reached, and aggregated metadata. Used by the Session Logs view."
+        auth={true}
+        queryParams={[
+          { name: "page", type: "number", description: "Page number (1-indexed). Default: 1.", required: false },
+          { name: "limit", type: "number", description: "Sessions per page (1-200). Default: 25.", required: false },
+          { name: "search", type: "string", description: "Search term to filter sessions by ID, name, email, or phone.", required: false },
+        ]}
+        responseExample={`{
+  "sessions": [
+    {
+      "sessionId": "abc-123",
+      "events": [ ... ],
+      "maxStep": 5,
+      "maxStepName": "Income",
+      "maxEventType": "step_complete",
+      "eventCount": 6,
+      "firstEventAt": "2025-02-10T12:00:00Z",
+      "lastEventAt": "2025-02-10T12:05:30Z",
+      "page": "seniors",
+      "pageType": "lead",
+      "domain": "blueskylife.net",
+      "deviceType": "mobile",
+      "os": "iOS",
+      "browser": "Safari",
+      "utmSource": "fb",
+      "utmCampaign": "spring-2025",
+      "firstName": null,
+      "lastName": null,
+      "email": null,
+      "phone": null
+    }
+  ],
+  "total": 1920,
+  "page": 1,
+  "limit": 25,
+  "totalPages": 77
+}`}
+        notes={[
+          "Sessions are ordered by most recent activity (lastEventAt) descending.",
+          "Each session includes the full events array for expandable detail views.",
+          "PII fields (firstName, lastName, email, phone) are only populated if the session includes a form_complete event.",
+          "Accepts all common filter parameters in addition to pagination and search.",
+        ]}
+      />
+
+      <EndpointSection
         testId="endpoint-get-drilldown"
         method="GET"
         path="/api/analytics/drilldown"
@@ -643,7 +734,7 @@ referrer,first_name,last_name,email,phone,event_timestamp
           { name: "startDate", type: "string", description: "ISO date string for range start.", required: false },
           { name: "endDate", type: "string", description: "ISO date string for range end.", required: false },
           { name: "domain", type: "string", description: "Filter by domain.", required: false },
-          { name: "page", type: "string", description: "Filter by audience (seniors, veterans, first-responders).", required: false },
+          { name: "audience", type: "string", description: "Filter by audience (seniors, veterans, first-responders).", required: false },
           { name: "deviceType", type: "string", description: "Filter by device type.", required: false },
           { name: "utmSource", type: "string", description: "Filter by UTM source.", required: false },
           { name: "utmCampaign", type: "string", description: "Filter by UTM campaign.", required: false },
