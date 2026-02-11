@@ -460,12 +460,7 @@ function DrilldownRowComponent({
 
   const handleDimSelect = (dim: string) => {
     setPopoverOpen(false);
-    if (selectedSubDim === dim && isExpanded) {
-      onToggle();
-    } else {
-      onChangeDim(dim);
-      if (!isExpanded) onToggle();
-    }
+    onChangeDim(dim);
   };
 
   return (
