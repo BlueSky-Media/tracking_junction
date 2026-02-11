@@ -100,6 +100,31 @@ interface EventLogResult {
   totalPages: number;
 }
 
+interface SessionLogEntry {
+  sessionId: string;
+  events: EventLog[];
+  maxStep: number;
+  maxStepName: string;
+  maxEventType: string;
+  eventCount: number;
+  firstEventAt: string;
+  lastEventAt: string;
+  page: string;
+  pageType: string;
+  domain: string;
+  deviceType: string | null;
+  os: string | null;
+  browser: string | null;
+}
+
+interface SessionLogResult {
+  sessions: SessionLogEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 interface Filters {
   domain: string;
   deviceType: string;
@@ -644,7 +669,7 @@ function EventLogsSection({
   const [logPage, setLogPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -656,26 +681,25 @@ function EventLogsSection({
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [deleting, setDeleting] = useState<Set<number>>(new Set());
   const [deletingSession, setDeletingSession] = useState<string | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
 
   const logsQueryStr = buildLogsQuery(dateRange, filters, logPage, debouncedSearch);
-  const logsQuery = useQuery<EventLogResult>({
-    queryKey: ["/api/analytics/logs", logsQueryStr],
+  const sessionsQuery = useQuery<SessionLogResult>({
+    queryKey: ["/api/analytics/sessions", logsQueryStr],
     queryFn: async () => {
-      const res = await fetch(`/api/analytics/logs?${logsQueryStr}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch logs");
+      const res = await fetch(`/api/analytics/sessions?${logsQueryStr}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sessions");
       return res.json();
     },
     enabled: expanded,
   });
 
-  const toggleRow = (id: number) => {
-    setExpandedRows(prev => {
+  const toggleSession = (sessionId: string) => {
+    setExpandedSessions(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(sessionId)) next.delete(sessionId); else next.add(sessionId);
       return next;
     });
   };
@@ -687,20 +711,6 @@ function EventLogsSection({
         return typeof key === "string" && key.startsWith("/api/analytics");
       },
     });
-  };
-
-  const deleteEvent = async (id: number) => {
-    setDeleting(prev => new Set(prev).add(id));
-    try {
-      const res = await fetch(`/api/analytics/events/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) throw new Error("Failed to delete");
-      toast({ title: "Event deleted" });
-      invalidateAnalytics();
-    } catch {
-      toast({ title: "Failed to delete event", variant: "destructive" });
-    } finally {
-      setDeleting(prev => { const n = new Set(prev); n.delete(id); return n; });
-    }
   };
 
   const deleteSession = async (sessionId: string) => {
@@ -742,15 +752,15 @@ function EventLogsSection({
           data-testid="button-toggle-logs"
         >
           {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          <h3 className="text-[11px] font-semibold">Event Logs</h3>
-          {logsQuery.data && (
-            <Badge variant="secondary" className="text-[9px] py-0 ml-1">{logsQuery.data.total.toLocaleString()} records</Badge>
+          <h3 className="text-[11px] font-semibold">Session Logs</h3>
+          {sessionsQuery.data && (
+            <Badge variant="secondary" className="text-[9px] py-0 ml-1">{sessionsQuery.data.total.toLocaleString()} sessions</Badge>
           )}
         </button>
-        {expanded && logsQuery.data && logsQuery.data.total > 0 && (
+        {expanded && sessionsQuery.data && sessionsQuery.data.total > 0 && (
           confirmDeleteAll ? (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-destructive font-medium">Delete all {logsQuery.data.total.toLocaleString()} events?</span>
+              <span className="text-[10px] text-destructive font-medium">Delete all events?</span>
               <Button variant="destructive" size="sm" onClick={deleteAll} disabled={deletingAll} data-testid="button-confirm-delete-all">
                 {deletingAll ? "..." : "Yes"}
               </Button>
@@ -780,42 +790,40 @@ function EventLogsSection({
             />
           </div>
 
-          {logsQuery.isLoading ? (
+          {sessionsQuery.isLoading ? (
             <div className="space-y-1">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-5 w-full" />
               ))}
             </div>
-          ) : logsQuery.data && logsQuery.data.events.length > 0 ? (
+          ) : sessionsQuery.data && sessionsQuery.data.sessions.length > 0 ? (
             <>
               <div className="overflow-x-auto border rounded-md">
                 <Table>
                   <TableHeader>
                     <TableRow className="h-6">
                       <TableHead className="w-5 px-0.5 py-0" />
-                      <TableHead className="text-[10px] px-1 py-0">Timestamp</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Last Activity</TableHead>
                       <TableHead className="text-[10px] px-1 py-0">Session ID</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Event</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Events</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Furthest Step</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Status</TableHead>
                       <TableHead className="text-[10px] px-1 py-0">Audience</TableHead>
                       <TableHead className="text-[10px] px-1 py-0">Domain</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Step</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Value</TableHead>
                       <TableHead className="text-[10px] px-1 py-0">Device</TableHead>
                       <TableHead className="text-[10px] px-1 py-0">OS</TableHead>
                       <TableHead className="text-[10px] px-1 py-0">Browser</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {logsQuery.data.events.map((event) => (
-                      <EventLogRow
-                        key={event.id}
-                        event={event}
-                        isExpanded={expandedRows.has(event.id)}
-                        onToggle={() => toggleRow(event.id)}
-                        onDeleteEvent={() => deleteEvent(event.id)}
-                        onDeleteSession={() => deleteSession(event.sessionId)}
-                        isDeleting={deleting.has(event.id)}
-                        isDeletingSession={deletingSession === event.sessionId}
+                    {sessionsQuery.data.sessions.map((session) => (
+                      <SessionLogRow
+                        key={session.sessionId}
+                        session={session}
+                        isExpanded={expandedSessions.has(session.sessionId)}
+                        onToggle={() => toggleSession(session.sessionId)}
+                        onDeleteSession={() => deleteSession(session.sessionId)}
+                        isDeletingSession={deletingSession === session.sessionId}
                       />
                     ))}
                   </TableBody>
@@ -824,22 +832,22 @@ function EventLogsSection({
 
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <p className="text-[10px] text-muted-foreground">
-                  {((logsQuery.data.page - 1) * logsQuery.data.limit) + 1}-{Math.min(logsQuery.data.page * logsQuery.data.limit, logsQuery.data.total)} of {logsQuery.data.total.toLocaleString()}
+                  {((sessionsQuery.data.page - 1) * sessionsQuery.data.limit) + 1}-{Math.min(sessionsQuery.data.page * sessionsQuery.data.limit, sessionsQuery.data.total)} of {sessionsQuery.data.total.toLocaleString()} sessions
                 </p>
                 <div className="flex items-center gap-0.5">
-                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(1)} disabled={logsQuery.data.page <= 1} data-testid="button-log-first">
+                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(1)} disabled={sessionsQuery.data.page <= 1} data-testid="button-log-first">
                     <ChevronsLeft className="w-3 h-3" />
                   </Button>
-                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logsQuery.data.page <= 1} data-testid="button-log-prev">
+                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={sessionsQuery.data.page <= 1} data-testid="button-log-prev">
                     <ChevronLeft className="w-3 h-3" />
                   </Button>
                   <span className="px-2 text-[10px] font-mono">
-                    {logsQuery.data.page} / {logsQuery.data.totalPages}
+                    {sessionsQuery.data.page} / {sessionsQuery.data.totalPages}
                   </span>
-                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(p => Math.min(logsQuery.data!.totalPages, p + 1))} disabled={logsQuery.data.page >= logsQuery.data.totalPages} data-testid="button-log-next">
+                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(p => Math.min(sessionsQuery.data!.totalPages, p + 1))} disabled={sessionsQuery.data.page >= sessionsQuery.data.totalPages} data-testid="button-log-next">
                     <ChevronRight className="w-3 h-3" />
                   </Button>
-                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(logsQuery.data!.totalPages)} disabled={logsQuery.data.page >= logsQuery.data.totalPages} data-testid="button-log-last">
+                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(sessionsQuery.data!.totalPages)} disabled={sessionsQuery.data.page >= sessionsQuery.data.totalPages} data-testid="button-log-last">
                     <ChevronsRight className="w-3 h-3" />
                   </Button>
                 </div>
@@ -847,7 +855,7 @@ function EventLogsSection({
             </>
           ) : (
             <div className="py-3 text-center text-muted-foreground text-[11px]">
-              {debouncedSearch ? "No records match your search." : "No event logs found for the selected filters."}
+              {debouncedSearch ? "No sessions match your search." : "No session logs found for the selected filters."}
             </div>
           )}
         </div>
@@ -856,129 +864,167 @@ function EventLogsSection({
   );
 }
 
-function EventLogRow({
-  event,
+function SessionLogRow({
+  session,
   isExpanded,
   onToggle,
-  onDeleteEvent,
   onDeleteSession,
-  isDeleting,
   isDeletingSession,
 }: {
-  event: EventLog;
+  session: SessionLogEntry;
   isExpanded: boolean;
   onToggle: () => void;
-  onDeleteEvent: () => void;
   onDeleteSession: () => void;
-  isDeleting: boolean;
   isDeletingSession: boolean;
 }) {
-  const ts = new Date(event.eventTimestamp);
+  const ts = new Date(session.lastEventAt);
   const formattedDate = format(ts, "MMM d h:mm:ss a");
+
+  const statusBadge = session.maxEventType === "form_complete"
+    ? <Badge variant="secondary" className="text-[9px] py-0 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30">Complete</Badge>
+    : session.maxStep === 0
+    ? <Badge variant="secondary" className="text-[9px] py-0 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30">Landed</Badge>
+    : <Badge variant="secondary" className="text-[9px] py-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">Step {session.maxStep}</Badge>;
 
   return (
     <>
       <TableRow
         className="cursor-pointer hover-elevate h-6"
         onClick={onToggle}
-        data-testid={`row-log-${event.id}`}
+        data-testid={`row-session-${session.sessionId}`}
       >
         <TableCell className="w-5 px-0.5 py-0">
           {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         </TableCell>
         <TableCell className="text-[10px] font-mono whitespace-nowrap px-1 py-0">{formattedDate}</TableCell>
-        <TableCell className="text-[10px] font-mono max-w-[80px] truncate px-1 py-0" title={event.sessionId}>
-          {event.sessionId.substring(0, 8)}...
+        <TableCell className="text-[10px] font-mono max-w-[100px] truncate px-1 py-0" title={session.sessionId}>
+          {session.sessionId.substring(0, 10)}...
         </TableCell>
-        <TableCell className="px-1 py-0">
-          <Badge variant="secondary" className="text-[9px] py-0">{event.eventType || "step_complete"}</Badge>
+        <TableCell className="text-[10px] font-mono px-1 py-0 text-center">
+          <Badge variant="outline" className="text-[9px] py-0">{session.eventCount}</Badge>
         </TableCell>
-        <TableCell className="text-[10px] px-1 py-0">{event.page}</TableCell>
-        <TableCell className="text-[10px] px-1 py-0">{event.domain}</TableCell>
-        <TableCell className="text-[10px] font-mono px-1 py-0">{event.stepNumber}. {event.stepName}</TableCell>
-        <TableCell className="text-[10px] max-w-[80px] truncate px-1 py-0" title={event.selectedValue || ""}>
-          {event.selectedValue || "\u2014"}
-        </TableCell>
-        <TableCell className="text-[10px] px-1 py-0">{event.deviceType || "\u2014"}</TableCell>
-        <TableCell className="text-[10px] px-1 py-0">{event.os || "\u2014"}</TableCell>
-        <TableCell className="text-[10px] px-1 py-0">{event.browser || "\u2014"}</TableCell>
+        <TableCell className="text-[10px] font-mono px-1 py-0">{session.maxStep}. {session.maxStepName}</TableCell>
+        <TableCell className="px-1 py-0">{statusBadge}</TableCell>
+        <TableCell className="text-[10px] px-1 py-0">{session.page}</TableCell>
+        <TableCell className="text-[10px] px-1 py-0">{session.domain}</TableCell>
+        <TableCell className="text-[10px] px-1 py-0">{session.deviceType || "\u2014"}</TableCell>
+        <TableCell className="text-[10px] px-1 py-0">{session.os || "\u2014"}</TableCell>
+        <TableCell className="text-[10px] px-1 py-0">{session.browser || "\u2014"}</TableCell>
       </TableRow>
       {isExpanded && (
-        <TableRow data-testid={`row-log-detail-${event.id}`}>
+        <TableRow data-testid={`row-session-detail-${session.sessionId}`}>
           <TableCell colSpan={11} className="p-0">
-            <div className="bg-muted/50 px-3 py-2 space-y-1.5">
+            <div className="bg-muted/50 px-3 py-2 space-y-2">
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-x-3 gap-y-0.5 text-[10px]">
-                <DetailField label="ID" value={String(event.id)} />
-                <DetailField label="Session ID" value={event.sessionId} />
-                <DetailField label="Event Type" value={event.eventType || "step_complete"} />
-                <DetailField label="Audience" value={event.page} />
-                <DetailField label="Funnel Type" value={event.pageType} />
-                <DetailField label="Domain" value={event.domain} />
-                <DetailField label="Step" value={`${event.stepNumber}. ${event.stepName}`} />
-                <DetailField label="Selected Value" value={event.selectedValue || "\u2014"} />
-                <DetailField label="Time on Step" value={event.timeOnStep !== null ? `${event.timeOnStep}s` : "\u2014"} />
-                <DetailField label="Device" value={event.deviceType || "\u2014"} />
-                <DetailField label="OS" value={event.os || "\u2014"} />
-                <DetailField label="Browser" value={event.browser || "\u2014"} />
-                <DetailField label="Geo State" value={event.geoState || "\u2014"} />
-                <DetailField label="IP Address" value={event.ipAddress || "\u2014"} />
-                <DetailField label="Placement" value={event.placement || "\u2014"} />
-                <DetailField label="UTM Source" value={event.utmSource || "\u2014"} />
-                <DetailField label="UTM Campaign" value={event.utmCampaign || "\u2014"} />
-                <DetailField label="UTM Medium" value={event.utmMedium || "\u2014"} />
-                <DetailField label="UTM Content" value={event.utmContent || "\u2014"} />
-                <DetailField label="UTM Term" value={event.utmTerm || "\u2014"} />
-                <DetailField label="UTM ID" value={event.utmId || "\u2014"} />
-                <DetailField label="Media Type" value={event.mediaType || "\u2014"} />
-                <DetailField label="Campaign Name" value={event.campaignName || "\u2014"} />
-                <DetailField label="Campaign ID" value={event.campaignId || "\u2014"} />
-                <DetailField label="Ad Name" value={event.adName || "\u2014"} />
-                <DetailField label="Ad ID" value={event.adId || "\u2014"} />
-                <DetailField label="Adset Name" value={event.adsetName || "\u2014"} />
-                <DetailField label="Adset ID" value={event.adsetId || "\u2014"} />
-                <DetailField label="FBCLID" value={event.fbclid || "\u2014"} />
-                <DetailField label="FBC" value={event.fbc || "\u2014"} />
-                <DetailField label="FBP" value={event.fbp || "\u2014"} />
-                <DetailField label="Event ID" value={event.eventId || "\u2014"} />
-                <DetailField label="External ID" value={event.externalId || "\u2014"} />
-                <DetailField label="Referrer" value={event.referrer || "\u2014"} />
-                <DetailField label="Timestamp" value={formattedDate} />
-                {event.quizAnswers && Object.keys(event.quizAnswers).length > 0 && (
+                <DetailField label="Session ID" value={session.sessionId} />
+                <DetailField label="Audience" value={session.page} />
+                <DetailField label="Funnel Type" value={session.pageType} />
+                <DetailField label="Domain" value={session.domain} />
+                <DetailField label="Device" value={session.deviceType || "\u2014"} />
+                <DetailField label="OS" value={session.os || "\u2014"} />
+                <DetailField label="Browser" value={session.browser || "\u2014"} />
+                {session.events[0] && (
                   <>
-                    {Object.entries(event.quizAnswers).map(([key, val]) => (
-                      <DetailField key={key} label={`Quiz: ${key.charAt(0).toUpperCase() + key.slice(1)}`} value={val} />
-                    ))}
-                  </>
-                )}
-                {event.eventType === "form_complete" && (
-                  <>
-                    <DetailField label="First Name" value={event.firstName || "\u2014"} />
-                    <DetailField label="Last Name" value={event.lastName || "\u2014"} />
-                    <DetailField label="Email" value={event.email || "\u2014"} />
-                    <DetailField label="Phone" value={event.phone || "\u2014"} />
+                    <DetailField label="IP Address" value={session.events[0].ipAddress || "\u2014"} />
+                    <DetailField label="Geo State" value={session.events[0].geoState || "\u2014"} />
+                    <DetailField label="UTM Source" value={session.events[0].utmSource || "\u2014"} />
+                    <DetailField label="UTM Campaign" value={session.events[0].utmCampaign || "\u2014"} />
+                    <DetailField label="UTM Medium" value={session.events[0].utmMedium || "\u2014"} />
+                    <DetailField label="Referrer" value={session.events[0].referrer || "\u2014"} />
+                    <DetailField label="External ID" value={session.events[0].externalId || "\u2014"} />
+                    <DetailField label="FBCLID" value={session.events[0].fbclid || "\u2014"} />
+                    <DetailField label="FBC" value={session.events[0].fbc || "\u2014"} />
+                    <DetailField label="FBP" value={session.events[0].fbp || "\u2014"} />
+                    <DetailField label="Campaign Name" value={session.events[0].campaignName || "\u2014"} />
+                    <DetailField label="Ad Name" value={session.events[0].adName || "\u2014"} />
+                    <DetailField label="Adset Name" value={session.events[0].adsetName || "\u2014"} />
+                    <DetailField label="Placement" value={session.events[0].placement || "\u2014"} />
                   </>
                 )}
               </div>
+
+              <div>
+                <h4 className="text-[10px] font-semibold mb-1">Steps ({session.events.length} events)</h4>
+                <div className="border rounded-md overflow-x-auto">
+                  <table className="w-full text-[10px]">
+                    <thead>
+                      <tr className="border-b bg-background/50">
+                        <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">Step</th>
+                        <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">Name</th>
+                        <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">Event</th>
+                        <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">Value</th>
+                        <th className="px-1.5 py-1 text-right font-medium text-muted-foreground">Time on Step</th>
+                        <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">Timestamp</th>
+                        <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">Event ID</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {session.events.map((event) => {
+                        const evTs = new Date(event.eventTimestamp);
+                        return (
+                          <tr key={event.id} className="border-b last:border-0" data-testid={`row-step-${event.id}`}>
+                            <td className="px-1.5 py-0.5 font-mono font-semibold">{event.stepNumber}</td>
+                            <td className="px-1.5 py-0.5">{event.stepName}</td>
+                            <td className="px-1.5 py-0.5">
+                              <Badge variant="secondary" className="text-[8px] py-0">{event.eventType || "step_complete"}</Badge>
+                            </td>
+                            <td className="px-1.5 py-0.5 max-w-[120px] truncate" title={event.selectedValue || ""}>{event.selectedValue || "\u2014"}</td>
+                            <td className="px-1.5 py-0.5 text-right font-mono text-muted-foreground">{event.timeOnStep !== null ? `${event.timeOnStep}s` : "\u2014"}</td>
+                            <td className="px-1.5 py-0.5 font-mono text-muted-foreground whitespace-nowrap">{format(evTs, "h:mm:ss a")}</td>
+                            <td className="px-1.5 py-0.5 font-mono text-muted-foreground max-w-[80px] truncate" title={event.eventId || ""}>{event.eventId || "\u2014"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {session.events.some(e => e.eventType === "form_complete") && (
+                <div>
+                  <h4 className="text-[10px] font-semibold mb-1">Lead Info</h4>
+                  <div className="grid grid-cols-4 gap-x-3 gap-y-0.5 text-[10px]">
+                    {(() => {
+                      const fc = session.events.find(e => e.eventType === "form_complete");
+                      if (!fc) return null;
+                      return (
+                        <>
+                          <DetailField label="First Name" value={fc.firstName || "\u2014"} />
+                          <DetailField label="Last Name" value={fc.lastName || "\u2014"} />
+                          <DetailField label="Email" value={fc.email || "\u2014"} />
+                          <DetailField label="Phone" value={fc.phone || "\u2014"} />
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {session.events.some(e => e.quizAnswers && Object.keys(e.quizAnswers).length > 0) && (
+                <div>
+                  <h4 className="text-[10px] font-semibold mb-1">Quiz Answers</h4>
+                  <div className="grid grid-cols-4 md:grid-cols-6 gap-x-3 gap-y-0.5 text-[10px]">
+                    {(() => {
+                      const lastWithAnswers = [...session.events].reverse().find(e => e.quizAnswers && Object.keys(e.quizAnswers).length > 0);
+                      if (!lastWithAnswers?.quizAnswers) return null;
+                      return Object.entries(lastWithAnswers.quizAnswers).map(([key, val]) => (
+                        <DetailField key={key} label={key.charAt(0).toUpperCase() + key.slice(1)} value={val} />
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center gap-1.5 pt-1 border-t border-border/50">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); onDeleteEvent(); }}
-                  disabled={isDeleting}
-                  data-testid={`button-delete-event-${event.id}`}
-                >
-                  <Trash2 className="w-3 h-3 mr-1" />
-                  <span className="text-[10px]">{isDeleting ? "..." : "Delete event"}</span>
-                </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={(e) => { e.stopPropagation(); onDeleteSession(); }}
                   disabled={isDeletingSession}
-                  data-testid={`button-delete-session-${event.id}`}
+                  data-testid={`button-delete-session-${session.sessionId}`}
                 >
                   <Trash2 className="w-3 h-3 mr-1" />
-                  <span className="text-[10px]">{isDeletingSession ? "..." : "Delete session"}</span>
+                  <span className="text-[10px]">{isDeletingSession ? "..." : `Delete session (${session.eventCount} events)`}</span>
                 </Button>
               </div>
             </div>

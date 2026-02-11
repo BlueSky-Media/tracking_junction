@@ -148,6 +148,28 @@ export interface IStorage {
   deleteAllEvents(): Promise<void>;
   deleteEvent(id: number): Promise<void>;
   deleteEventsBySession(sessionId: string): Promise<number>;
+  getSessionLogs(filters: AnalyticsFilters, page: number, limit: number, search?: string): Promise<{
+    sessions: {
+      sessionId: string;
+      events: TrackingEvent[];
+      maxStep: number;
+      maxStepName: string;
+      maxEventType: string;
+      eventCount: number;
+      firstEventAt: Date;
+      lastEventAt: Date;
+      page: string;
+      pageType: string;
+      domain: string;
+      deviceType: string | null;
+      os: string | null;
+      browser: string | null;
+    }[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>;
   insertRequestLog(log: InsertRequestLog): Promise<RequestLog>;
   getRequestLogs(filters: {
     startDate?: string;
@@ -868,6 +890,94 @@ class DatabaseStorage implements IStorage {
   async deleteEventsBySession(sessionId: string): Promise<number> {
     const result = await db.delete(trackingEvents).where(eq(trackingEvents.sessionId, sessionId)).returning({ id: trackingEvents.id });
     return result.length;
+  }
+
+  async getSessionLogs(filters: AnalyticsFilters, page: number, limit: number, search?: string) {
+    const conditions = buildConditions(filters) ? [buildConditions(filters)!] : [];
+
+    if (search) {
+      conditions.push(
+        or(
+          ilike(trackingEvents.sessionId, `%${search}%`),
+          ilike(trackingEvents.stepName, `%${search}%`),
+          ilike(trackingEvents.selectedValue, `%${search}%`),
+          ilike(trackingEvents.utmCampaign, `%${search}%`),
+          ilike(trackingEvents.utmSource, `%${search}%`),
+        )!
+      );
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const sessionCountResult = await db
+      .select({ total: countDistinct(trackingEvents.sessionId) })
+      .from(trackingEvents)
+      .where(where);
+    const total = Number(sessionCountResult[0]?.total || 0);
+
+    const offset = (page - 1) * limit;
+
+    const sessionIdRows = await db
+      .select({
+        sessionId: trackingEvents.sessionId,
+        lastEvent: sql<Date>`MAX(${trackingEvents.eventTimestamp})`.as("last_event"),
+      })
+      .from(trackingEvents)
+      .where(where)
+      .groupBy(trackingEvents.sessionId)
+      .orderBy(desc(sql`MAX(${trackingEvents.eventTimestamp})`))
+      .limit(limit)
+      .offset(offset);
+
+    const sessionIds = sessionIdRows.map(r => r.sessionId);
+
+    if (sessionIds.length === 0) {
+      return { sessions: [], total, page, limit, totalPages: Math.ceil(total / limit) };
+    }
+
+    const allEvents = await db
+      .select()
+      .from(trackingEvents)
+      .where(sql`${trackingEvents.sessionId} IN (${sql.join(sessionIds.map(id => sql`${id}`), sql`, `)})`)
+      .orderBy(trackingEvents.eventTimestamp, trackingEvents.stepNumber);
+
+    const sessionMap = new Map<string, TrackingEvent[]>();
+    for (const event of allEvents) {
+      if (!sessionMap.has(event.sessionId)) sessionMap.set(event.sessionId, []);
+      sessionMap.get(event.sessionId)!.push(event);
+    }
+
+    const sessions = sessionIds.map(sessionId => {
+      const events = sessionMap.get(sessionId) || [];
+      const maxStepEvent = events.reduce((max, e) => (e.stepNumber > max.stepNumber ? e : max), events[0]);
+      const hasFormComplete = events.some(e => e.eventType === "form_complete");
+      const firstEvent = events[0];
+
+      return {
+        sessionId,
+        events,
+        maxStep: maxStepEvent.stepNumber,
+        maxStepName: maxStepEvent.stepName,
+        maxEventType: hasFormComplete ? "form_complete" : maxStepEvent.eventType || "step_complete",
+        eventCount: events.length,
+        firstEventAt: events.reduce((min, e) => new Date(e.eventTimestamp) < min ? new Date(e.eventTimestamp) : min, new Date(events[0].eventTimestamp)),
+        lastEventAt: events.reduce((max, e) => new Date(e.eventTimestamp) > max ? new Date(e.eventTimestamp) : max, new Date(events[0].eventTimestamp)),
+        page: firstEvent.page,
+        pageType: firstEvent.pageType,
+        domain: firstEvent.domain,
+        deviceType: firstEvent.deviceType,
+        os: firstEvent.os,
+        browser: firstEvent.browser,
+      };
+    });
+
+    return {
+      sessions,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async insertRequestLog(log: InsertRequestLog): Promise<RequestLog> {

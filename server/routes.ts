@@ -308,6 +308,21 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/analytics/sessions", isAuthenticated, async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
+      const search = req.query.search as string | undefined;
+      const filters = parseFilters(req.query);
+      filters.page = req.query.audience as string | undefined;
+      const sessions = await storage.getSessionLogs(filters, page, limit, search);
+      res.json(sessions);
+    } catch (error) {
+      console.error("Error fetching session logs:", error);
+      res.status(500).json({ message: "Failed to fetch session logs" });
+    }
+  });
+
   app.get("/api/analytics/logs", isAuthenticated, async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
