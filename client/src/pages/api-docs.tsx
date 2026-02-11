@@ -200,8 +200,8 @@ export default function ApiDocsPage() {
   "page_type": "lead",
   "domain": "blueskylife.net",
   "step_number": 2,
-  "step_name": "Age",
-  "selected_value": "66-70",
+  "step_name": "State",
+  "selected_value": "Florida",
   "session_id": "a50e8400-e29b-41d4-a716-446655440001",
   "event_type": "step_complete",
   "time_on_step": 8,
@@ -210,18 +210,24 @@ export default function ApiDocsPage() {
   "utm_medium": "cpc",
   "utm_content": "hero-banner",
   "device_type": "mobile",
+  "os": "iOS",
+  "browser": "Safari",
+  "placement": "feed",
+  "geo_state": "FL",
+  "ip_address": "203.0.113.42",
   "referrer": "https://google.com/search?q=..."
 }`}
         responseExample={`{ "ok": true }`}
         notes={[
           'CORS is restricted to origins: blueskylife.net and blueskylife.io (with/without www prefix).',
           'page: Audience name -- "seniors", "veterans", or "first-responders".',
-          'page_type: "lead" for lead-gen funnels (9 steps) or "call" for call-in funnels (6 steps).',
-          'event_type: "page_land" when visitor first arrives, "step_complete" after each quiz answer, "form_complete" for final submission.',
+          'page_type: "lead" for lead-gen funnels (8 steps + landing) or "call" for call-in funnels (6 steps + landing).',
+          'event_type: "page_land" when visitor first arrives, "step_complete" after each quiz answer, "form_complete" for final form submission.',
           'time_on_step: Seconds (0-3600) the visitor spent on this step before clicking. Optional.',
           'session_id: A UUID v4 generated client-side per visitor session.',
-          'selected_value: The option the visitor chose at this step (e.g., "California", "66-70").',
-          'UTM fields, device_type, and referrer are all optional.',
+          'selected_value: The option the visitor chose at this step (e.g., "Florida", "66-70").',
+          'PII fields (first_name, last_name, email, phone) are only stored when event_type is "form_complete". They are silently ignored for other event types.',
+          'UTM fields, device_type, os, browser, placement, geo_state, ip_address, and referrer are all optional.',
         ]}
       />
 
@@ -246,10 +252,10 @@ export default function ApiDocsPage() {
                 { field: "page", type: "string", required: "Yes", desc: 'Audience: "seniors", "veterans", or "first-responders"' },
                 { field: "page_type", type: "string", required: "Yes", desc: '"lead" or "call"' },
                 { field: "domain", type: "string", required: "Yes", desc: '"blueskylife.net" or "blueskylife.io"' },
-                { field: "step_number", type: "integer", required: "Yes", desc: "Step index (0-20)" },
-                { field: "step_name", type: "string", required: "Yes", desc: 'Step label (e.g., "State", "Age", "Email")' },
+                { field: "step_number", type: "integer", required: "Yes", desc: "Step index (0 = Landing, 1-8 for lead, 1-6 for call)" },
+                { field: "step_name", type: "string", required: "Yes", desc: 'Step label (e.g., "Landing", "State", "Age", "Phone")' },
                 { field: "selected_value", type: "string", required: "No", desc: "Visitor's choice at this step" },
-                { field: "session_id", type: "string (UUID)", required: "Yes", desc: "UUID v4 per visitor session" },
+                { field: "session_id", type: "string (UUID)", required: "Yes", desc: "UUID v4 generated client-side per visitor session" },
                 { field: "event_type", type: "string", required: "No", desc: '"page_land", "step_complete", or "form_complete". Defaults to "step_complete"' },
                 { field: "time_on_step", type: "integer", required: "No", desc: "Seconds spent on step (0-3600)" },
                 { field: "timestamp", type: "string (ISO)", required: "No", desc: "Event timestamp. Defaults to server receive time" },
@@ -259,7 +265,16 @@ export default function ApiDocsPage() {
                 { field: "utm_medium", type: "string", required: "No", desc: "UTM medium parameter" },
                 { field: "utm_content", type: "string", required: "No", desc: "UTM content parameter" },
                 { field: "device_type", type: "string", required: "No", desc: '"mobile", "desktop", or "tablet"' },
+                { field: "os", type: "string", required: "No", desc: '"Windows", "macOS", "iOS", "Android", "Linux", "ChromeOS", or "Unknown"' },
+                { field: "browser", type: "string", required: "No", desc: '"Chrome", "Safari", "Firefox", "Edge", "Opera", "Facebook", "Instagram", or "Unknown"' },
+                { field: "placement", type: "string", required: "No", desc: "Facebook ad placement (e.g., \"feed\", \"story\", \"reels\")" },
+                { field: "geo_state", type: "string", required: "No", desc: "2-letter US state code from geo-IP (e.g., \"FL\", \"CA\")" },
+                { field: "ip_address", type: "string", required: "No", desc: "Visitor IP address" },
                 { field: "referrer", type: "string", required: "No", desc: "Full referrer URL" },
+                { field: "first_name", type: "string", required: "No", desc: "Lead first name (form_complete only)" },
+                { field: "last_name", type: "string", required: "No", desc: "Lead last name (form_complete only)" },
+                { field: "email", type: "string", required: "No", desc: "Lead email address (form_complete only)" },
+                { field: "phone", type: "string", required: "No", desc: "Lead phone number (form_complete only)" },
               ].map((row) => (
                 <tr key={row.field} className="border-t">
                   <td className="px-3 py-2 font-mono text-xs">{row.field}</td>
@@ -288,23 +303,24 @@ export default function ApiDocsPage() {
         <Card className="p-5">
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             Lead-Gen Funnel
-            <Badge variant="secondary" className="text-xs">9 steps</Badge>
+            <Badge variant="secondary" className="text-xs">9 steps (0-8)</Badge>
           </h3>
           <ol className="space-y-1.5 text-sm">
             {[
-              { n: 1, name: "State" },
-              { n: 2, name: "Age" },
-              { n: 3, name: "Income" },
-              { n: 4, name: "Budget" },
-              { n: 5, name: "Beneficiary" },
-              { n: 6, name: "Name" },
-              { n: 7, name: "Email" },
-              { n: 8, name: "Phone" },
-              { n: 9, name: "Thank You" },
+              { n: 0, name: "Landing", type: "page_land" },
+              { n: 1, name: "Beneficiary", type: "step_complete" },
+              { n: 2, name: "State", type: "step_complete" },
+              { n: 3, name: "Budget", type: "step_complete" },
+              { n: 4, name: "Age", type: "step_complete" },
+              { n: 5, name: "Income", type: "step_complete" },
+              { n: 6, name: "Name", type: "step_complete" },
+              { n: 7, name: "Email", type: "step_complete" },
+              { n: 8, name: "Phone", type: "form_complete" },
             ].map((s) => (
               <li key={s.n} className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{s.n}</span>
                 <span>{s.name}</span>
+                <span className="text-xs text-muted-foreground">({s.type})</span>
               </li>
             ))}
           </ol>
@@ -312,20 +328,22 @@ export default function ApiDocsPage() {
         <Card className="p-5">
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             Call-In Funnel
-            <Badge variant="secondary" className="text-xs">6 steps</Badge>
+            <Badge variant="secondary" className="text-xs">7 steps (0-6)</Badge>
           </h3>
           <ol className="space-y-1.5 text-sm">
             {[
-              { n: 1, name: "State" },
-              { n: 2, name: "Age" },
-              { n: 3, name: "Income" },
-              { n: 4, name: "Budget" },
-              { n: 5, name: "Purpose" },
-              { n: 6, name: "Call CTA" },
+              { n: 0, name: "Landing", type: "page_land" },
+              { n: 1, name: "State", type: "step_complete" },
+              { n: 2, name: "Age", type: "step_complete" },
+              { n: 3, name: "Income", type: "step_complete" },
+              { n: 4, name: "Budget", type: "step_complete" },
+              { n: 5, name: "Purpose", type: "step_complete" },
+              { n: 6, name: "Call CTA", type: "step_complete" },
             ].map((s) => (
               <li key={s.n} className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{s.n}</span>
                 <span>{s.name}</span>
+                <span className="text-xs text-muted-foreground">({s.type})</span>
               </li>
             ))}
           </ol>
@@ -525,14 +543,17 @@ export default function ApiDocsPage() {
         responseExample={`id,session_id,event_type,page,page_type,domain,
 step_number,step_name,selected_value,time_on_step,
 utm_source,utm_campaign,utm_medium,utm_content,
-device_type,referrer,event_timestamp
+device_type,os,browser,placement,geo_state,ip_address,
+referrer,first_name,last_name,email,phone,event_timestamp
 1,"abc-123","step_complete","seniors","lead",
-"blueskylife.net",2,"Age","66-70",8,"google",
-"spring-2025","cpc","hero","mobile",
-"https://google.com","2025-02-10T12:00:00Z"`}
+"blueskylife.net",2,"State","Florida",8,"google",
+"spring-2025","cpc","hero","mobile","iOS","Safari",
+"feed","FL","203.0.113.42","https://google.com",
+,,,,,"2025-02-10T12:00:00Z"`}
         notes={[
           "Response Content-Type is text/csv.",
           "Maximum 10,000 rows returned, ordered by most recent first.",
+          "PII fields (first_name, last_name, email, phone) are only populated for form_complete events.",
         ]}
       />
 
@@ -574,6 +595,29 @@ device_type,referrer,event_timestamp
         <CodeBlock language="javascript" code={`// Generate a session ID once per visitor
 const SESSION_ID = crypto.randomUUID();
 
+// Detect OS and browser
+function detectOS() {
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua)) return "iOS";
+  if (/Android/.test(ua)) return "Android";
+  if (/Mac/.test(ua)) return "macOS";
+  if (/Win/.test(ua)) return "Windows";
+  if (/CrOS/.test(ua)) return "ChromeOS";
+  if (/Linux/.test(ua)) return "Linux";
+  return "Unknown";
+}
+function detectBrowser() {
+  const ua = navigator.userAgent;
+  if (/FBAN|FBAV/.test(ua)) return "Facebook";
+  if (/Instagram/.test(ua)) return "Instagram";
+  if (/Edg/.test(ua)) return "Edge";
+  if (/OPR|Opera/.test(ua)) return "Opera";
+  if (/Chrome/.test(ua)) return "Chrome";
+  if (/Safari/.test(ua)) return "Safari";
+  if (/Firefox/.test(ua)) return "Firefox";
+  return "Unknown";
+}
+
 // Helper to send a tracking event
 async function trackEvent(data) {
   await fetch("https://trackingjunction.com/api/events", {
@@ -586,7 +630,10 @@ async function trackEvent(data) {
       page_type: "lead",         // funnel type
       domain: "blueskylife.net",
       device_type: /Mobi/i.test(navigator.userAgent)
-        ? "mobile" : "desktop",
+        ? "mobile" : /Tablet|iPad/i.test(navigator.userAgent)
+        ? "tablet" : "desktop",
+      os: detectOS(),
+      browser: detectBrowser(),
       referrer: document.referrer || undefined,
       // Include UTM params from URL
       ...Object.fromEntries(
@@ -617,6 +664,21 @@ function onStepComplete(stepNumber, stepName, selectedValue) {
     time_on_step: Math.min(timeOnStep, 3600),
   });
   stepStart = Date.now(); // reset for next step
+}
+
+// Track form submission (final step) with PII
+function onFormComplete(formData) {
+  const timeOnStep = Math.round((Date.now() - stepStart) / 1000);
+  trackEvent({
+    step_number: 8,
+    step_name: "Phone",
+    event_type: "form_complete",
+    time_on_step: Math.min(timeOnStep, 3600),
+    first_name: formData.firstName,
+    last_name: formData.lastName,
+    email: formData.email,
+    phone: formData.phone,
+  });
 }`} />
       </Card>
 
