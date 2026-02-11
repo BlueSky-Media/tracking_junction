@@ -829,13 +829,18 @@ class DatabaseStorage implements IStorage {
       return aName.join(":").localeCompare(bName.join(":"));
     });
 
-    function buildSteps(uniqueViews: number, stepsMap: Map<string, { stepNumber: number; stepName: string; completions: number }>): DrilldownStepData[] {
-      let prevCount = uniqueViews;
+    function buildSteps(
+      defaultBase: number,
+      stepsMap: Map<string, { stepNumber: number; stepName: string; completions: number }>,
+      perStepLandBase?: Map<string, number>,
+    ): DrilldownStepData[] {
+      let prevCount = defaultBase;
       return sortedStepKeys.map((sk) => {
         const stepData = stepsMap.get(sk);
         const completions = stepData?.completions || 0;
         const convFromPrev = prevCount > 0 ? (completions / prevCount) * 100 : 0;
-        const convFromInitial = uniqueViews > 0 ? (completions / uniqueViews) * 100 : 0;
+        const landBase = perStepLandBase?.get(sk) ?? defaultBase;
+        const convFromInitial = landBase > 0 ? (completions / landBase) * 100 : 0;
         if (completions > 0) prevCount = completions;
         const [numStr, ...nameParts] = sk.split(":");
         return {
@@ -881,33 +886,49 @@ class DatabaseStorage implements IStorage {
     }
 
     const totalPageLandBase = totalPageLands || totalUniqueViews;
+
+    const perStepLandBase = new Map<string, number>();
+    for (const sk of sortedStepKeys) {
+      let stepBase = 0;
+      for (const row of drilldownRows) {
+        const rowStep = row.steps.find(s => s.stepKey === sk && s.completions > 0);
+        if (rowStep) {
+          stepBase += row.pageLands || row.uniqueViews;
+        }
+      }
+      perStepLandBase.set(sk, stepBase > 0 ? stepBase : totalPageLandBase);
+    }
+
     const totals: DrilldownRow = {
       groupValue: "Totals",
       uniqueViews: totalUniqueViews,
       grossViews: totalGrossViews,
       pageLands: totalPageLands,
       formCompletions: totalFormCompletions,
-      steps: buildSteps(totalPageLandBase, totalsStepsMap),
+      steps: buildSteps(totalPageLandBase, totalsStepsMap, perStepLandBase),
     };
 
     return { rows: drilldownRows, totals, groupBy };
   }
 
   async getEventLogs(filters: AnalyticsFilters, page: number, limit: number, search?: string): Promise<EventLogResult> {
-    const conditions = [];
-    if (filters.page) conditions.push(eq(trackingEvents.page, filters.page));
-    if (filters.pageType) conditions.push(eq(trackingEvents.pageType, filters.pageType));
-    if (filters.domain) conditions.push(eq(trackingEvents.domain, filters.domain));
+    const conditions: any[] = [];
+    addFilterCondition(conditions, trackingEvents.page, filters.page);
+    addFilterCondition(conditions, trackingEvents.pageType, filters.pageType);
+    addFilterCondition(conditions, trackingEvents.domain, filters.domain);
     if (filters.startDate) conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
     if (filters.endDate) {
       const end = new Date(filters.endDate);
       end.setHours(23, 59, 59, 999);
       conditions.push(lte(trackingEvents.eventTimestamp, end));
     }
-    if (filters.utmSource) conditions.push(eq(trackingEvents.utmSource, filters.utmSource));
-    if (filters.utmCampaign) conditions.push(eq(trackingEvents.utmCampaign, filters.utmCampaign));
-    if (filters.utmMedium) conditions.push(eq(trackingEvents.utmMedium, filters.utmMedium));
-    if (filters.deviceType) conditions.push(eq(trackingEvents.deviceType, filters.deviceType));
+    addFilterCondition(conditions, trackingEvents.utmSource, filters.utmSource);
+    addFilterCondition(conditions, trackingEvents.utmCampaign, filters.utmCampaign);
+    addFilterCondition(conditions, trackingEvents.utmMedium, filters.utmMedium);
+    addFilterCondition(conditions, trackingEvents.deviceType, filters.deviceType);
+    addFilterCondition(conditions, trackingEvents.os, filters.os);
+    addFilterCondition(conditions, trackingEvents.browser, filters.browser);
+    addFilterCondition(conditions, trackingEvents.geoState, filters.geoState);
 
     if (search && search.trim()) {
       const searchTerm = `%${search.trim().toLowerCase()}%`;

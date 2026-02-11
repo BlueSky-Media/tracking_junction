@@ -632,7 +632,7 @@ function DrilldownTable({
             {showLands && <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Lands</TableHead>}
             {showLandCvr && <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Land CVR</TableHead>}
             {visibleSteps.map((step) => (
-              <TableHead key={`step-${step.stepKey}`} colSpan={3} className="text-[9px] text-center px-0 py-0 border-l border-border/30 whitespace-nowrap">
+              <TableHead key={`step-${step.stepKey}`} colSpan={4} className="text-[9px] text-center px-0 py-0 border-l border-border/30 whitespace-nowrap">
                 <span className="font-semibold">S{step.stepNumber}</span>
                 <span className="text-muted-foreground ml-0.5 text-[8px]">{step.stepName}</span>
               </TableHead>
@@ -649,6 +649,7 @@ function DrilldownTable({
               <Fragment key={`sh-grp-${step.stepKey}`}>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap border-l border-border/30">#</TableHead>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">CVR</TableHead>
+                <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">SCVR</TableHead>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">Drop-off</TableHead>
               </Fragment>
             ))}
@@ -706,6 +707,7 @@ function DrilldownTable({
                   return (
                     <Fragment key={`tc-grp-${step.stepKey}`}>
                       <TableCell className="text-right font-mono text-[10px] px-0.5 py-0 font-bold border-l border-border/30">{step.completions.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono text-[9px] px-0.5 py-0">{step.conversionFromInitial.toFixed(1)}%</TableCell>
                       <TableCell className="text-right font-mono text-[9px] px-0.5 py-0">{step.conversionFromPrev.toFixed(1)}%</TableCell>
                       <TableCell className="text-right font-mono text-[9px] px-0.5 py-0 text-muted-foreground">{dropOff.toFixed(1)}%</TableCell>
                     </Fragment>
@@ -771,7 +773,7 @@ function DrilldownRowComponent({
   showFormCvr: boolean;
 }) {
   const metricCount = (showLands ? 1 : 0) + (showLandCvr ? 1 : 0) + (showFormComplete ? 1 : 0) + (showFormCvr ? 1 : 0);
-  const colSpan = 1 + metricCount + (allSteps.length * 3) + (canDrill ? 1 : 0);
+  const colSpan = 1 + metricCount + (allSteps.length * 4) + (canDrill ? 1 : 0);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const subDimLabel = availableNextDimensions.find(d => d.value === selectedSubDim)?.label;
 
@@ -833,12 +835,14 @@ function DrilldownRowComponent({
         {allSteps.map((refStep) => {
           const rowStep = row.steps.find(s => s.stepKey === refStep.stepKey);
           const count = rowStep?.completions || 0;
-          const cvr = rowStep?.conversionFromPrev || 0;
-          const dropOff = 100 - cvr;
+          const cvrVal = rowStep?.conversionFromInitial || 0;
+          const scvrVal = rowStep?.conversionFromPrev || 0;
+          const dropOff = 100 - scvrVal;
           return (
             <Fragment key={`rc-grp-${refStep.stepKey}`}>
               <TableCell className="text-right font-mono text-[10px] px-0.5 py-0 border-l border-border/30">{count > 0 ? count.toLocaleString() : "\u2014"}</TableCell>
-              <TableCell className={`text-right font-mono text-[9px] px-0.5 py-0 ${count > 0 ? "" : "text-muted-foreground"}`}>{count > 0 ? `${cvr.toFixed(1)}%` : ""}</TableCell>
+              <TableCell className={`text-right font-mono text-[9px] px-0.5 py-0 ${count > 0 ? "" : "text-muted-foreground"}`}>{count > 0 ? `${cvrVal.toFixed(1)}%` : ""}</TableCell>
+              <TableCell className={`text-right font-mono text-[9px] px-0.5 py-0 ${count > 0 ? "" : "text-muted-foreground"}`}>{count > 0 ? `${scvrVal.toFixed(1)}%` : ""}</TableCell>
               <TableCell className={`text-right font-mono text-[9px] px-0.5 py-0 text-muted-foreground`}>{count > 0 ? `${dropOff.toFixed(1)}%` : ""}</TableCell>
             </Fragment>
           );
@@ -914,9 +918,9 @@ function FunnelReport({
   const stepsWithDropOff = totals.steps.map((step, idx) => {
     const prevCount = idx === 0 ? pageLands : totals.steps[idx - 1].completions;
     const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
-    const landCvr = pageLands > 0 ? (step.completions / pageLands) * 100 : 0;
-    const stepCvr = prevCount > 0 ? (step.completions / prevCount) * 100 : 0;
-    return { ...step, dropOff, landCvr, stepCvr, prevCount };
+    const cvr = step.conversionFromInitial;
+    const scvr = prevCount > 0 ? (step.completions / prevCount) * 100 : 0;
+    return { ...step, dropOff, cvr, scvr, prevCount };
   });
 
   return (
@@ -952,9 +956,9 @@ function FunnelReport({
               <TableRow className="h-5">
                 <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Step</TableHead>
                 <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Count</TableHead>
-                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Step CVR</TableHead>
+                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">CVR</TableHead>
+                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">SCVR</TableHead>
                 <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Drop-off</TableHead>
-                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Land CVR</TableHead>
                 <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Drop-off Visual</TableHead>
               </TableRow>
             </TableHeader>
@@ -962,9 +966,9 @@ function FunnelReport({
               <TableRow className="h-5 bg-muted/20">
                 <TableCell className="font-mono text-[9px] px-1.5 py-0">0. Landing</TableCell>
                 <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">{pageLands.toLocaleString()}</TableCell>
-                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
-                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
                 <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">100.0%</TableCell>
+                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
+                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
                 <TableCell className="px-1.5 py-0">
                   <div className="w-full bg-muted rounded-sm h-2.5">
                     <div className="h-2.5 rounded-sm bg-primary" style={{ width: "100%" }} />
@@ -983,14 +987,14 @@ function FunnelReport({
                     <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">
                       {step.completions.toLocaleString()}
                     </TableCell>
-                    <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.stepCvr < 50 ? "text-red-500" : step.stepCvr < 70 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
-                      {step.stepCvr.toFixed(1)}%
+                    <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.cvr < 30 ? "text-red-500" : step.cvr < 60 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
+                      {step.cvr.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.scvr < 50 ? "text-red-500" : step.scvr < 70 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
+                      {step.scvr.toFixed(1)}%
                     </TableCell>
                     <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${isHighDropOff ? "text-red-500 font-bold" : isMedDropOff ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}`}>
                       {step.dropOff.toFixed(1)}%
-                    </TableCell>
-                    <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right text-muted-foreground">
-                      {step.landCvr.toFixed(1)}%
                     </TableCell>
                     <TableCell className="px-1.5 py-0">
                       <div className="w-full bg-muted rounded-sm h-2.5">
