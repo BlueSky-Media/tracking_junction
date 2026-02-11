@@ -147,7 +147,7 @@ function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, ex
 function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logPage: number, search: string): string {
   const params = new URLSearchParams();
   params.set("page", logPage.toString());
-  params.set("limit", "25");
+  params.set("limit", "50");
   if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
   if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
   if (filters.domain && filters.domain !== ALL_FILTER) params.set("domain", filters.domain);
@@ -181,13 +181,13 @@ function FilterBar({
   const activeCount = Object.values(filters).filter(v => v && v !== ALL_FILTER).length;
 
   return (
-    <Card className="p-4" data-testid="card-filters">
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <Filter className="w-4 h-4 text-muted-foreground" />
-        <span className="text-sm font-semibold">Filters</span>
+    <div className="border-b border-border pb-2" data-testid="card-filters">
+      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+        <Filter className="w-3 h-3 text-muted-foreground" />
+        <span className="text-[11px] font-semibold">Filters</span>
         {activeCount > 0 && (
           <>
-            <Badge variant="secondary" className="text-xs" data-testid="badge-active-filters">{activeCount} active</Badge>
+            <Badge variant="secondary" className="text-[10px]" data-testid="badge-active-filters">{activeCount} active</Badge>
             <Button
               variant="ghost"
               size="sm"
@@ -195,16 +195,16 @@ function FilterBar({
               data-testid="button-clear-filters"
             >
               <X className="w-3 h-3 mr-1" />
-              Clear all
+              <span className="text-[10px]">Clear</span>
             </Button>
           </>
         )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Domain</label>
+          <label className="text-[10px] text-muted-foreground block">Domain</label>
           <Select value={filters.domain} onValueChange={(v) => onChange({ ...filters, domain: v })}>
-            <SelectTrigger data-testid="filter-domain">
+            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-domain">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -215,9 +215,9 @@ function FilterBar({
           </Select>
         </div>
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Device Type</label>
+          <label className="text-[10px] text-muted-foreground block">Device Type</label>
           <Select value={filters.deviceType} onValueChange={(v) => onChange({ ...filters, deviceType: v })}>
-            <SelectTrigger data-testid="filter-deviceType">
+            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-deviceType">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -229,9 +229,9 @@ function FilterBar({
           </Select>
         </div>
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Audience</label>
+          <label className="text-[10px] text-muted-foreground block">Audience</label>
           <Select value={filters.page} onValueChange={(v) => onChange({ ...filters, page: v })}>
-            <SelectTrigger data-testid="filter-audience">
+            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-audience">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -243,9 +243,9 @@ function FilterBar({
           </Select>
         </div>
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">UTM Source</label>
+          <label className="text-[10px] text-muted-foreground block">UTM Source</label>
           <Select value={filters.utmSource} onValueChange={(v) => onChange({ ...filters, utmSource: v })}>
-            <SelectTrigger data-testid="filter-utmSource">
+            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-utmSource">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -257,9 +257,9 @@ function FilterBar({
           </Select>
         </div>
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">UTM Campaign</label>
+          <label className="text-[10px] text-muted-foreground block">UTM Campaign</label>
           <Select value={filters.utmCampaign} onValueChange={(v) => onChange({ ...filters, utmCampaign: v })}>
-            <SelectTrigger data-testid="filter-utmCampaign">
+            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-utmCampaign">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -271,9 +271,9 @@ function FilterBar({
           </Select>
         </div>
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">UTM Medium</label>
+          <label className="text-[10px] text-muted-foreground block">UTM Medium</label>
           <Select value={filters.utmMedium} onValueChange={(v) => onChange({ ...filters, utmMedium: v })}>
-            <SelectTrigger data-testid="filter-utmMedium">
+            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-utmMedium">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -285,19 +285,19 @@ function FilterBar({
           </Select>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
 function StepCvrCell({ completions, prevStepCvr, pageLandCvr, isHeader }: { completions: number; prevStepCvr: number; pageLandCvr: number; isHeader?: boolean }) {
   const isLowStep = prevStepCvr < 50 && prevStepCvr > 0;
   return (
-    <TableCell className="text-center px-1">
-      <p className={`font-mono text-[11px] ${isHeader ? "font-semibold" : ""}`}>{completions.toLocaleString()}</p>
-      <p className={`font-mono text-[10px] ${isLowStep ? "text-destructive" : "text-muted-foreground"}`}>
+    <TableCell className="text-center px-0.5 py-0">
+      <p className={`font-mono text-[10px] leading-tight ${isHeader ? "font-semibold" : ""}`}>{completions.toLocaleString()}</p>
+      <p className={`font-mono text-[9px] leading-tight ${isLowStep ? "text-destructive" : "text-muted-foreground"}`}>
         {prevStepCvr.toFixed(1)}%
       </p>
-      <p className="font-mono text-[10px] text-muted-foreground">
+      <p className="font-mono text-[9px] leading-tight text-muted-foreground">
         {pageLandCvr.toFixed(1)}%
       </p>
     </TableCell>
@@ -351,16 +351,16 @@ function DrilldownTable({
 
   if (isLoading) {
     return (
-      <div className="space-y-2 p-4">
+      <div className="space-y-1 p-2">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-8 w-full" />
+          <Skeleton key={i} className="h-5 w-full" />
         ))}
       </div>
     );
   }
 
   if (!data || data.rows.length === 0) {
-    return <p className="text-[11px] text-muted-foreground text-center py-4">No data available.</p>;
+    return <p className="text-[10px] text-muted-foreground text-center py-2">No data available.</p>;
   }
 
   const dimLabel = DRILL_DIMENSIONS.find(d => d.value === groupBy)?.label || groupBy;
@@ -370,24 +370,18 @@ function DrilldownTable({
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
-          <TableRow>
-            {depth < 3 && availableNextDimensions.length > 0 && <TableHead className="w-6 px-1" />}
-            <TableHead className="text-[11px] min-w-[80px] px-1">{dimLabel}</TableHead>
-            <TableHead className="text-[11px] text-center px-1 min-w-[50px]">Lands</TableHead>
+          <TableRow className="h-6">
+            {depth < 3 && availableNextDimensions.length > 0 && <TableHead className="w-4 px-0.5 py-0" />}
+            <TableHead className="text-[10px] min-w-[70px] px-1 py-0">{dimLabel}</TableHead>
+            <TableHead className="text-[10px] text-center px-0.5 py-0 min-w-[40px]">Lands</TableHead>
             {data.totals.steps.map((s) => (
-              <TableHead key={`h-${s.stepNumber}-${s.stepName}`} className="text-center px-1 min-w-[55px]" colSpan={1}>
-                <div className="flex flex-col items-center leading-tight">
-                  <span className="text-[10px] font-semibold">S{s.stepNumber}</span>
-                  <span className="text-[9px] text-muted-foreground">{s.stepName}</span>
-                </div>
+              <TableHead key={`h-${s.stepNumber}-${s.stepName}`} className="text-center px-0.5 py-0 min-w-[42px]" colSpan={1}>
+                <span className="text-[9px] font-semibold">S{s.stepNumber}</span>
               </TableHead>
             ))}
             {hasFormComplete && (
-              <TableHead className="text-center px-1 min-w-[55px]">
-                <div className="flex flex-col items-center leading-tight">
-                  <span className="text-[10px] font-semibold">Form</span>
-                  <span className="text-[9px] text-muted-foreground">Complete</span>
-                </div>
+              <TableHead className="text-center px-0.5 py-0 min-w-[42px]">
+                <span className="text-[9px] font-semibold">Form</span>
               </TableHead>
             )}
           </TableRow>
@@ -442,10 +436,10 @@ function TotalsRow({ totals, canDrill, groupBy, depth, hasFormComplete }: {
 }) {
   const pageLands = totals.pageLands || totals.uniqueViews;
   return (
-    <TableRow className="bg-muted/50 font-semibold border-t-2" data-testid={`row-totals-${groupBy}-depth${depth}`}>
-      {canDrill && <TableCell className="px-1" />}
-      <TableCell className="text-[11px] font-bold px-1">Totals</TableCell>
-      <TableCell className="text-center font-mono text-[11px] px-1">{pageLands.toLocaleString()}</TableCell>
+    <TableRow className="bg-muted/50 font-semibold border-t h-6" data-testid={`row-totals-${groupBy}-depth${depth}`}>
+      {canDrill && <TableCell className="px-0.5 py-0" />}
+      <TableCell className="text-[10px] font-bold px-1 py-0">Totals</TableCell>
+      <TableCell className="text-center font-mono text-[10px] px-0.5 py-0">{pageLands.toLocaleString()}</TableCell>
       {totals.steps.map((step) => {
         const plCvr = pageLands > 0 ? (step.completions / pageLands) * 100 : 0;
         return (
@@ -512,17 +506,17 @@ function DrilldownRowComponent({
   return (
     <>
       <TableRow
-        className={canDrill ? "cursor-pointer hover-elevate" : ""}
+        className={`h-6 ${canDrill ? "cursor-pointer hover-elevate" : ""}`}
         onClick={canDrill ? onToggle : undefined}
         data-testid={`row-drill-${groupBy}-${row.groupValue}`}
       >
         {canDrill && (
-          <TableCell className="w-6 px-1">
+          <TableCell className="w-4 px-0.5 py-0">
             {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           </TableCell>
         )}
-        <TableCell className="text-[11px] font-medium px-1">{row.groupValue}</TableCell>
-        <TableCell className="text-center font-mono text-[11px] px-1">{pageLands.toLocaleString()}</TableCell>
+        <TableCell className="text-[10px] font-medium px-1 py-0">{row.groupValue}</TableCell>
+        <TableCell className="text-center font-mono text-[10px] px-0.5 py-0">{pageLands.toLocaleString()}</TableCell>
         {row.steps.map((step) => {
           const plCvr = pageLands > 0 ? (step.completions / pageLands) * 100 : 0;
           return (
@@ -546,13 +540,13 @@ function DrilldownRowComponent({
       {isExpanded && canDrill && (
         <TableRow data-testid={`row-drilldown-${groupBy}-${row.groupValue}`}>
           <TableCell colSpan={colSpan} className="p-0">
-            <div className="border-y bg-muted/20 px-3 py-2 space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className="text-[10px]">{dimLabel}: {row.groupValue}</Badge>
-                <span className="text-[11px] text-muted-foreground">drill down by</span>
+            <div className="border-y bg-muted/20 px-2 py-1 space-y-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Badge variant="outline" className="text-[9px] py-0">{dimLabel}: {row.groupValue}</Badge>
+                <span className="text-[10px] text-muted-foreground">drill down by</span>
                 <Select value={selectedSubDim} onValueChange={onChangeDim}>
-                  <SelectTrigger className="w-[160px]" data-testid={`select-subdim-${groupBy}-${row.groupValue}`}>
-                    <SelectValue placeholder="Select dimension..." />
+                  <SelectTrigger className="w-[130px] h-6 text-[10px]" data-testid={`select-subdim-${groupBy}-${row.groupValue}`}>
+                    <SelectValue placeholder="Select..." />
                   </SelectTrigger>
                   <SelectContent>
                     {availableNextDimensions.map((d) => (
@@ -602,14 +596,14 @@ function FunnelReport({
 
   if (summaryLoading) {
     return (
-      <Card className="p-5" data-testid="card-funnel-report">
-        <Skeleton className="h-5 w-48 mb-4" />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div data-testid="card-funnel-report">
+        <Skeleton className="h-4 w-48 mb-2" />
+        <div className="grid grid-cols-4 gap-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full" />
+            <Skeleton key={i} className="h-10 w-full" />
           ))}
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -623,61 +617,58 @@ function FunnelReport({
   const overallConversion = pageLands > 0 ? (finalCount / pageLands) * 100 : 0;
 
   return (
-    <Card className="p-5" data-testid="card-funnel-report">
-      <h3 className="font-semibold mb-4" data-testid="text-funnel-title">Funnel Summary</h3>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Page Lands</p>
-          <p className="text-2xl font-bold font-mono" data-testid="text-page-lands">{pageLands.toLocaleString()}</p>
+    <div data-testid="card-funnel-report">
+      <h3 className="text-[11px] font-semibold mb-1" data-testid="text-funnel-title">Funnel Summary</h3>
+      <div className="grid grid-cols-4 gap-2 mb-2">
+        <div>
+          <p className="text-[10px] text-muted-foreground">Page Lands</p>
+          <p className="text-base font-bold font-mono" data-testid="text-page-lands">{pageLands.toLocaleString()}</p>
         </div>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Total Events</p>
-          <p className="text-2xl font-bold font-mono" data-testid="text-total-events">{totals.grossViews.toLocaleString()}</p>
+        <div>
+          <p className="text-[10px] text-muted-foreground">Total Events</p>
+          <p className="text-base font-bold font-mono" data-testid="text-total-events">{totals.grossViews.toLocaleString()}</p>
         </div>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Overall Conversion</p>
-          <p className="text-2xl font-bold font-mono" data-testid="text-overall-conversion">{overallConversion.toFixed(1)}%</p>
+        <div>
+          <p className="text-[10px] text-muted-foreground">Overall Conversion</p>
+          <p className="text-base font-bold font-mono" data-testid="text-overall-conversion">{overallConversion.toFixed(1)}%</p>
         </div>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Funnel Steps</p>
-          <p className="text-2xl font-bold font-mono" data-testid="text-total-steps">{totals.steps.length}</p>
+        <div>
+          <p className="text-[10px] text-muted-foreground">Funnel Steps</p>
+          <p className="text-base font-bold font-mono" data-testid="text-total-steps">{totals.steps.length}</p>
         </div>
       </div>
 
-      <div className="overflow-x-auto mb-5">
+      <div className="overflow-x-auto border rounded-md mb-2">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="text-center px-1 min-w-[55px]">
-                <div className="flex flex-col items-center leading-tight">
-                  <span className="text-[10px] font-semibold">Lands</span>
-                  <span className="text-[9px] text-muted-foreground">Step 0</span>
-                </div>
+            <TableRow className="h-6">
+              <TableHead className="text-center px-0.5 py-0 min-w-[42px]">
+                <span className="text-[9px] font-semibold">Lands</span>
               </TableHead>
               {totals.steps.map((s) => (
-                <TableHead key={`sum-${s.stepNumber}-${s.stepName}`} className="text-center px-1 min-w-[55px]">
-                  <div className="flex flex-col items-center leading-tight">
-                    <span className="text-[10px] font-semibold">S{s.stepNumber}</span>
-                    <span className="text-[9px] text-muted-foreground">{s.stepName}</span>
+                <TableHead key={`sum-${s.stepNumber}-${s.stepName}`} className="text-center px-0.5 py-0 min-w-[42px]">
+                  <div className="flex flex-col items-center leading-none">
+                    <span className="text-[9px] font-semibold">S{s.stepNumber}</span>
+                    <span className="text-[8px] text-muted-foreground">{s.stepName}</span>
                   </div>
                 </TableHead>
               ))}
               {hasFormComplete && (
-                <TableHead className="text-center px-1 min-w-[55px]">
-                  <div className="flex flex-col items-center leading-tight">
-                    <span className="text-[10px] font-semibold">Form</span>
-                    <span className="text-[9px] text-muted-foreground">Complete</span>
+                <TableHead className="text-center px-0.5 py-0 min-w-[42px]">
+                  <div className="flex flex-col items-center leading-none">
+                    <span className="text-[9px] font-semibold">Form</span>
+                    <span className="text-[8px] text-muted-foreground">Complete</span>
                   </div>
                 </TableHead>
               )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow>
-              <TableCell className="text-center px-1">
-                <p className="font-mono text-[11px] font-semibold">{pageLands.toLocaleString()}</p>
-                <p className="font-mono text-[10px] text-muted-foreground">&mdash;</p>
-                <p className="font-mono text-[10px] text-muted-foreground">100.0%</p>
+            <TableRow className="h-6">
+              <TableCell className="text-center px-0.5 py-0">
+                <p className="font-mono text-[10px] font-semibold leading-tight">{pageLands.toLocaleString()}</p>
+                <p className="font-mono text-[9px] text-muted-foreground leading-tight">&mdash;</p>
+                <p className="font-mono text-[9px] text-muted-foreground leading-tight">100.0%</p>
               </TableCell>
               {totals.steps.map((s) => {
                 const plCvr = pageLands > 0 ? (s.completions / pageLands) * 100 : 0;
@@ -704,11 +695,11 @@ function FunnelReport({
         </Table>
       </div>
 
-      <div className="border-t pt-4 space-y-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-sm font-semibold">Drill down by</span>
+      <div className="border-t pt-2 space-y-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-semibold">Drill down by</span>
           <Select value={drillDimension} onValueChange={setDrillDimension}>
-            <SelectTrigger className="w-[180px]" data-testid="select-drill-dimension">
+            <SelectTrigger className="w-[140px] h-6 text-[10px]" data-testid="select-drill-dimension">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -729,7 +720,7 @@ function FunnelReport({
           />
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -834,58 +825,56 @@ function EventLogsSection({
   };
 
   return (
-    <Card className="p-5" data-testid="card-event-logs">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="border-t pt-2" data-testid="card-event-logs">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-2 text-left"
+          className="flex items-center gap-1.5 text-left"
           data-testid="button-toggle-logs"
         >
-          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          <h3 className="font-semibold">Event Logs</h3>
+          {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          <h3 className="text-[11px] font-semibold">Event Logs</h3>
           {logsQuery.data && (
-            <Badge variant="secondary" className="ml-2 text-xs">{logsQuery.data.total.toLocaleString()} records</Badge>
+            <Badge variant="secondary" className="text-[9px] py-0 ml-1">{logsQuery.data.total.toLocaleString()} records</Badge>
           )}
         </button>
         {expanded && logsQuery.data && logsQuery.data.total > 0 && (
           confirmDeleteAll ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-destructive font-medium">Delete all {logsQuery.data.total.toLocaleString()} events?</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-destructive font-medium">Delete all {logsQuery.data.total.toLocaleString()} events?</span>
               <Button variant="destructive" size="sm" onClick={deleteAll} disabled={deletingAll} data-testid="button-confirm-delete-all">
-                {deletingAll ? "Deleting..." : "Yes, delete all"}
+                {deletingAll ? "..." : "Yes"}
               </Button>
               <Button variant="outline" size="sm" onClick={() => setConfirmDeleteAll(false)} data-testid="button-cancel-delete-all">
-                Cancel
+                No
               </Button>
             </div>
           ) : (
             <Button variant="outline" size="sm" onClick={() => setConfirmDeleteAll(true)} data-testid="button-delete-all">
-              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-              Delete All
+              <Trash2 className="w-3 h-3 mr-1" />
+              <span className="text-[10px]">Delete All</span>
             </Button>
           )
         )}
       </div>
 
       {expanded && (
-        <div className="mt-4 space-y-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by session ID, step, value, campaign..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-                data-testid="input-log-search"
-              />
-            </div>
+        <div className="mt-1.5 space-y-1.5">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+            <Input
+              placeholder="Search by session ID, step, value, campaign..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-7 h-7 text-[11px]"
+              data-testid="input-log-search"
+            />
           </div>
 
           {logsQuery.isLoading ? (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
+                <Skeleton key={i} className="h-5 w-full" />
               ))}
             </div>
           ) : logsQuery.data && logsQuery.data.events.length > 0 ? (
@@ -893,18 +882,18 @@ function EventLogsSection({
               <div className="overflow-x-auto border rounded-md">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8" />
-                      <TableHead className="text-xs">Timestamp</TableHead>
-                      <TableHead className="text-xs">Session ID</TableHead>
-                      <TableHead className="text-xs">Event</TableHead>
-                      <TableHead className="text-xs">Audience</TableHead>
-                      <TableHead className="text-xs">Domain</TableHead>
-                      <TableHead className="text-xs">Step</TableHead>
-                      <TableHead className="text-xs">Value</TableHead>
-                      <TableHead className="text-xs">Device</TableHead>
-                      <TableHead className="text-xs">OS</TableHead>
-                      <TableHead className="text-xs">Browser</TableHead>
+                    <TableRow className="h-6">
+                      <TableHead className="w-5 px-0.5 py-0" />
+                      <TableHead className="text-[10px] px-1 py-0">Timestamp</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Session ID</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Event</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Audience</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Domain</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Step</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Value</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Device</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">OS</TableHead>
+                      <TableHead className="text-[10px] px-1 py-0">Browser</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -924,37 +913,37 @@ function EventLogsSection({
                 </Table>
               </div>
 
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <p className="text-xs text-muted-foreground">
-                  Showing {((logsQuery.data.page - 1) * logsQuery.data.limit) + 1}-{Math.min(logsQuery.data.page * logsQuery.data.limit, logsQuery.data.total)} of {logsQuery.data.total.toLocaleString()} records
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-[10px] text-muted-foreground">
+                  {((logsQuery.data.page - 1) * logsQuery.data.limit) + 1}-{Math.min(logsQuery.data.page * logsQuery.data.limit, logsQuery.data.total)} of {logsQuery.data.total.toLocaleString()}
                 </p>
-                <div className="flex items-center gap-1">
-                  <Button variant="outline" size="icon" onClick={() => setLogPage(1)} disabled={logsQuery.data.page <= 1} data-testid="button-log-first">
-                    <ChevronsLeft className="w-4 h-4" />
+                <div className="flex items-center gap-0.5">
+                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(1)} disabled={logsQuery.data.page <= 1} data-testid="button-log-first">
+                    <ChevronsLeft className="w-3 h-3" />
                   </Button>
-                  <Button variant="outline" size="icon" onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logsQuery.data.page <= 1} data-testid="button-log-prev">
-                    <ChevronLeft className="w-4 h-4" />
+                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logsQuery.data.page <= 1} data-testid="button-log-prev">
+                    <ChevronLeft className="w-3 h-3" />
                   </Button>
-                  <span className="px-3 text-sm font-mono">
+                  <span className="px-2 text-[10px] font-mono">
                     {logsQuery.data.page} / {logsQuery.data.totalPages}
                   </span>
-                  <Button variant="outline" size="icon" onClick={() => setLogPage(p => Math.min(logsQuery.data!.totalPages, p + 1))} disabled={logsQuery.data.page >= logsQuery.data.totalPages} data-testid="button-log-next">
-                    <ChevronRight className="w-4 h-4" />
+                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(p => Math.min(logsQuery.data!.totalPages, p + 1))} disabled={logsQuery.data.page >= logsQuery.data.totalPages} data-testid="button-log-next">
+                    <ChevronRight className="w-3 h-3" />
                   </Button>
-                  <Button variant="outline" size="icon" onClick={() => setLogPage(logsQuery.data!.totalPages)} disabled={logsQuery.data.page >= logsQuery.data.totalPages} data-testid="button-log-last">
-                    <ChevronsRight className="w-4 h-4" />
+                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => setLogPage(logsQuery.data!.totalPages)} disabled={logsQuery.data.page >= logsQuery.data.totalPages} data-testid="button-log-last">
+                    <ChevronsRight className="w-3 h-3" />
                   </Button>
                 </div>
               </div>
             </>
           ) : (
-            <div className="py-8 text-center text-muted-foreground text-sm">
+            <div className="py-3 text-center text-muted-foreground text-[11px]">
               {debouncedSearch ? "No records match your search." : "No event logs found for the selected filters."}
             </div>
           )}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -976,40 +965,40 @@ function EventLogRow({
   isDeletingSession: boolean;
 }) {
   const ts = new Date(event.eventTimestamp);
-  const formattedDate = format(ts, "MMM d, yyyy h:mm:ss a");
+  const formattedDate = format(ts, "MMM d h:mm:ss a");
 
   return (
     <>
       <TableRow
-        className="cursor-pointer hover-elevate"
+        className="cursor-pointer hover-elevate h-6"
         onClick={onToggle}
         data-testid={`row-log-${event.id}`}
       >
-        <TableCell className="w-8">
-          {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        <TableCell className="w-5 px-0.5 py-0">
+          {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         </TableCell>
-        <TableCell className="text-xs font-mono whitespace-nowrap">{formattedDate}</TableCell>
-        <TableCell className="text-xs font-mono max-w-[120px] truncate" title={event.sessionId}>
+        <TableCell className="text-[10px] font-mono whitespace-nowrap px-1 py-0">{formattedDate}</TableCell>
+        <TableCell className="text-[10px] font-mono max-w-[80px] truncate px-1 py-0" title={event.sessionId}>
           {event.sessionId.substring(0, 8)}...
         </TableCell>
-        <TableCell>
-          <Badge variant="secondary" className="text-xs">{event.eventType || "step_complete"}</Badge>
+        <TableCell className="px-1 py-0">
+          <Badge variant="secondary" className="text-[9px] py-0">{event.eventType || "step_complete"}</Badge>
         </TableCell>
-        <TableCell className="text-xs">{event.page}</TableCell>
-        <TableCell className="text-xs">{event.domain}</TableCell>
-        <TableCell className="text-xs font-mono">{event.stepNumber}. {event.stepName}</TableCell>
-        <TableCell className="text-xs max-w-[120px] truncate" title={event.selectedValue || ""}>
+        <TableCell className="text-[10px] px-1 py-0">{event.page}</TableCell>
+        <TableCell className="text-[10px] px-1 py-0">{event.domain}</TableCell>
+        <TableCell className="text-[10px] font-mono px-1 py-0">{event.stepNumber}. {event.stepName}</TableCell>
+        <TableCell className="text-[10px] max-w-[80px] truncate px-1 py-0" title={event.selectedValue || ""}>
           {event.selectedValue || "\u2014"}
         </TableCell>
-        <TableCell className="text-xs">{event.deviceType || "\u2014"}</TableCell>
-        <TableCell className="text-xs">{event.os || "\u2014"}</TableCell>
-        <TableCell className="text-xs">{event.browser || "\u2014"}</TableCell>
+        <TableCell className="text-[10px] px-1 py-0">{event.deviceType || "\u2014"}</TableCell>
+        <TableCell className="text-[10px] px-1 py-0">{event.os || "\u2014"}</TableCell>
+        <TableCell className="text-[10px] px-1 py-0">{event.browser || "\u2014"}</TableCell>
       </TableRow>
       {isExpanded && (
         <TableRow data-testid={`row-log-detail-${event.id}`}>
-          <TableCell colSpan={11}>
-            <div className="bg-muted/50 rounded-md p-4 space-y-3">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-xs">
+          <TableCell colSpan={11} className="p-0">
+            <div className="bg-muted/50 px-3 py-2 space-y-1.5">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-x-3 gap-y-0.5 text-[10px]">
                 <DetailField label="ID" value={String(event.id)} />
                 <DetailField label="Session ID" value={event.sessionId} />
                 <DetailField label="Event Type" value={event.eventType || "step_complete"} />
@@ -1061,7 +1050,7 @@ function EventLogRow({
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+              <div className="flex items-center gap-1.5 pt-1 border-t border-border/50">
                 <Button
                   variant="outline"
                   size="sm"
@@ -1069,8 +1058,8 @@ function EventLogRow({
                   disabled={isDeleting}
                   data-testid={`button-delete-event-${event.id}`}
                 >
-                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                  {isDeleting ? "Deleting..." : "Delete this event"}
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  <span className="text-[10px]">{isDeleting ? "..." : "Delete event"}</span>
                 </Button>
                 <Button
                   variant="outline"
@@ -1079,8 +1068,8 @@ function EventLogRow({
                   disabled={isDeletingSession}
                   data-testid={`button-delete-session-${event.id}`}
                 >
-                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                  {isDeletingSession ? "Deleting..." : "Delete entire session"}
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  <span className="text-[10px]">{isDeletingSession ? "..." : "Delete session"}</span>
                 </Button>
               </div>
             </div>
@@ -1093,9 +1082,9 @@ function EventLogRow({
 
 function DetailField({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <span className="text-muted-foreground">{label}</span>
-      <p className="font-mono break-all">{value}</p>
+    <div className="leading-tight">
+      <span className="text-muted-foreground text-[9px]">{label}</span>
+      <p className="font-mono break-all text-[10px]">{value}</p>
     </div>
   );
 }
@@ -1111,7 +1100,7 @@ function LastUpdatedIndicator({ lastUpdated, isRefreshing }: { lastUpdated: Date
   if (!lastUpdated) return null;
 
   return (
-    <span className="text-xs text-muted-foreground" data-testid="text-last-updated">
+    <span className="text-[10px] text-muted-foreground" data-testid="text-last-updated">
       {isRefreshing ? (
         "Refreshing..."
       ) : (
@@ -1161,16 +1150,14 @@ export default function ReportsPage() {
   }, [refreshInterval, refreshAll]);
 
   return (
-    <div className="px-4 sm:px-6 py-6 space-y-5">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-reports-title">
-            <BarChart3 className="w-6 h-6" />
-            Funnel Reports
-          </h1>
-          <p className="text-sm text-muted-foreground">One report, drill down up to 3 levels deep</p>
+    <div className="px-3 py-2 space-y-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="w-4 h-4" />
+          <h1 className="text-sm font-bold" data-testid="text-reports-title">Funnel Reports</h1>
+          <span className="text-[10px] text-muted-foreground">drill down up to 3 levels deep</span>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <LastUpdatedIndicator lastUpdated={lastUpdated} isRefreshing={isRefreshing} />
           <Button
             variant="outline"
@@ -1179,11 +1166,11 @@ export default function ReportsPage() {
             disabled={isRefreshing}
             data-testid="button-refresh"
           >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`} />
-            Refresh
+            <RefreshCw className={`w-3 h-3 mr-1 ${isRefreshing ? "animate-spin" : ""}`} />
+            <span className="text-[10px]">Refresh</span>
           </Button>
           <Select value={String(refreshInterval)} onValueChange={(v) => setRefreshInterval(Number(v))}>
-            <SelectTrigger className="w-[100px]" data-testid="select-auto-refresh">
+            <SelectTrigger className="w-[80px] h-7 text-[10px]" data-testid="select-auto-refresh">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1197,21 +1184,21 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" data-testid="button-date-range">
-              <CalendarIcon className="w-4 h-4 mr-2" />
+            <Button variant="outline" size="sm" data-testid="button-date-range">
+              <CalendarIcon className="w-3 h-3 mr-1.5" />
               {dateRange?.from ? (
                 dateRange.to ? (
-                  <span className="text-sm">
+                  <span className="text-[10px]">
                     {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
                   </span>
                 ) : (
-                  <span className="text-sm">{format(dateRange.from, "MMM d, yyyy")}</span>
+                  <span className="text-[10px]">{format(dateRange.from, "MMM d, yyyy")}</span>
                 )
               ) : (
-                <span className="text-sm">All Time</span>
+                <span className="text-[10px]">All Time</span>
               )}
             </Button>
           </PopoverTrigger>
