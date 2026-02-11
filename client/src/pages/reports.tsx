@@ -151,18 +151,25 @@ interface SessionLogResult {
 }
 
 interface Filters {
-  domain: string;
-  deviceType: string;
-  page: string;
-  utmSource: string;
-  utmCampaign: string;
-  utmMedium: string;
+  domain: string[];
+  deviceType: string[];
+  page: string[];
+  pageType: string[];
+  utmSource: string[];
+  utmCampaign: string[];
+  utmMedium: string[];
+  os: string[];
+  browser: string[];
+  geoState: string[];
 }
 
 interface FilterOptions {
   utmSources: string[];
   utmCampaigns: string[];
   utmMediums: string[];
+  osList: string[];
+  browsers: string[];
+  geoStates: string[];
 }
 
 const DRILL_DIMENSIONS = [
@@ -174,18 +181,30 @@ const DRILL_DIMENSIONS = [
   { value: "utmMedium", label: "UTM Medium" },
 ];
 
-const ALL_FILTER = "__all__";
+function setFilterParam(params: URLSearchParams, key: string, values: string[] | string | undefined) {
+  if (!values) return;
+  const arr = Array.isArray(values) ? values : (values && values !== "__all__" ? [values] : []);
+  if (arr.length > 0) params.set(key, arr.join(","));
+}
+
+function isFilterActive(values: string[]): boolean {
+  return values.length > 0;
+}
 
 function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, extra?: Record<string, string>): string {
   const params = new URLSearchParams();
   if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
   if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
-  if (filters.domain && filters.domain !== ALL_FILTER) params.set("domain", filters.domain);
-  if (filters.deviceType && filters.deviceType !== ALL_FILTER) params.set("deviceType", filters.deviceType);
-  if (filters.page && filters.page !== ALL_FILTER) params.set("page", filters.page);
-  if (filters.utmSource && filters.utmSource !== ALL_FILTER) params.set("utmSource", filters.utmSource);
-  if (filters.utmCampaign && filters.utmCampaign !== ALL_FILTER) params.set("utmCampaign", filters.utmCampaign);
-  if (filters.utmMedium && filters.utmMedium !== ALL_FILTER) params.set("utmMedium", filters.utmMedium);
+  setFilterParam(params, "domain", filters.domain);
+  setFilterParam(params, "deviceType", filters.deviceType);
+  setFilterParam(params, "audience", filters.page);
+  setFilterParam(params, "pageType", filters.pageType);
+  setFilterParam(params, "utmSource", filters.utmSource);
+  setFilterParam(params, "utmCampaign", filters.utmCampaign);
+  setFilterParam(params, "utmMedium", filters.utmMedium);
+  setFilterParam(params, "os", filters.os);
+  setFilterParam(params, "browser", filters.browser);
+  setFilterParam(params, "geoState", filters.geoState);
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
       params.set(k, v);
@@ -200,44 +219,157 @@ function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logP
   params.set("limit", logLimit.toString());
   if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
   if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
-  if (filters.domain && filters.domain !== ALL_FILTER) params.set("domain", filters.domain);
-  if (filters.deviceType && filters.deviceType !== ALL_FILTER) params.set("deviceType", filters.deviceType);
-  if (filters.page && filters.page !== ALL_FILTER) params.set("audience", filters.page);
-  if (filters.utmSource && filters.utmSource !== ALL_FILTER) params.set("utmSource", filters.utmSource);
-  if (filters.utmCampaign && filters.utmCampaign !== ALL_FILTER) params.set("utmCampaign", filters.utmCampaign);
-  if (filters.utmMedium && filters.utmMedium !== ALL_FILTER) params.set("utmMedium", filters.utmMedium);
+  setFilterParam(params, "domain", filters.domain);
+  setFilterParam(params, "deviceType", filters.deviceType);
+  setFilterParam(params, "audience", filters.page);
+  setFilterParam(params, "pageType", filters.pageType);
+  setFilterParam(params, "utmSource", filters.utmSource);
+  setFilterParam(params, "utmCampaign", filters.utmCampaign);
+  setFilterParam(params, "utmMedium", filters.utmMedium);
+  setFilterParam(params, "os", filters.os);
+  setFilterParam(params, "browser", filters.browser);
+  setFilterParam(params, "geoState", filters.geoState);
   if (search.trim()) params.set("search", search.trim());
   return params.toString();
 }
 
 const emptyFilters: Filters = {
-  domain: ALL_FILTER,
-  deviceType: ALL_FILTER,
-  page: ALL_FILTER,
-  utmSource: ALL_FILTER,
-  utmCampaign: ALL_FILTER,
-  utmMedium: ALL_FILTER,
+  domain: [],
+  deviceType: [],
+  page: [],
+  pageType: [],
+  utmSource: [],
+  utmCampaign: [],
+  utmMedium: [],
+  os: [],
+  browser: [],
+  geoState: [],
 };
+
+function MultiSelectDropdown({
+  label,
+  selected,
+  options,
+  filterKey,
+  onChange,
+  testId,
+}: {
+  label: string;
+  selected: string[];
+  options: { value: string; label: string }[];
+  filterKey: keyof Filters;
+  onChange: (key: keyof Filters, val: string[]) => void;
+  testId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = (val: string) => {
+    if (selected.includes(val)) {
+      onChange(filterKey, selected.filter(v => v !== val));
+    } else {
+      onChange(filterKey, [...selected, val]);
+    }
+  };
+  const summary = selected.length === 0
+    ? `All ${label}`
+    : selected.length === 1
+      ? options.find(o => o.value === selected[0])?.label || selected[0]
+      : `${selected.length} selected`;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={`h-7 text-[11px] justify-between font-normal px-2 ${selected.length > 0 ? "border-primary/50" : ""}`}
+          data-testid={testId}
+        >
+          <span className="truncate">{summary}</span>
+          <ChevronDown className="w-3 h-3 ml-1 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[180px] p-1" align="start">
+        <div className="max-h-[250px] overflow-y-auto">
+          {options.map((o) => (
+            <label
+              key={o.value}
+              className="flex items-center gap-2 px-2 py-1 text-[11px] cursor-pointer hover-elevate rounded-sm"
+              data-testid={`${testId}-option-${o.value}`}
+            >
+              <Checkbox
+                checked={selected.includes(o.value)}
+                onCheckedChange={() => toggle(o.value)}
+                className="h-3.5 w-3.5"
+              />
+              <span className="truncate">{o.label}</span>
+            </label>
+          ))}
+        </div>
+        {selected.length > 0 && (
+          <div className="border-t border-border mt-1 pt-1 px-2 pb-1">
+            <button
+              onClick={() => onChange(filterKey, [])}
+              className="text-[10px] text-muted-foreground cursor-pointer"
+              data-testid={`${testId}-clear`}
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function FilterBar({
   filters,
   onChange,
   filterOptions,
+  showExtended = false,
 }: {
   filters: Filters;
   onChange: (f: Filters) => void;
   filterOptions: FilterOptions | undefined;
+  showExtended?: boolean;
 }) {
-  const activeCount = Object.values(filters).filter(v => v && v !== ALL_FILTER).length;
+  const [expanded, setExpanded] = useState(false);
+  const activeCount = Object.values(filters).filter(v => v.length > 0).length;
+
+  const handleChange = (key: keyof Filters, val: string[]) => {
+    onChange({ ...filters, [key]: val });
+  };
+
+  const safe = (v: string[] | string | undefined): string[] => Array.isArray(v) ? v : (v && v !== "__all__" ? [v] : []);
+  const activeLabels: string[] = [];
+  safe(filters.domain).forEach(v => activeLabels.push(v));
+  safe(filters.deviceType).forEach(v => activeLabels.push(v));
+  safe(filters.page).forEach(v => activeLabels.push(v));
+  safe(filters.pageType).forEach(v => activeLabels.push(v));
+  safe(filters.utmSource).forEach(v => activeLabels.push(`src:${v}`));
+  safe(filters.utmCampaign).forEach(v => activeLabels.push(`camp:${v}`));
+  safe(filters.utmMedium).forEach(v => activeLabels.push(`med:${v}`));
+  safe(filters.os).forEach(v => activeLabels.push(v));
+  safe(filters.browser).forEach(v => activeLabels.push(v));
+  safe(filters.geoState).forEach(v => activeLabels.push(`state:${v}`));
 
   return (
-    <div className="border-b border-border pb-2" data-testid="card-filters">
-      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-        <Filter className="w-3 h-3 text-muted-foreground" />
-        <span className="text-[11px] font-semibold">Filters</span>
+    <div className="border-b border-border pb-1.5" data-testid="card-filters">
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 cursor-pointer"
+          data-testid="button-toggle-filters"
+        >
+          {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          <Filter className="w-3 h-3 text-muted-foreground" />
+          <span className="text-[11px] font-semibold">Filters</span>
+        </button>
         {activeCount > 0 && (
           <>
             <Badge variant="secondary" className="text-[10px]" data-testid="badge-active-filters">{activeCount} active</Badge>
+            {activeLabels.map((l, i) => (
+              <Badge key={i} variant="outline" className="text-[9px] py-0">{l}</Badge>
+            ))}
             <Button
               variant="ghost"
               size="sm"
@@ -250,91 +382,80 @@ function FilterBar({
           </>
         )}
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-        <div>
-          <label className="text-[10px] text-muted-foreground block">Domain</label>
-          <Select value={filters.domain} onValueChange={(v) => onChange({ ...filters, domain: v })}>
-            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-domain">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_FILTER}>All Domains</SelectItem>
-              <SelectItem value="blueskylife.net">blueskylife.net</SelectItem>
-              <SelectItem value="blueskylife.io">blueskylife.io</SelectItem>
-            </SelectContent>
-          </Select>
+      {expanded && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Domain:</span>
+            <MultiSelectDropdown label="Domains" selected={filters.domain} filterKey="domain" onChange={handleChange} testId="filter-domain" options={[
+              { value: "blueskylife.net", label: "blueskylife.net" },
+              { value: "blueskylife.io", label: "blueskylife.io" },
+            ]} />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Device:</span>
+            <MultiSelectDropdown label="Devices" selected={filters.deviceType} filterKey="deviceType" onChange={handleChange} testId="filter-deviceType" options={[
+              { value: "mobile", label: "Mobile" },
+              { value: "desktop", label: "Desktop" },
+              { value: "tablet", label: "Tablet" },
+            ]} />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Audience:</span>
+            <MultiSelectDropdown label="Audiences" selected={filters.page} filterKey="page" onChange={handleChange} testId="filter-audience" options={[
+              { value: "seniors", label: "Seniors" },
+              { value: "veterans", label: "Veterans" },
+              { value: "first-responders", label: "First Responders" },
+            ]} />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Funnel:</span>
+            <MultiSelectDropdown label="Types" selected={filters.pageType} filterKey="pageType" onChange={handleChange} testId="filter-pageType" options={[
+              { value: "lead", label: "Lead" },
+              { value: "call", label: "Call" },
+            ]} />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Source:</span>
+            <MultiSelectDropdown label="Sources" selected={filters.utmSource} filterKey="utmSource" onChange={handleChange} testId="filter-utmSource" options={
+              (filterOptions?.utmSources || []).map(s => ({ value: s, label: s }))
+            } />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Campaign:</span>
+            <MultiSelectDropdown label="Campaigns" selected={filters.utmCampaign} filterKey="utmCampaign" onChange={handleChange} testId="filter-utmCampaign" options={
+              (filterOptions?.utmCampaigns || []).map(s => ({ value: s, label: s }))
+            } />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Medium:</span>
+            <MultiSelectDropdown label="Mediums" selected={filters.utmMedium} filterKey="utmMedium" onChange={handleChange} testId="filter-utmMedium" options={
+              (filterOptions?.utmMediums || []).map(s => ({ value: s, label: s }))
+            } />
+          </div>
+          {showExtended && (
+            <>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">OS:</span>
+                <MultiSelectDropdown label="OS" selected={filters.os} filterKey="os" onChange={handleChange} testId="filter-os" options={
+                  (filterOptions?.osList || []).map(s => ({ value: s, label: s }))
+                } />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">Browser:</span>
+                <MultiSelectDropdown label="Browsers" selected={filters.browser} filterKey="browser" onChange={handleChange} testId="filter-browser" options={
+                  (filterOptions?.browsers || []).map(s => ({ value: s, label: s }))
+                } />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">State:</span>
+                <MultiSelectDropdown label="States" selected={filters.geoState} filterKey="geoState" onChange={handleChange} testId="filter-geoState" options={
+                  (filterOptions?.geoStates || []).map(s => ({ value: s, label: s }))
+                } />
+              </div>
+            </>
+          )}
         </div>
-        <div>
-          <label className="text-[10px] text-muted-foreground block">Device Type</label>
-          <Select value={filters.deviceType} onValueChange={(v) => onChange({ ...filters, deviceType: v })}>
-            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-deviceType">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_FILTER}>All Devices</SelectItem>
-              <SelectItem value="mobile">Mobile</SelectItem>
-              <SelectItem value="desktop">Desktop</SelectItem>
-              <SelectItem value="tablet">Tablet</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="text-[10px] text-muted-foreground block">Audience</label>
-          <Select value={filters.page} onValueChange={(v) => onChange({ ...filters, page: v })}>
-            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-audience">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_FILTER}>All Audiences</SelectItem>
-              <SelectItem value="seniors">Seniors</SelectItem>
-              <SelectItem value="veterans">Veterans</SelectItem>
-              <SelectItem value="first-responders">First Responders</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="text-[10px] text-muted-foreground block">UTM Source</label>
-          <Select value={filters.utmSource} onValueChange={(v) => onChange({ ...filters, utmSource: v })}>
-            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-utmSource">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_FILTER}>All Sources</SelectItem>
-              {filterOptions?.utmSources.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="text-[10px] text-muted-foreground block">UTM Campaign</label>
-          <Select value={filters.utmCampaign} onValueChange={(v) => onChange({ ...filters, utmCampaign: v })}>
-            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-utmCampaign">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_FILTER}>All Campaigns</SelectItem>
-              {filterOptions?.utmCampaigns.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="text-[10px] text-muted-foreground block">UTM Medium</label>
-          <Select value={filters.utmMedium} onValueChange={(v) => onChange({ ...filters, utmMedium: v })}>
-            <SelectTrigger className="h-7 text-[11px]" data-testid="filter-utmMedium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_FILTER}>All Mediums</SelectItem>
-              {filterOptions?.utmMediums.map((m) => (
-                <SelectItem key={m} value={m}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -887,7 +1008,7 @@ function FunnelReport({
         </div>
       )}
 
-      {(!filters.page || filters.page === ALL_FILTER) && (
+      {(!Array.isArray(filters.page) || filters.page.length === 0 || filters.page.length > 1) && (
         <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2 py-1 text-[10px] text-amber-800 dark:text-amber-300" data-testid="banner-mixed-audiences">
           <Info className="w-3 h-3 shrink-0" />
           <span>Step definitions differ by audience. Filter by a specific audience for accurate funnel step comparisons.</span>
@@ -1067,11 +1188,31 @@ interface SavedViewState {
   logsExpanded: boolean;
 }
 
+function migrateFilters(saved: any): Filters | undefined {
+  if (!saved) return undefined;
+  const result: any = {};
+  for (const key of Object.keys(emptyFilters)) {
+    const val = saved[key];
+    if (Array.isArray(val)) {
+      result[key] = val;
+    } else if (typeof val === "string" && val && val !== "__all__") {
+      result[key] = [val];
+    } else {
+      result[key] = [];
+    }
+  }
+  return result as Filters;
+}
+
 function loadSavedView(): Partial<SavedViewState> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (parsed.filters) {
+      parsed.filters = migrateFilters(parsed.filters);
+    }
+    return parsed;
   } catch {
     return {};
   }
@@ -1406,7 +1547,7 @@ function EventLogsSection({
 
       {expanded && (
         <div className="mt-1.5 space-y-1.5">
-          <FilterBar filters={filters} onChange={onFiltersChange} filterOptions={filterOptions} />
+          <FilterBar filters={filters} onChange={onFiltersChange} filterOptions={filterOptions} showExtended={true} />
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
             <Input
@@ -2150,7 +2291,7 @@ export default function ReportsPage() {
         </Popover>
       </div>
 
-      <FilterBar filters={filters} onChange={setFilters} filterOptions={filterOptions} />
+      <FilterBar filters={filters} onChange={setFilters} filterOptions={filterOptions} showExtended={true} />
 
       <FunnelReport dateRange={dateRange} filters={filters} drillDimension={drillDimension} onDrillDimensionChange={setDrillDimension} />
 

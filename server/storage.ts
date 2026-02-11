@@ -12,16 +12,19 @@ import { db } from "./db";
 import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or, inArray } from "drizzle-orm";
 
 export interface AnalyticsFilters {
-  page?: string;
-  pageType?: string;
-  domain?: string;
+  page?: string | string[];
+  pageType?: string | string[];
+  domain?: string | string[];
   startDate?: string;
   endDate?: string;
-  utmSource?: string;
-  utmCampaign?: string;
-  utmMedium?: string;
-  utmContent?: string;
-  deviceType?: string;
+  utmSource?: string | string[];
+  utmCampaign?: string | string[];
+  utmMedium?: string | string[];
+  utmContent?: string | string[];
+  deviceType?: string | string[];
+  os?: string | string[];
+  browser?: string | string[];
+  geoState?: string | string[];
 }
 
 interface FunnelStep {
@@ -144,7 +147,7 @@ export interface IStorage {
   getTimeHeatmap(filters: AnalyticsFilters): Promise<HeatmapCell[]>;
   getContactFormFunnel(filters: AnalyticsFilters): Promise<{ steps: ContactFunnelStep[] }>;
   getReferrerBreakdown(filters: AnalyticsFilters): Promise<ReferrerRow[]>;
-  getFilterOptions(): Promise<{ utmSources: string[]; utmCampaigns: string[]; utmMediums: string[] }>;
+  getFilterOptions(): Promise<{ utmSources: string[]; utmCampaigns: string[]; utmMediums: string[]; osList: string[]; browsers: string[]; geoStates: string[] }>;
   exportCsv(filters: AnalyticsFilters): Promise<string>;
   getDrilldown(filters: AnalyticsFilters, groupBy: string): Promise<DrilldownResult>;
   getEventLogs(filters: AnalyticsFilters, page: number, limit: number, search?: string): Promise<EventLogResult>;
@@ -203,22 +206,35 @@ export interface IStorage {
   bulkUnblockPhones(phones: string[]): Promise<number>;
 }
 
+function addFilterCondition(conditions: any[], column: any, value: string | string[] | undefined) {
+  if (!value) return;
+  if (Array.isArray(value)) {
+    if (value.length === 1) conditions.push(eq(column, value[0]));
+    else if (value.length > 1) conditions.push(inArray(column, value));
+  } else {
+    conditions.push(eq(column, value));
+  }
+}
+
 function buildConditions(filters: AnalyticsFilters) {
-  const conditions = [];
-  if (filters.page) conditions.push(eq(trackingEvents.page, filters.page));
-  if (filters.pageType) conditions.push(eq(trackingEvents.pageType, filters.pageType));
-  if (filters.domain) conditions.push(eq(trackingEvents.domain, filters.domain));
+  const conditions: any[] = [];
+  addFilterCondition(conditions, trackingEvents.page, filters.page);
+  addFilterCondition(conditions, trackingEvents.pageType, filters.pageType);
+  addFilterCondition(conditions, trackingEvents.domain, filters.domain);
   if (filters.startDate) conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
   if (filters.endDate) {
     const end = new Date(filters.endDate);
     end.setHours(23, 59, 59, 999);
     conditions.push(lte(trackingEvents.eventTimestamp, end));
   }
-  if (filters.utmSource) conditions.push(eq(trackingEvents.utmSource, filters.utmSource));
-  if (filters.utmCampaign) conditions.push(eq(trackingEvents.utmCampaign, filters.utmCampaign));
-  if (filters.utmMedium) conditions.push(eq(trackingEvents.utmMedium, filters.utmMedium));
-  if (filters.utmContent) conditions.push(eq(trackingEvents.utmContent, filters.utmContent));
-  if (filters.deviceType) conditions.push(eq(trackingEvents.deviceType, filters.deviceType));
+  addFilterCondition(conditions, trackingEvents.utmSource, filters.utmSource);
+  addFilterCondition(conditions, trackingEvents.utmCampaign, filters.utmCampaign);
+  addFilterCondition(conditions, trackingEvents.utmMedium, filters.utmMedium);
+  addFilterCondition(conditions, trackingEvents.utmContent, filters.utmContent);
+  addFilterCondition(conditions, trackingEvents.deviceType, filters.deviceType);
+  addFilterCondition(conditions, trackingEvents.os, filters.os);
+  addFilterCondition(conditions, trackingEvents.browser, filters.browser);
+  addFilterCondition(conditions, trackingEvents.geoState, filters.geoState);
   return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
@@ -574,8 +590,11 @@ class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getFilterOptions(): Promise<{ utmSources: string[]; utmCampaigns: string[]; utmMediums: string[] }> {
-    const [sources, campaigns, mediums] = await Promise.all([
+  async getFilterOptions(): Promise<{
+    utmSources: string[]; utmCampaigns: string[]; utmMediums: string[];
+    osList: string[]; browsers: string[]; geoStates: string[];
+  }> {
+    const [sources, campaigns, mediums, osList, browsers, geoStates] = await Promise.all([
       db.selectDistinct({ val: trackingEvents.utmSource })
         .from(trackingEvents)
         .where(isNotNull(trackingEvents.utmSource))
@@ -591,12 +610,30 @@ class DatabaseStorage implements IStorage {
         .where(isNotNull(trackingEvents.utmMedium))
         .orderBy(trackingEvents.utmMedium)
         .limit(100),
+      db.selectDistinct({ val: trackingEvents.os })
+        .from(trackingEvents)
+        .where(isNotNull(trackingEvents.os))
+        .orderBy(trackingEvents.os)
+        .limit(50),
+      db.selectDistinct({ val: trackingEvents.browser })
+        .from(trackingEvents)
+        .where(isNotNull(trackingEvents.browser))
+        .orderBy(trackingEvents.browser)
+        .limit(50),
+      db.selectDistinct({ val: trackingEvents.geoState })
+        .from(trackingEvents)
+        .where(isNotNull(trackingEvents.geoState))
+        .orderBy(trackingEvents.geoState)
+        .limit(60),
     ]);
 
     return {
       utmSources: sources.map(s => s.val!).filter(Boolean),
       utmCampaigns: campaigns.map(s => s.val!).filter(Boolean),
       utmMediums: mediums.map(s => s.val!).filter(Boolean),
+      osList: osList.map(s => s.val!).filter(Boolean),
+      browsers: browsers.map(s => s.val!).filter(Boolean),
+      geoStates: geoStates.map(s => s.val!).filter(Boolean),
     };
   }
 

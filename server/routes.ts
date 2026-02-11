@@ -22,18 +22,29 @@ const ALLOWED_ORIGINS = [
   "https://www.blueskylife.io",
 ];
 
+function parseMulti(val: string | undefined): string | string[] | undefined {
+  if (!val) return undefined;
+  const parts = val.split(",").map(s => s.trim()).filter(Boolean);
+  if (parts.length === 0) return undefined;
+  if (parts.length === 1) return parts[0];
+  return parts;
+}
+
 function parseFilters(query: any) {
   return {
-    page: query.page as string | undefined,
-    pageType: query.pageType as string | undefined,
-    domain: query.domain as string | undefined,
+    page: parseMulti(query.page as string | undefined) ?? parseMulti(query.audience as string | undefined),
+    pageType: parseMulti(query.pageType as string | undefined),
+    domain: parseMulti(query.domain as string | undefined),
     startDate: query.startDate as string | undefined,
     endDate: query.endDate as string | undefined,
-    utmSource: query.utmSource as string | undefined,
-    utmCampaign: query.utmCampaign as string | undefined,
-    utmMedium: query.utmMedium as string | undefined,
-    utmContent: query.utmContent as string | undefined,
-    deviceType: query.deviceType as string | undefined,
+    utmSource: parseMulti(query.utmSource as string | undefined),
+    utmCampaign: parseMulti(query.utmCampaign as string | undefined),
+    utmMedium: parseMulti(query.utmMedium as string | undefined),
+    utmContent: parseMulti(query.utmContent as string | undefined),
+    deviceType: parseMulti(query.deviceType as string | undefined),
+    os: parseMulti(query.os as string | undefined),
+    browser: parseMulti(query.browser as string | undefined),
+    geoState: parseMulti(query.geoState as string | undefined),
   };
 }
 
@@ -319,7 +330,6 @@ export async function registerRoutes(
       const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 25));
       const search = req.query.search as string | undefined;
       const filters = parseFilters(req.query);
-      filters.page = req.query.audience as string | undefined;
       const sessions = await storage.getSessionLogs(filters, page, limit, search);
       res.json(sessions);
     } catch (error) {
@@ -334,7 +344,6 @@ export async function registerRoutes(
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
       const search = req.query.search as string | undefined;
       const filters = parseFilters(req.query);
-      filters.page = req.query.audience as string | undefined;
       const logs = await storage.getEventLogs(filters, page, limit, search);
       res.json(logs);
     } catch (error) {
