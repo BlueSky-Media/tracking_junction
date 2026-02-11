@@ -321,139 +321,132 @@ function MultiSelectDropdown({
   );
 }
 
-function FilterBar({
+function FilterPanel({
   filters,
   onChange,
   filterOptions,
-  showExtended = false,
+  testIdPrefix,
 }: {
   filters: Filters;
   onChange: (f: Filters) => void;
   filterOptions: FilterOptions | undefined;
-  showExtended?: boolean;
+  testIdPrefix: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   const activeCount = Object.values(filters).filter(v => v.length > 0).length;
 
   const handleChange = (key: keyof Filters, val: string[]) => {
     onChange({ ...filters, [key]: val });
   };
 
-  const safe = (v: string[] | string | undefined): string[] => Array.isArray(v) ? v : (v && v !== "__all__" ? [v] : []);
-  const activeLabels: string[] = [];
-  safe(filters.domain).forEach(v => activeLabels.push(v));
-  safe(filters.deviceType).forEach(v => activeLabels.push(v));
-  safe(filters.page).forEach(v => activeLabels.push(v));
-  safe(filters.pageType).forEach(v => activeLabels.push(v));
-  safe(filters.utmSource).forEach(v => activeLabels.push(`src:${v}`));
-  safe(filters.utmCampaign).forEach(v => activeLabels.push(`camp:${v}`));
-  safe(filters.utmMedium).forEach(v => activeLabels.push(`med:${v}`));
-  safe(filters.os).forEach(v => activeLabels.push(v));
-  safe(filters.browser).forEach(v => activeLabels.push(v));
-  safe(filters.geoState).forEach(v => activeLabels.push(`state:${v}`));
-
   return (
-    <div className="border-b border-border pb-1.5" data-testid="card-filters">
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 cursor-pointer"
-          data-testid="button-toggle-filters"
+    <div data-testid={`${testIdPrefix}-filter-panel`}>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Button
+          variant={open ? "default" : "outline"}
+          size="sm"
+          onClick={() => setOpen(!open)}
+          data-testid={`${testIdPrefix}-toggle-filters`}
         >
-          {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          <Filter className="w-3 h-3 text-muted-foreground" />
-          <span className="text-[11px] font-semibold">Filters</span>
-        </button>
-        {activeCount > 0 && (
-          <>
-            <Badge variant="secondary" className="text-[10px]" data-testid="badge-active-filters">{activeCount} active</Badge>
-            {activeLabels.map((l, i) => (
-              <Badge key={i} variant="outline" className="text-[9px] py-0">{l}</Badge>
-            ))}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onChange(emptyFilters)}
-              data-testid="button-clear-filters"
-            >
-              <X className="w-3 h-3 mr-1" />
-              <span className="text-[10px]">Clear</span>
-            </Button>
-          </>
+          <Filter className="w-3 h-3 mr-1" />
+          <span className="text-[10px]">Filters</span>
+          {activeCount > 0 && (
+            <Badge variant="secondary" className="text-[9px] ml-1 py-0">{activeCount}</Badge>
+          )}
+        </Button>
+        {activeCount > 0 && !open && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onChange(emptyFilters)}
+            data-testid={`${testIdPrefix}-clear-filters`}
+          >
+            <X className="w-3 h-3 mr-1" />
+            <span className="text-[10px]">Clear</span>
+          </Button>
         )}
       </div>
-      {expanded && (
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">Domain:</span>
-            <MultiSelectDropdown label="Domains" selected={filters.domain} filterKey="domain" onChange={handleChange} testId="filter-domain" options={[
-              { value: "blueskylife.net", label: "blueskylife.net" },
-              { value: "blueskylife.io", label: "blueskylife.io" },
-            ]} />
+      {open && (
+        <div className="mt-1.5 border rounded-md bg-muted/30 p-2 space-y-2" data-testid={`${testIdPrefix}-filter-dropdown`}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-3 gap-y-1.5">
+            <div>
+              <span className="text-[9px] text-muted-foreground block mb-0.5">Domain</span>
+              <MultiSelectDropdown label="Domains" selected={filters.domain} filterKey="domain" onChange={handleChange} testId={`${testIdPrefix}-filter-domain`} options={[
+                { value: "blueskylife.net", label: "blueskylife.net" },
+                { value: "blueskylife.io", label: "blueskylife.io" },
+              ]} />
+            </div>
+            <div>
+              <span className="text-[9px] text-muted-foreground block mb-0.5">Device</span>
+              <MultiSelectDropdown label="Devices" selected={filters.deviceType} filterKey="deviceType" onChange={handleChange} testId={`${testIdPrefix}-filter-device`} options={[
+                { value: "mobile", label: "Mobile" },
+                { value: "desktop", label: "Desktop" },
+                { value: "tablet", label: "Tablet" },
+              ]} />
+            </div>
+            <div>
+              <span className="text-[9px] text-muted-foreground block mb-0.5">Audience</span>
+              <MultiSelectDropdown label="Audiences" selected={filters.page} filterKey="page" onChange={handleChange} testId={`${testIdPrefix}-filter-audience`} options={[
+                { value: "seniors", label: "Seniors" },
+                { value: "veterans", label: "Veterans" },
+                { value: "first-responders", label: "First Responders" },
+              ]} />
+            </div>
+            <div>
+              <span className="text-[9px] text-muted-foreground block mb-0.5">Funnel</span>
+              <MultiSelectDropdown label="Types" selected={filters.pageType} filterKey="pageType" onChange={handleChange} testId={`${testIdPrefix}-filter-funnel`} options={[
+                { value: "lead", label: "Lead" },
+                { value: "call", label: "Call" },
+              ]} />
+            </div>
+            <div>
+              <span className="text-[9px] text-muted-foreground block mb-0.5">Source</span>
+              <MultiSelectDropdown label="Sources" selected={filters.utmSource} filterKey="utmSource" onChange={handleChange} testId={`${testIdPrefix}-filter-source`} options={
+                (filterOptions?.utmSources || []).map(s => ({ value: s, label: s }))
+              } />
+            </div>
+            <div>
+              <span className="text-[9px] text-muted-foreground block mb-0.5">Campaign</span>
+              <MultiSelectDropdown label="Campaigns" selected={filters.utmCampaign} filterKey="utmCampaign" onChange={handleChange} testId={`${testIdPrefix}-filter-campaign`} options={
+                (filterOptions?.utmCampaigns || []).map(s => ({ value: s, label: s }))
+              } />
+            </div>
+            <div>
+              <span className="text-[9px] text-muted-foreground block mb-0.5">Medium</span>
+              <MultiSelectDropdown label="Mediums" selected={filters.utmMedium} filterKey="utmMedium" onChange={handleChange} testId={`${testIdPrefix}-filter-medium`} options={
+                (filterOptions?.utmMediums || []).map(s => ({ value: s, label: s }))
+              } />
+            </div>
+            <div>
+              <span className="text-[9px] text-muted-foreground block mb-0.5">OS</span>
+              <MultiSelectDropdown label="OS" selected={filters.os} filterKey="os" onChange={handleChange} testId={`${testIdPrefix}-filter-os`} options={
+                (filterOptions?.osList || []).map(s => ({ value: s, label: s }))
+              } />
+            </div>
+            <div>
+              <span className="text-[9px] text-muted-foreground block mb-0.5">Browser</span>
+              <MultiSelectDropdown label="Browsers" selected={filters.browser} filterKey="browser" onChange={handleChange} testId={`${testIdPrefix}-filter-browser`} options={
+                (filterOptions?.browsers || []).map(s => ({ value: s, label: s }))
+              } />
+            </div>
+            <div>
+              <span className="text-[9px] text-muted-foreground block mb-0.5">State</span>
+              <MultiSelectDropdown label="States" selected={filters.geoState} filterKey="geoState" onChange={handleChange} testId={`${testIdPrefix}-filter-state`} options={
+                (filterOptions?.geoStates || []).map(s => ({ value: s, label: s }))
+              } />
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">Device:</span>
-            <MultiSelectDropdown label="Devices" selected={filters.deviceType} filterKey="deviceType" onChange={handleChange} testId="filter-deviceType" options={[
-              { value: "mobile", label: "Mobile" },
-              { value: "desktop", label: "Desktop" },
-              { value: "tablet", label: "Tablet" },
-            ]} />
+          <div className="flex items-center gap-2 border-t pt-1.5">
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)} data-testid={`${testIdPrefix}-close-filters`}>
+              <span className="text-[10px]">Close</span>
+            </Button>
+            {activeCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => onChange(emptyFilters)} data-testid={`${testIdPrefix}-clear-filters-panel`}>
+                <X className="w-3 h-3 mr-1" />
+                <span className="text-[10px]">Clear All</span>
+              </Button>
+            )}
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">Audience:</span>
-            <MultiSelectDropdown label="Audiences" selected={filters.page} filterKey="page" onChange={handleChange} testId="filter-audience" options={[
-              { value: "seniors", label: "Seniors" },
-              { value: "veterans", label: "Veterans" },
-              { value: "first-responders", label: "First Responders" },
-            ]} />
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">Funnel:</span>
-            <MultiSelectDropdown label="Types" selected={filters.pageType} filterKey="pageType" onChange={handleChange} testId="filter-pageType" options={[
-              { value: "lead", label: "Lead" },
-              { value: "call", label: "Call" },
-            ]} />
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">Source:</span>
-            <MultiSelectDropdown label="Sources" selected={filters.utmSource} filterKey="utmSource" onChange={handleChange} testId="filter-utmSource" options={
-              (filterOptions?.utmSources || []).map(s => ({ value: s, label: s }))
-            } />
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">Campaign:</span>
-            <MultiSelectDropdown label="Campaigns" selected={filters.utmCampaign} filterKey="utmCampaign" onChange={handleChange} testId="filter-utmCampaign" options={
-              (filterOptions?.utmCampaigns || []).map(s => ({ value: s, label: s }))
-            } />
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">Medium:</span>
-            <MultiSelectDropdown label="Mediums" selected={filters.utmMedium} filterKey="utmMedium" onChange={handleChange} testId="filter-utmMedium" options={
-              (filterOptions?.utmMediums || []).map(s => ({ value: s, label: s }))
-            } />
-          </div>
-          {showExtended && (
-            <>
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-muted-foreground">OS:</span>
-                <MultiSelectDropdown label="OS" selected={filters.os} filterKey="os" onChange={handleChange} testId="filter-os" options={
-                  (filterOptions?.osList || []).map(s => ({ value: s, label: s }))
-                } />
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-muted-foreground">Browser:</span>
-                <MultiSelectDropdown label="Browsers" selected={filters.browser} filterKey="browser" onChange={handleChange} testId="filter-browser" options={
-                  (filterOptions?.browsers || []).map(s => ({ value: s, label: s }))
-                } />
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-muted-foreground">State:</span>
-                <MultiSelectDropdown label="States" selected={filters.geoState} filterKey="geoState" onChange={handleChange} testId="filter-geoState" options={
-                  (filterOptions?.geoStates || []).map(s => ({ value: s, label: s }))
-                } />
-              </div>
-            </>
-          )}
         </div>
       )}
     </div>
@@ -874,14 +867,18 @@ function DrilldownRowComponent({
 
 function FunnelReport({
   dateRange,
-  filters,
+  filterOptions,
   drillDimension,
   onDrillDimensionChange,
+  filters,
+  onFiltersChange,
 }: {
   dateRange: DateRange | undefined;
-  filters: Filters;
+  filterOptions: FilterOptions | undefined;
   drillDimension: string;
   onDrillDimensionChange: (d: string) => void;
+  filters: Filters;
+  onFiltersChange: (f: Filters) => void;
 }) {
 
   const summaryQuery = buildQueryParams(dateRange, filters, { groupBy: "domain" });
@@ -931,7 +928,10 @@ function FunnelReport({
 
   return (
     <div data-testid="card-funnel-report">
-      <h3 className="text-[11px] font-semibold mb-1" data-testid="text-funnel-title">Funnel Summary</h3>
+      <div className="flex items-center gap-2 mb-1 flex-wrap">
+        <h3 className="text-[11px] font-semibold" data-testid="text-funnel-title">Funnel Summary</h3>
+        <FilterPanel filters={filters} onChange={onFiltersChange} filterOptions={filterOptions} testIdPrefix="report" />
+      </div>
       <div className="overflow-x-auto border rounded-md mb-2">
         <Table>
           <TableHeader>
@@ -1207,6 +1207,7 @@ const STORAGE_KEY = "trackingjunction_view_state";
 
 interface SavedViewState {
   filters: Filters;
+  logsFilters?: Filters;
   drillDimension: string;
   dateRange?: { from?: string; to?: string };
   refreshInterval: number;
@@ -1236,6 +1237,9 @@ function loadSavedView(): Partial<SavedViewState> {
     const parsed = JSON.parse(raw);
     if (parsed.filters) {
       parsed.filters = migrateFilters(parsed.filters);
+    }
+    if (parsed.logsFilters) {
+      parsed.logsFilters = migrateFilters(parsed.logsFilters);
     }
     return parsed;
   } catch {
@@ -1349,15 +1353,15 @@ function ResizableHeader({
 
 function EventLogsSection({
   dateRange,
-  filters,
   filterOptions,
+  filters,
   onFiltersChange,
   expanded,
   onToggleExpanded,
 }: {
   dateRange: DateRange | undefined;
-  filters: Filters;
   filterOptions: FilterOptions | undefined;
+  filters: Filters;
   onFiltersChange: (f: Filters) => void;
   expanded: boolean;
   onToggleExpanded: () => void;
@@ -1572,7 +1576,7 @@ function EventLogsSection({
 
       {expanded && (
         <div className="mt-1.5 space-y-1.5">
-          <FilterBar filters={filters} onChange={onFiltersChange} filterOptions={filterOptions} showExtended={true} />
+          <FilterPanel filters={filters} onChange={onFiltersChange} filterOptions={filterOptions} testIdPrefix="logs" />
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
             <Input
@@ -2189,7 +2193,8 @@ export default function ReportsPage() {
     }
     return undefined;
   });
-  const [filters, setFilters] = useState<Filters>(() => savedView.current.filters || emptyFilters);
+  const [reportFilters, setReportFilters] = useState<Filters>(() => savedView.current.filters || emptyFilters);
+  const [logsFilters, setLogsFilters] = useState<Filters>(() => savedView.current.logsFilters || emptyFilters);
   const [drillDimension, setDrillDimension] = useState<string>(() => savedView.current.drillDimension || "domain");
   const [refreshInterval, setRefreshInterval] = useState<number>(() => savedView.current.refreshInterval || 0);
   const [logsExpanded, setLogsExpanded] = useState<boolean>(() => savedView.current.logsExpanded || false);
@@ -2198,7 +2203,8 @@ export default function ReportsPage() {
 
   useEffect(() => {
     const state: SavedViewState = {
-      filters,
+      filters: reportFilters,
+      logsFilters,
       drillDimension,
       dateRange: dateRange ? {
         from: dateRange.from?.toISOString(),
@@ -2208,7 +2214,7 @@ export default function ReportsPage() {
       logsExpanded,
     };
     saveViewState(state);
-  }, [filters, drillDimension, dateRange, refreshInterval, logsExpanded]);
+  }, [reportFilters, logsFilters, drillDimension, dateRange, refreshInterval, logsExpanded]);
 
   const { data: filterOptions } = useQuery<FilterOptions>({
     queryKey: ["/api/analytics/filter-options"],
@@ -2316,15 +2322,13 @@ export default function ReportsPage() {
         </Popover>
       </div>
 
-      <FilterBar filters={filters} onChange={setFilters} filterOptions={filterOptions} showExtended={true} />
-
-      <FunnelReport dateRange={dateRange} filters={filters} drillDimension={drillDimension} onDrillDimensionChange={setDrillDimension} />
+      <FunnelReport dateRange={dateRange} filterOptions={filterOptions} filters={reportFilters} onFiltersChange={setReportFilters} drillDimension={drillDimension} onDrillDimensionChange={setDrillDimension} />
 
       <EventLogsSection
         dateRange={dateRange}
-        filters={filters}
         filterOptions={filterOptions}
-        onFiltersChange={setFilters}
+        filters={logsFilters}
+        onFiltersChange={setLogsFilters}
         expanded={logsExpanded}
         onToggleExpanded={() => setLogsExpanded(prev => !prev)}
       />
