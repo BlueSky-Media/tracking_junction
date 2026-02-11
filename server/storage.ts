@@ -141,6 +141,8 @@ export interface IStorage {
   getDrilldown(filters: AnalyticsFilters, groupBy: string): Promise<DrilldownResult>;
   getEventLogs(filters: AnalyticsFilters, page: number, limit: number, search?: string): Promise<EventLogResult>;
   deleteAllEvents(): Promise<void>;
+  deleteEvent(id: number): Promise<void>;
+  deleteEventsBySession(sessionId: string): Promise<number>;
 }
 
 function buildConditions(filters: AnalyticsFilters) {
@@ -782,6 +784,15 @@ class DatabaseStorage implements IStorage {
 
   async deleteAllEvents(): Promise<void> {
     await db.delete(trackingEvents);
+  }
+
+  async deleteEvent(id: number): Promise<void> {
+    await db.delete(trackingEvents).where(eq(trackingEvents.id, id));
+  }
+
+  async deleteEventsBySession(sessionId: string): Promise<number> {
+    const result = await db.delete(trackingEvents).where(eq(trackingEvents.sessionId, sessionId)).returning({ id: trackingEvents.id });
+    return result.length;
   }
 }
 

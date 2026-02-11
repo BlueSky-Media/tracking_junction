@@ -12,8 +12,9 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   BarChart3, ChevronDown, ChevronRight, Search,
   CalendarIcon, ChevronLeft, ChevronsLeft, ChevronsRight,
-  Filter, X, RefreshCw,
+  Filter, X, RefreshCw, Trash2,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
@@ -641,6 +642,13 @@ function EventLogsSection({
     return () => clearTimeout(timer);
   }, [search]);
 
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [deleting, setDeleting] = useState<Set<number>>(new Set());
+  const [deletingSession, setDeletingSession] = useState<string | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+
   const logsQueryStr = buildLogsQuery(dateRange, filters, logPage, debouncedSearch);
   const logsQuery = useQuery<EventLogResult>({
     queryKey: ["/api/analytics/logs", logsQueryStr],
@@ -660,19 +668,92 @@ function EventLogsSection({
     });
   };
 
+  const invalidateAnalytics = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/analytics");
+      },
+    });
+  };
+
+  const deleteEvent = async (id: number) => {
+    setDeleting(prev => new Set(prev).add(id));
+    try {
+      const res = await fetch(`/api/analytics/events/${id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete");
+      toast({ title: "Event deleted" });
+      invalidateAnalytics();
+    } catch {
+      toast({ title: "Failed to delete event", variant: "destructive" });
+    } finally {
+      setDeleting(prev => { const n = new Set(prev); n.delete(id); return n; });
+    }
+  };
+
+  const deleteSession = async (sessionId: string) => {
+    setDeletingSession(sessionId);
+    try {
+      const res = await fetch(`/api/analytics/events/session/${sessionId}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete");
+      const data = await res.json();
+      toast({ title: `Deleted ${data.count} events for this session` });
+      invalidateAnalytics();
+    } catch {
+      toast({ title: "Failed to delete session events", variant: "destructive" });
+    } finally {
+      setDeletingSession(null);
+    }
+  };
+
+  const deleteAll = async () => {
+    setDeletingAll(true);
+    try {
+      const res = await fetch("/api/analytics/all-events", { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete");
+      toast({ title: "All events deleted" });
+      setConfirmDeleteAll(false);
+      invalidateAnalytics();
+    } catch {
+      toast({ title: "Failed to delete all events", variant: "destructive" });
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   return (
     <Card className="p-5" data-testid="card-event-logs">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full text-left"
-        data-testid="button-toggle-logs"
-      >
-        {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        <h3 className="font-semibold">Event Logs</h3>
-        {logsQuery.data && (
-          <Badge variant="secondary" className="ml-2 text-xs">{logsQuery.data.total.toLocaleString()} records</Badge>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 text-left"
+          data-testid="button-toggle-logs"
+        >
+          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          <h3 className="font-semibold">Event Logs</h3>
+          {logsQuery.data && (
+            <Badge variant="secondary" className="ml-2 text-xs">{logsQuery.data.total.toLocaleString()} records</Badge>
+          )}
+        </button>
+        {expanded && logsQuery.data && logsQuery.data.total > 0 && (
+          confirmDeleteAll ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-destructive font-medium">Delete all {logsQuery.data.total.toLocaleString()} events?</span>
+              <Button variant="destructive" size="sm" onClick={deleteAll} disabled={deletingAll} data-testid="button-confirm-delete-all">
+                {deletingAll ? "Deleting..." : "Yes, delete all"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConfirmDeleteAll(false)} data-testid="button-cancel-delete-all">
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setConfirmDeleteAll(true)} data-testid="button-delete-all">
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              Delete All
+            </Button>
+          )
         )}
-      </button>
+      </div>
 
       {expanded && (
         <div className="mt-4 space-y-4">
@@ -719,6 +800,10 @@ function EventLogsSection({
                         event={event}
                         isExpanded={expandedRows.has(event.id)}
                         onToggle={() => toggleRow(event.id)}
+                        onDeleteEvent={() => deleteEvent(event.id)}
+                        onDeleteSession={() => deleteSession(event.sessionId)}
+                        isDeleting={deleting.has(event.id)}
+                        isDeletingSession={deletingSession === event.sessionId}
                       />
                     ))}
                   </TableBody>
@@ -763,10 +848,18 @@ function EventLogRow({
   event,
   isExpanded,
   onToggle,
+  onDeleteEvent,
+  onDeleteSession,
+  isDeleting,
+  isDeletingSession,
 }: {
   event: EventLog;
   isExpanded: boolean;
   onToggle: () => void;
+  onDeleteEvent: () => void;
+  onDeleteSession: () => void;
+  isDeleting: boolean;
+  isDeletingSession: boolean;
 }) {
   const ts = new Date(event.eventTimestamp);
   const formattedDate = format(ts, "MMM d, yyyy h:mm:ss a");
@@ -799,23 +892,47 @@ function EventLogRow({
       {isExpanded && (
         <TableRow data-testid={`row-log-detail-${event.id}`}>
           <TableCell colSpan={9}>
-            <div className="bg-muted/50 rounded-md p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-xs">
-              <DetailField label="ID" value={String(event.id)} />
-              <DetailField label="Session ID" value={event.sessionId} />
-              <DetailField label="Event Type" value={event.eventType || "step_complete"} />
-              <DetailField label="Audience" value={event.page} />
-              <DetailField label="Funnel Type" value={event.pageType} />
-              <DetailField label="Domain" value={event.domain} />
-              <DetailField label="Step" value={`${event.stepNumber}. ${event.stepName}`} />
-              <DetailField label="Selected Value" value={event.selectedValue || "\u2014"} />
-              <DetailField label="Time on Step" value={event.timeOnStep !== null ? `${event.timeOnStep}s` : "\u2014"} />
-              <DetailField label="Device" value={event.deviceType || "\u2014"} />
-              <DetailField label="UTM Source" value={event.utmSource || "\u2014"} />
-              <DetailField label="UTM Campaign" value={event.utmCampaign || "\u2014"} />
-              <DetailField label="UTM Medium" value={event.utmMedium || "\u2014"} />
-              <DetailField label="UTM Content" value={event.utmContent || "\u2014"} />
-              <DetailField label="Referrer" value={event.referrer || "\u2014"} />
-              <DetailField label="Timestamp" value={formattedDate} />
+            <div className="bg-muted/50 rounded-md p-4 space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-xs">
+                <DetailField label="ID" value={String(event.id)} />
+                <DetailField label="Session ID" value={event.sessionId} />
+                <DetailField label="Event Type" value={event.eventType || "step_complete"} />
+                <DetailField label="Audience" value={event.page} />
+                <DetailField label="Funnel Type" value={event.pageType} />
+                <DetailField label="Domain" value={event.domain} />
+                <DetailField label="Step" value={`${event.stepNumber}. ${event.stepName}`} />
+                <DetailField label="Selected Value" value={event.selectedValue || "\u2014"} />
+                <DetailField label="Time on Step" value={event.timeOnStep !== null ? `${event.timeOnStep}s` : "\u2014"} />
+                <DetailField label="Device" value={event.deviceType || "\u2014"} />
+                <DetailField label="UTM Source" value={event.utmSource || "\u2014"} />
+                <DetailField label="UTM Campaign" value={event.utmCampaign || "\u2014"} />
+                <DetailField label="UTM Medium" value={event.utmMedium || "\u2014"} />
+                <DetailField label="UTM Content" value={event.utmContent || "\u2014"} />
+                <DetailField label="Referrer" value={event.referrer || "\u2014"} />
+                <DetailField label="Timestamp" value={formattedDate} />
+              </div>
+              <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); onDeleteEvent(); }}
+                  disabled={isDeleting}
+                  data-testid={`button-delete-event-${event.id}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  {isDeleting ? "Deleting..." : "Delete this event"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); onDeleteSession(); }}
+                  disabled={isDeletingSession}
+                  data-testid={`button-delete-session-${event.id}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  {isDeletingSession ? "Deleting..." : "Delete entire session"}
+                </Button>
+              </div>
             </div>
           </TableCell>
         </TableRow>
@@ -873,7 +990,12 @@ export default function ReportsPage() {
 
   const refreshAll = useCallback(async () => {
     setIsRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ["/api/analytics"] });
+    await queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/analytics");
+      },
+    });
     setLastUpdated(new Date());
     setIsRefreshing(false);
   }, [queryClient]);

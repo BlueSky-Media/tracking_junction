@@ -60,7 +60,12 @@ export default function DashboardPage() {
 
   const refreshAll = useCallback(async () => {
     setIsRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ["/api/analytics"] });
+    await queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/analytics");
+      },
+    });
     setLastUpdated(new Date());
     setIsRefreshing(false);
   }, [queryClient]);
