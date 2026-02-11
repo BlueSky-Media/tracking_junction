@@ -672,6 +672,7 @@ const DEFAULT_COL_WIDTHS: Record<string, number> = {
   events: 50,
   furthestStep: 110,
   status: 80,
+  calls: 50,
   audience: 80,
   domain: 120,
   device: 70,
@@ -713,6 +714,7 @@ const SESSION_COLUMNS = [
   { key: "events", label: "Events", resizable: true },
   { key: "furthestStep", label: "Furthest Step", resizable: true },
   { key: "status", label: "Status", resizable: true },
+  { key: "calls", label: "Calls", resizable: true },
   { key: "audience", label: "Audience", resizable: true },
   { key: "domain", label: "Domain", resizable: true },
   { key: "device", label: "Device", resizable: true },
@@ -1090,6 +1092,9 @@ function SessionLogRow({
     ? <Badge variant="secondary" className="text-[9px] py-0 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30">Landed</Badge>
     : <Badge variant="secondary" className="text-[9px] py-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">Step {session.maxStep}</Badge>;
 
+  const formCompleteEvent = session.events.find(e => e.eventType === "form_complete" && e.phone);
+  const hasPhone = !!formCompleteEvent;
+
   return (
     <>
       <tr
@@ -1117,6 +1122,13 @@ function SessionLogRow({
         </td>
         <td className="text-[10px] font-mono px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.furthestStep}px` }}>{session.maxStep}. {session.maxStepName}</td>
         <td className="px-1 py-0 overflow-hidden" style={{ width: `${colWidths.status}px` }}>{statusBadge}</td>
+        <td className="px-1 py-0 overflow-hidden text-center" style={{ width: `${colWidths.calls}px` }} data-testid={`cell-calls-${session.sessionId}`}>
+          {hasPhone ? (
+            <Phone className="w-3 h-3 text-green-600 dark:text-green-400 inline-block" />
+          ) : (
+            <span className="text-[9px] text-muted-foreground">{"\u2014"}</span>
+          )}
+        </td>
         <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.audience}px` }}>{session.page}</td>
         <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.domain}px` }}>{session.domain}</td>
         <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.device}px` }}>{session.deviceType || "\u2014"}</td>
