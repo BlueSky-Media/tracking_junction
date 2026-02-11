@@ -134,6 +134,12 @@ interface SessionLogEntry {
   viewport: string | null;
   language: string | null;
   selectedState: string | null;
+  ipAddress: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  quizAnswers: Record<string, string> | null;
 }
 
 interface SessionLogResult {
@@ -333,6 +339,47 @@ function FilterBar({
   );
 }
 
+const STEP_VIS_KEY = "trackingjunction_step_visibility";
+
+function loadStepVisibility(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(STEP_VIS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return {};
+}
+
+function saveStepVisibility(vis: Record<string, boolean>) {
+  try {
+    localStorage.setItem(STEP_VIS_KEY, JSON.stringify(vis));
+  } catch {}
+}
+
+const DRILLDOWN_METRIC_COLS = [
+  { key: "lands", label: "Lands", defaultVisible: true },
+  { key: "landCvr", label: "Land CVR", defaultVisible: true },
+  { key: "formComplete", label: "Form Complete", defaultVisible: true },
+  { key: "formCvr", label: "Form CVR", defaultVisible: true },
+];
+
+const DRILLDOWN_METRIC_VIS_KEY = "trackingjunction_drilldown_metrics";
+
+function loadDrilldownMetricVis(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(DRILLDOWN_METRIC_VIS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  const defaults: Record<string, boolean> = {};
+  DRILLDOWN_METRIC_COLS.forEach(c => { defaults[c.key] = c.defaultVisible; });
+  return defaults;
+}
+
+function saveDrilldownMetricVis(vis: Record<string, boolean>) {
+  try {
+    localStorage.setItem(DRILLDOWN_METRIC_VIS_KEY, JSON.stringify(vis));
+  } catch {}
+}
+
 function DrilldownTable({
   parentFilters,
   dateRange,
@@ -349,6 +396,25 @@ function DrilldownTable({
   usedDimensions: string[];
 }) {
   const [expandedRows, setExpandedRows] = useState<Record<string, string>>({});
+  const [stepVisibility, setStepVisibility] = useState<Record<string, boolean>>(loadStepVisibility);
+  const [stepColSelectorOpen, setStepColSelectorOpen] = useState(false);
+  const [metricVis, setMetricVis] = useState<Record<string, boolean>>(loadDrilldownMetricVis);
+
+  const toggleStepVis = useCallback((stepKey: string) => {
+    setStepVisibility(prev => {
+      const next = { ...prev, [stepKey]: prev[stepKey] === false ? true : false };
+      saveStepVisibility(next);
+      return next;
+    });
+  }, []);
+
+  const toggleMetricVis = useCallback((key: string) => {
+    setMetricVis(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      saveDrilldownMetricVis(next);
+      return next;
+    });
+  }, []);
 
   const queryStr = buildQueryParams(dateRange, globalFilters, { groupBy, ...parentFilters });
 
@@ -397,40 +463,76 @@ function DrilldownTable({
   const totalLands = data.totals.pageLands || data.totals.uniqueViews;
 
   const allSteps = data.totals.steps || [];
+  const visibleSteps = allSteps.filter(s => stepVisibility[s.stepKey] !== false);
   const canDrillGlobal = depth < 3 && availableNextDimensions.length > 0;
+  const showLands = metricVis.lands !== false;
+  const showLandCvr = metricVis.landCvr !== false;
+  const showFormComplete = metricVis.formComplete !== false;
+  const showFormCvr = metricVis.formCvr !== false;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-1">
+      {depth === 0 && (
+        <div className="flex items-center gap-1">
+          <Popover open={stepColSelectorOpen} onOpenChange={setStepColSelectorOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" data-testid="button-drilldown-col-selector">
+                <Columns className="w-3 h-3 mr-1" />
+                <span className="text-[10px]">Columns</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[220px] p-1.5 max-h-[400px] overflow-y-auto" align="start" data-testid="popover-drilldown-col-selector">
+              <p className="text-[10px] font-semibold text-muted-foreground px-1 mb-1">Metric Columns</p>
+              {DRILLDOWN_METRIC_COLS.map(col => (
+                <label key={col.key} className="flex items-center gap-1.5 px-1 py-0.5 rounded-md hover-elevate cursor-pointer" data-testid={`toggle-metric-${col.key}`}>
+                  <Checkbox checked={metricVis[col.key] !== false} onCheckedChange={() => toggleMetricVis(col.key)} className="h-3 w-3" />
+                  <span className="text-[10px]">{col.label}</span>
+                </label>
+              ))}
+              <div className="border-t my-1" />
+              <p className="text-[10px] font-semibold text-muted-foreground px-1 mb-1">Step Columns</p>
+              {allSteps.map(step => (
+                <label key={step.stepKey} className="flex items-center gap-1.5 px-1 py-0.5 rounded-md hover-elevate cursor-pointer" data-testid={`toggle-step-${step.stepKey}`}>
+                  <Checkbox checked={stepVisibility[step.stepKey] !== false} onCheckedChange={() => toggleStepVis(step.stepKey)} className="h-3 w-3" />
+                  <span className="text-[10px]">S{step.stepNumber} {step.stepName}</span>
+                </label>
+              ))}
+            </PopoverContent>
+          </Popover>
+          <span className="text-[9px] text-muted-foreground">{visibleSteps.length}/{allSteps.length} steps shown</span>
+        </div>
+      )}
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="h-6">
             {canDrillGlobal && <TableHead className="w-4 px-0.5 py-0" />}
             <TableHead className="text-[10px] min-w-[70px] px-1 py-0">{dimLabel}</TableHead>
-            <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Lands</TableHead>
-            <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Land CVR</TableHead>
-            {allSteps.map((step) => (
+            {showLands && <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Lands</TableHead>}
+            {showLandCvr && <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Land CVR</TableHead>}
+            {visibleSteps.map((step) => (
               <TableHead key={`step-${step.stepKey}`} colSpan={3} className="text-[9px] text-center px-0 py-0 border-l border-border/30 whitespace-nowrap">
                 <span className="font-semibold">S{step.stepNumber}</span>
                 <span className="text-muted-foreground ml-0.5 text-[8px]">{step.stepName}</span>
               </TableHead>
             ))}
-            <TableHead className="text-[10px] text-right px-1 py-0 border-l border-border/30 whitespace-nowrap">Form Complete</TableHead>
-            <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Form CVR</TableHead>
+            {showFormComplete && <TableHead className="text-[10px] text-right px-1 py-0 border-l border-border/30 whitespace-nowrap">Form Complete</TableHead>}
+            {showFormCvr && <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Form CVR</TableHead>}
           </TableRow>
           <TableRow className="h-4 bg-muted/30">
             {canDrillGlobal && <TableHead className="px-0.5 py-0" />}
             <TableHead className="px-1 py-0" />
-            <TableHead className="px-1 py-0" />
-            <TableHead className="px-1 py-0" />
-            {allSteps.map((step) => (
+            {showLands && <TableHead className="px-1 py-0" />}
+            {showLandCvr && <TableHead className="px-1 py-0" />}
+            {visibleSteps.map((step) => (
               <Fragment key={`sh-grp-${step.stepKey}`}>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap border-l border-border/30">#</TableHead>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">CVR</TableHead>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">Drop-off</TableHead>
               </Fragment>
             ))}
-            <TableHead className="px-1 py-0 border-l border-border/30" />
-            <TableHead className="px-1 py-0" />
+            {showFormComplete && <TableHead className="px-1 py-0 border-l border-border/30" />}
+            {showFormCvr && <TableHead className="px-1 py-0" />}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -462,7 +564,11 @@ function DrilldownTable({
                 pageLands={rowLands}
                 landCvr={landCvr}
                 formCvr={formCvr}
-                allSteps={allSteps}
+                allSteps={visibleSteps}
+                showLands={showLands}
+                showLandCvr={showLandCvr}
+                showFormComplete={showFormComplete}
+                showFormCvr={showFormCvr}
               />
             );
           })}
@@ -472,9 +578,9 @@ function DrilldownTable({
               <TableRow className="bg-muted/50 font-semibold border-t h-6" data-testid={`row-totals-${groupBy}-depth${depth}`}>
                 {canDrillGlobal && <TableCell className="px-0.5 py-0" />}
                 <TableCell className="text-[10px] font-bold px-1 py-0">Totals</TableCell>
-                <TableCell className="text-right font-mono text-[10px] px-1 py-0 font-bold">{totalLands.toLocaleString()}</TableCell>
-                <TableCell className="text-right font-mono text-[10px] px-1 py-0 font-bold">100.0%</TableCell>
-                {data.totals.steps.map((step) => {
+                {showLands && <TableCell className="text-right font-mono text-[10px] px-1 py-0 font-bold">{totalLands.toLocaleString()}</TableCell>}
+                {showLandCvr && <TableCell className="text-right font-mono text-[10px] px-1 py-0 font-bold">100.0%</TableCell>}
+                {visibleSteps.map((step) => {
                   const dropOff = 100 - step.conversionFromPrev;
                   return (
                     <Fragment key={`tc-grp-${step.stepKey}`}>
@@ -484,13 +590,14 @@ function DrilldownTable({
                     </Fragment>
                   );
                 })}
-                <TableCell className="text-right font-mono text-[10px] px-1 py-0 font-bold border-l border-border/30">{data.totals.formCompletions.toLocaleString()}</TableCell>
-                <TableCell className={`text-right font-mono text-[10px] px-1 py-0 font-bold ${totCvr > 0 ? "" : "text-muted-foreground"}`}>{totCvr.toFixed(1)}%</TableCell>
+                {showFormComplete && <TableCell className="text-right font-mono text-[10px] px-1 py-0 font-bold border-l border-border/30">{data.totals.formCompletions.toLocaleString()}</TableCell>}
+                {showFormCvr && <TableCell className={`text-right font-mono text-[10px] px-1 py-0 font-bold ${totCvr > 0 ? "" : "text-muted-foreground"}`}>{totCvr.toFixed(1)}%</TableCell>}
               </TableRow>
             );
           })()}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }
@@ -514,6 +621,10 @@ function DrilldownRowComponent({
   landCvr,
   formCvr,
   allSteps,
+  showLands,
+  showLandCvr,
+  showFormComplete,
+  showFormCvr,
 }: {
   row: DrilldownRow;
   canDrill: boolean;
@@ -533,8 +644,13 @@ function DrilldownRowComponent({
   landCvr: number;
   formCvr: number;
   allSteps: DrilldownStepData[];
+  showLands: boolean;
+  showLandCvr: boolean;
+  showFormComplete: boolean;
+  showFormCvr: boolean;
 }) {
-  const colSpan = 4 + (allSteps.length * 3) + 2 + (canDrill ? 1 : 0);
+  const metricCount = (showLands ? 1 : 0) + (showLandCvr ? 1 : 0) + (showFormComplete ? 1 : 0) + (showFormCvr ? 1 : 0);
+  const colSpan = 1 + metricCount + (allSteps.length * 3) + (canDrill ? 1 : 0);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const subDimLabel = availableNextDimensions.find(d => d.value === selectedSubDim)?.label;
 
@@ -591,8 +707,8 @@ function DrilldownRowComponent({
             <span className="text-muted-foreground ml-1">- {subDimLabel}</span>
           )}
         </TableCell>
-        <TableCell className="text-right font-mono text-[10px] px-1 py-0">{pageLands.toLocaleString()}</TableCell>
-        <TableCell className="text-right font-mono text-[10px] px-1 py-0">{landCvr.toFixed(1)}%</TableCell>
+        {showLands && <TableCell className="text-right font-mono text-[10px] px-1 py-0">{pageLands.toLocaleString()}</TableCell>}
+        {showLandCvr && <TableCell className="text-right font-mono text-[10px] px-1 py-0">{landCvr.toFixed(1)}%</TableCell>}
         {allSteps.map((refStep) => {
           const rowStep = row.steps.find(s => s.stepKey === refStep.stepKey);
           const count = rowStep?.completions || 0;
@@ -606,8 +722,8 @@ function DrilldownRowComponent({
             </Fragment>
           );
         })}
-        <TableCell className="text-right font-mono text-[10px] px-1 py-0 border-l border-border/30">{row.formCompletions.toLocaleString()}</TableCell>
-        <TableCell className={`text-right font-mono text-[10px] px-1 py-0 ${formCvr > 0 ? "" : "text-muted-foreground"}`}>{formCvr.toFixed(1)}%</TableCell>
+        {showFormComplete && <TableCell className="text-right font-mono text-[10px] px-1 py-0 border-l border-border/30">{row.formCompletions.toLocaleString()}</TableCell>}
+        {showFormCvr && <TableCell className={`text-right font-mono text-[10px] px-1 py-0 ${formCvr > 0 ? "" : "text-muted-foreground"}`}>{formCvr.toFixed(1)}%</TableCell>}
       </TableRow>
       {isExpanded && canDrill && selectedSubDim && (
         <TableRow data-testid={`row-drilldown-${groupBy}-${row.groupValue}`}>
@@ -916,6 +1032,26 @@ function getCellRenderer(key: string, session: SessionLogEntry, colWidths: Recor
       return <td key={key} className={cls} style={style}>{session.language || "\u2014"}</td>;
     case "selectedState":
       return <td key={key} className={cls} style={style}>{session.selectedState || "\u2014"}</td>;
+    case "ipAddress":
+      return <td key={key} className={`${cls} font-mono`} style={style}>{session.ipAddress || "\u2014"}</td>;
+    case "firstName":
+      return <td key={key} className={cls} style={style}>{session.firstName || "\u2014"}</td>;
+    case "lastName":
+      return <td key={key} className={cls} style={style}>{session.lastName || "\u2014"}</td>;
+    case "email":
+      return <td key={key} className={`${cls} truncate`} style={style} title={session.email || ""}>{session.email || "\u2014"}</td>;
+    case "phone":
+      return <td key={key} className={`${cls} font-mono`} style={style}>{session.phone || "\u2014"}</td>;
+    case "quizState":
+      return <td key={key} className={cls} style={style}>{session.quizAnswers?.state || session.quizAnswers?.State || "\u2014"}</td>;
+    case "quizAge":
+      return <td key={key} className={cls} style={style}>{session.quizAnswers?.age || session.quizAnswers?.Age || "\u2014"}</td>;
+    case "quizIncome":
+      return <td key={key} className={cls} style={style}>{session.quizAnswers?.income || session.quizAnswers?.Income || session.quizAnswers?.["Monthly Income"] || session.quizAnswers?.monthly_income || "\u2014"}</td>;
+    case "quizBudget":
+      return <td key={key} className={cls} style={style}>{session.quizAnswers?.budget || session.quizAnswers?.Budget || session.quizAnswers?.["Budget Affordability"] || session.quizAnswers?.budget_affordability || "\u2014"}</td>;
+    case "quizBeneficiary":
+      return <td key={key} className={cls} style={style}>{session.quizAnswers?.beneficiary || session.quizAnswers?.Beneficiary || "\u2014"}</td>;
     default:
       return <td key={key} className={cls} style={style}>{"\u2014"}</td>;
   }
@@ -960,25 +1096,35 @@ const SESSION_COLUMNS: SessionColumn[] = [
   { key: "expand", label: "", resizable: false },
   { key: "lastActivity", label: "Last Activity", resizable: true },
   { key: "sessionId", label: "Session ID", resizable: true },
-  { key: "events", label: "Events", resizable: true },
-  { key: "furthestStep", label: "Furthest Step", resizable: true },
-  { key: "status", label: "Status", resizable: true },
-  { key: "calls", label: "Calls", resizable: true },
-  { key: "audience", label: "Audience", resizable: true },
-  { key: "domain", label: "Domain", resizable: true },
-  { key: "device", label: "Device", resizable: true },
-  { key: "os", label: "OS", resizable: true },
-  { key: "browser", label: "Browser", resizable: true },
+  { key: "events", label: "Events", resizable: true, optional: true, defaultVisible: true },
+  { key: "furthestStep", label: "Furthest Step", resizable: true, optional: true, defaultVisible: true },
+  { key: "status", label: "Status", resizable: true, optional: true, defaultVisible: true },
+  { key: "calls", label: "Calls", resizable: true, optional: true, defaultVisible: true },
+  { key: "audience", label: "Audience", resizable: true, optional: true, defaultVisible: true },
+  { key: "domain", label: "Domain", resizable: true, optional: true, defaultVisible: true },
+  { key: "device", label: "Device", resizable: true, optional: true, defaultVisible: true },
+  { key: "os", label: "OS", resizable: true, optional: true, defaultVisible: true },
+  { key: "browser", label: "Browser", resizable: true, optional: true, defaultVisible: true },
+  { key: "ipAddress", label: "IP Address", resizable: true, optional: true, defaultVisible: false },
+  { key: "geoState", label: "Geo State", resizable: true, optional: true, defaultVisible: false },
+  { key: "selectedState", label: "User State", resizable: true, optional: true, defaultVisible: false },
+  { key: "firstName", label: "First Name", resizable: true, optional: true, defaultVisible: false },
+  { key: "lastName", label: "Last Name", resizable: true, optional: true, defaultVisible: false },
+  { key: "email", label: "Email", resizable: true, optional: true, defaultVisible: false },
+  { key: "phone", label: "Phone", resizable: true, optional: true, defaultVisible: false },
+  { key: "quizState", label: "Quiz: State", resizable: true, optional: true, defaultVisible: false },
+  { key: "quizAge", label: "Quiz: Age", resizable: true, optional: true, defaultVisible: false },
+  { key: "quizIncome", label: "Quiz: Income", resizable: true, optional: true, defaultVisible: false },
+  { key: "quizBudget", label: "Quiz: Budget", resizable: true, optional: true, defaultVisible: false },
+  { key: "quizBeneficiary", label: "Quiz: Beneficiary", resizable: true, optional: true, defaultVisible: false },
   { key: "utmSource", label: "UTM Source", resizable: true, optional: true, defaultVisible: false },
   { key: "utmCampaign", label: "UTM Campaign", resizable: true, optional: true, defaultVisible: false },
   { key: "utmMedium", label: "UTM Medium", resizable: true, optional: true, defaultVisible: false },
-  { key: "geoState", label: "Geo State", resizable: true, optional: true, defaultVisible: false },
   { key: "referrer", label: "Referrer", resizable: true, optional: true, defaultVisible: false },
   { key: "pageUrl", label: "Page URL", resizable: true, optional: true, defaultVisible: false },
   { key: "screenRes", label: "Screen", resizable: true, optional: true, defaultVisible: false },
   { key: "viewport", label: "Viewport", resizable: true, optional: true, defaultVisible: false },
   { key: "language", label: "Language", resizable: true, optional: true, defaultVisible: false },
-  { key: "selectedState", label: "Selected State", resizable: true, optional: true, defaultVisible: false },
 ];
 
 function ResizableHeader({

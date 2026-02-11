@@ -1022,6 +1022,15 @@ class DatabaseStorage implements IStorage {
         viewport: firstEvent.viewport,
         language: firstEvent.language,
         selectedState: firstEvent.selectedState,
+        ipAddress: firstEvent.ipAddress,
+        firstName: (() => { const fc = events.find(e => e.eventType === "form_complete"); return fc?.firstName || null; })(),
+        lastName: (() => { const fc = events.find(e => e.eventType === "form_complete"); return fc?.lastName || null; })(),
+        email: (() => { const fc = events.find(e => e.eventType === "form_complete"); return fc?.email || null; })(),
+        phone: (() => { const fc = events.find(e => e.eventType === "form_complete"); return fc?.phone || null; })(),
+        quizAnswers: (() => {
+          const lastWithAnswers = [...events].reverse().find(e => e.quizAnswers && Object.keys(e.quizAnswers as any).length > 0);
+          return (lastWithAnswers?.quizAnswers as Record<string, string>) || null;
+        })(),
       };
     });
 

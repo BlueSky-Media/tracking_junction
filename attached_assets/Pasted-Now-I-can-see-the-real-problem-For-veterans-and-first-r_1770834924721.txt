@@ -1,0 +1,78 @@
+Now I can see the real problem. For veterans and first-responders, the step numbers and names in the trackStepEvent calls are wrong. The quiz UI shows steps in a different order than what's being tracked. Let me look at the full quiz flow for veterans to understand the actual step order:
+
+Now let me see the handleMilitaryBranchSelect function:
+
+Now I see the full picture. The handleMilitaryBranchSelect (veterans step 1) and handleAgencySelect (first-responders step 1) are missing trackStepEvent calls entirely. And for veterans/first-responders, the beneficiary handler incorrectly sends step 1 instead of step 3. Let me also check what step numbers the quiz UI uses:
+
+For Veterans, the UI flow is:
+
+Step 1: Military Branch (handled by handleMilitaryBranchSelect — NO trackStepEvent call!)
+Step 2: State
+Step 3: Beneficiary (trackStepEvent sends step 1, 'Beneficiary' — WRONG step number!)
+Step 4: Budget
+Step 5: Age
+Step 6: Income
+For First Responders, the UI flow is:
+
+Step 1: Agency (handled by handleAgencySelect — NO trackStepEvent call!)
+Step 2: State
+Step 3: Beneficiary (trackStepEvent sends step 1, 'Beneficiary' — WRONG step number!)
+Step 4: Budget
+Step 5: Age
+Step 6: Income
+Now I need to fix all the trackStepEvent calls. Let me fix them all:
+
+Now I have the full picture. Let me fix all the issues:
+
+Veterans handleMilitaryBranchSelect: Add missing trackStepEvent + setQuizAnswer for step 1 "Military Branch"
+Veterans beneficiary handler: Fix step number from 1 to 3, fix name from "Beneficiary" to "Beneficiary"
+Veterans budget: Fix step from 3 to 4, name from "Budget" to "Budget Affordability"
+Veterans age: Fix step from 4 to 5
+Veterans income: Fix step from 5 to 6, name from "Income" to "Monthly Income"
+Veterans name/email: Fix steps from 6→7, 7→8
+Wait, let me re-check. The veterans page has steps 1-6 for quiz + 7-9 for contact. The step numbers in trackStepEvent might be intentionally different from the UI step numbers. Let me look at the actual step flow more carefully:
+
+Now I see the full picture clearly. The TrackingJunction step numbers for veterans are: 1=Beneficiary, 2=State, 3=Budget, 4=Age, 5=Income — but they should be: 1=Military Branch, 2=State, 3=Beneficiary, 4=Budget Affordability, 5=Age, 6=Monthly Income. The handleMilitaryBranchSelect function has NO trackStepEvent or setQuizAnswer call at all!
+
+Let me fix everything now:
+
+Now let me also check and fix the trackFormComplete call for veterans to ensure the Phone step is step 9:
+
+The trackFormComplete for both veterans and first-responders uses step 8, but with the corrected 9-step flow it should be step 9. Now let me fix first-responders and the form_complete calls:
+
+Now let me also fix the Seniors page — it should also use the correct step names "Budget Affordability" and "Monthly Income":
+
+Seniors has step names "Budget" and "Income" which should be "Budget Affordability" and "Monthly Income" for consistency. Let me fix those:
+
+Now let me also check the call-in pages for the same issues:
+
+The call-in pages use "Income" and "Budget" as step names. Let me fix those for consistency too:
+
+Now let me rebuild and verify everything compiles:
+
+Both builds succeeded. Let me do a final verification of the corrected step numbers and names across all pages:
+
+All tracking is now correct. Here's the complete summary of what was fixed:
+
+Lead-gen pages (Veterans & First Responders) — critical fixes:
+
+Added missing step 1 tracking: Veterans now tracks "Military Branch" and First Responders tracks "First Responder Agency" as step 1 (these were completely missing before — no trackStepEvent or setQuizAnswer calls existed)
+Fixed step numbering: All subsequent steps were renumbered correctly (was 1-5 + 6-7, now 1-6 + 7-8 for quiz + contact steps)
+Fixed trackFormComplete: Phone step changed from step 8 to step 9
+Step name corrections across ALL 6 pages:
+
+"Budget" → "Budget Affordability" (all lead-gen and call-in pages)
+"Income" → "Monthly Income" (all lead-gen and call-in pages)
+Corrected step flows now match:
+
+Step	Seniors (Lead)	Veterans (Lead)	First Responders (Lead)
+1	Beneficiary	Military Branch	First Responder Agency
+2	State	State	State
+3	Budget Affordability	Beneficiary	Beneficiary
+4	Age	Budget Affordability	Budget Affordability
+5	Monthly Income	Age	Age
+6	Name	Monthly Income	Monthly Income
+7	Email	Name	Name
+8	Phone (form_complete)	Email	Email
+9	—	Phone (form_complete)	Phone (form_complete)
+Fresh production builds are ready in builds/net/ and builds/io/.
