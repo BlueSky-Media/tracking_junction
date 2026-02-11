@@ -48,7 +48,7 @@ function EndpointSection({
   notes,
   testId,
 }: {
-  method: "GET" | "POST" | "OPTIONS";
+  method: "GET" | "POST" | "DELETE" | "OPTIONS";
   path: string;
   description: string;
   auth: boolean;
@@ -61,6 +61,7 @@ function EndpointSection({
   const methodColors: Record<string, string> = {
     GET: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
     POST: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+    DELETE: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
     OPTIONS: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   };
 
@@ -629,6 +630,286 @@ referrer,first_name,last_name,email,phone,event_timestamp
           "Maximum 10,000 rows returned, ordered by most recent first.",
           "PII fields (first_name, last_name, email, phone) are only populated for form_complete events.",
         ]}
+      />
+
+      <EndpointSection
+        testId="endpoint-get-drilldown"
+        method="GET"
+        path="/api/analytics/drilldown"
+        description="Returns multi-level drilldown data grouped by a dimension. Each row includes page lands, form completions, and per-step metrics (completions, step CVR, land CVR)."
+        auth={true}
+        queryParams={[
+          { name: "groupBy", type: "string", description: "Dimension to group by: domain, deviceType, utmSource, utmCampaign, utmMedium, or page. Default: domain.", required: false },
+          { name: "startDate", type: "string", description: "ISO date string for range start.", required: false },
+          { name: "endDate", type: "string", description: "ISO date string for range end.", required: false },
+          { name: "domain", type: "string", description: "Filter by domain.", required: false },
+          { name: "page", type: "string", description: "Filter by audience (seniors, veterans, first-responders).", required: false },
+          { name: "deviceType", type: "string", description: "Filter by device type.", required: false },
+          { name: "utmSource", type: "string", description: "Filter by UTM source.", required: false },
+          { name: "utmCampaign", type: "string", description: "Filter by UTM campaign.", required: false },
+          { name: "utmMedium", type: "string", description: "Filter by UTM medium.", required: false },
+        ]}
+        responseExample={`{
+  "rows": [
+    {
+      "groupValue": "blueskylife.net",
+      "uniqueViews": 120,
+      "grossViews": 450,
+      "pageLands": 120,
+      "formCompletions": 18,
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepName": "Beneficiary",
+          "completions": 95,
+          "conversionFromPrev": 79.2,
+          "conversionFromInitial": 79.2
+        },
+        {
+          "stepNumber": 2,
+          "stepName": "State",
+          "completions": 72,
+          "conversionFromPrev": 75.8,
+          "conversionFromInitial": 60.0
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "groupValue": "Totals",
+    "uniqueViews": 200,
+    "grossViews": 800,
+    "pageLands": 200,
+    "formCompletions": 30,
+    "steps": [ ... ]
+  },
+  "groupBy": "domain"
+}`}
+        notes={[
+          "conversionFromPrev: step completions / previous step count * 100 (step-to-step CVR).",
+          "conversionFromInitial: step completions / page lands * 100 (land-to-step CVR).",
+          "Steps array follows quiz step definitions for lead-gen (steps 1-8) or call-in (steps 1-6).",
+          "Valid groupBy values: domain, deviceType, utmSource, utmCampaign, utmMedium, page.",
+        ]}
+      />
+
+      <EndpointSection
+        testId="endpoint-get-logs"
+        method="GET"
+        path="/api/analytics/logs"
+        description="Returns paginated event logs with optional full-text search across session IDs, names, emails, and phones."
+        auth={true}
+        queryParams={[
+          { name: "page", type: "number", description: "Page number (1-indexed). Default: 1.", required: false },
+          { name: "limit", type: "number", description: "Events per page (1-200). Default: 25.", required: false },
+          { name: "search", type: "string", description: "Search term to filter events.", required: false },
+        ]}
+        responseExample={`{
+  "events": [
+    {
+      "id": 1,
+      "sessionId": "abc-123",
+      "eventType": "step_complete",
+      "page": "seniors",
+      "pageType": "lead",
+      "domain": "blueskylife.net",
+      "stepNumber": 2,
+      "stepName": "State",
+      "selectedValue": "Florida",
+      "timeOnStep": 8,
+      "eventTimestamp": "2025-02-10T12:00:00Z"
+    }
+  ],
+  "total": 10850,
+  "page": 1,
+  "limit": 25,
+  "totalPages": 434
+}`}
+      />
+
+      <EndpointSection
+        testId="endpoint-delete-event"
+        method="DELETE"
+        path="/api/analytics/events/:id"
+        description="Deletes a single tracking event by its database ID."
+        auth={true}
+        responseExample={`{ "ok": true }`}
+        notes={[
+          "Returns 404 if the event ID is not found.",
+        ]}
+      />
+
+      <EndpointSection
+        testId="endpoint-delete-session"
+        method="DELETE"
+        path="/api/analytics/events/session/:sessionId"
+        description="Deletes all events for a specific session ID."
+        auth={true}
+        responseExample={`{ "ok": true, "deleted": 7 }`}
+      />
+
+      <EndpointSection
+        testId="endpoint-delete-sessions-bulk"
+        method="DELETE"
+        path="/api/analytics/events/sessions"
+        description="Bulk-deletes events for multiple session IDs in one request."
+        auth={true}
+        requestBody={`{
+  "sessionIds": ["abc-123", "def-456", "ghi-789"]
+}`}
+        responseExample={`{ "ok": true, "deleted": 21 }`}
+      />
+
+      <EndpointSection
+        testId="endpoint-delete-all-events"
+        method="DELETE"
+        path="/api/analytics/all-events"
+        description="Deletes ALL tracking events. Use with caution."
+        auth={true}
+        responseExample={`{ "ok": true }`}
+      />
+
+      <div className="border-t pt-6">
+        <h2 className="text-lg font-semibold mb-1" data-testid="text-section-server-logs">Server Logs</h2>
+        <p className="text-sm text-muted-foreground mb-4">Endpoints for viewing and managing server request logs.</p>
+      </div>
+
+      <EndpointSection
+        testId="endpoint-get-server-logs"
+        method="GET"
+        path="/api/server-logs"
+        description="Returns paginated server request logs with optional filters for method, status code, and path search."
+        auth={true}
+        queryParams={[
+          { name: "page", type: "number", description: "Page number (1-indexed). Default: 1.", required: false },
+          { name: "limit", type: "number", description: "Logs per page (1-200). Default: 50.", required: false },
+          { name: "method", type: "string", description: "Filter by HTTP method (GET, POST, etc.).", required: false },
+          { name: "status", type: "string", description: "Filter by status code range (2xx, 3xx, 4xx, 5xx).", required: false },
+          { name: "search", type: "string", description: "Search term to filter by request path.", required: false },
+        ]}
+        responseExample={`{
+  "logs": [
+    {
+      "id": 1,
+      "method": "POST",
+      "path": "/api/events",
+      "statusCode": 200,
+      "duration": 12,
+      "ip": "203.0.113.42",
+      "userAgent": "Mozilla/5.0...",
+      "timestamp": "2025-02-10T12:00:00Z"
+    }
+  ],
+  "total": 5400,
+  "page": 1,
+  "limit": 50,
+  "totalPages": 108
+}`}
+      />
+
+      <EndpointSection
+        testId="endpoint-delete-server-logs"
+        method="DELETE"
+        path="/api/server-logs"
+        description="Clears all server request logs."
+        auth={true}
+        responseExample={`{ "ok": true }`}
+      />
+
+      <div className="border-t pt-6">
+        <h2 className="text-lg font-semibold mb-1" data-testid="text-section-retell">Retell AI Integration</h2>
+        <p className="text-sm text-muted-foreground mb-4">Endpoints for searching Retell call history, playing recordings, and managing blocked phone numbers.</p>
+      </div>
+
+      <EndpointSection
+        testId="endpoint-get-retell-calls"
+        method="GET"
+        path="/api/retell/calls"
+        description="Search Retell call history by phone number. Returns matching calls with metadata."
+        auth={true}
+        queryParams={[
+          { name: "phone", type: "string", description: "Phone number to search for (partial or full match).", required: true },
+        ]}
+        responseExample={`[
+  {
+    "call_id": "call_abc123",
+    "agent_id": "agent_xyz",
+    "call_type": "phone_call",
+    "from_number": "+15551234567",
+    "to_number": "+15559876543",
+    "direction": "inbound",
+    "start_timestamp": 1707566400000,
+    "end_timestamp": 1707567000000,
+    "duration_ms": 600000,
+    "status": "ended",
+    "disconnection_reason": "agent_hangup",
+    "call_analysis": {
+      "call_summary": "Caller inquired about...",
+      "user_sentiment": "Positive"
+    }
+  }
+]`}
+      />
+
+      <EndpointSection
+        testId="endpoint-get-retell-recording"
+        method="GET"
+        path="/api/retell/recording/:callId"
+        description="Get recording URL and transcript for a specific Retell call."
+        auth={true}
+        responseExample={`{
+  "recording_url": "https://storage.retellai.com/...",
+  "transcript": "Agent: Hello, how can I help you?\\nUser: I'm interested in..."
+}`}
+      />
+
+      <EndpointSection
+        testId="endpoint-get-retell-blocked"
+        method="GET"
+        path="/api/retell/blocked"
+        description="List all blocked phone numbers with optional block reasons."
+        auth={true}
+        responseExample={`[
+  {
+    "phone": "+15551234567",
+    "reason": "Spam caller",
+    "createdAt": "2025-02-10T12:00:00Z"
+  }
+]`}
+      />
+
+      <EndpointSection
+        testId="endpoint-post-retell-block"
+        method="POST"
+        path="/api/retell/block"
+        description="Block a phone number. Optionally provide a reason."
+        auth={true}
+        requestBody={`{
+  "phone": "+15551234567",
+  "reason": "Spam caller"
+}`}
+        responseExample={`{ "ok": true }`}
+      />
+
+      <EndpointSection
+        testId="endpoint-post-retell-bulk-unblock"
+        method="POST"
+        path="/api/retell/bulk-unblock"
+        description="Unblock multiple phone numbers in one request."
+        auth={true}
+        requestBody={`{
+  "phones": ["+15551234567", "+15559876543"]
+}`}
+        responseExample={`{ "ok": true, "unblocked": 2 }`}
+      />
+
+      <EndpointSection
+        testId="endpoint-delete-retell-block"
+        method="DELETE"
+        path="/api/retell/block/:phone"
+        description="Unblock a single phone number."
+        auth={true}
+        responseExample={`{ "ok": true }`}
       />
 
       <div className="border-t pt-6">
