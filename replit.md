@@ -96,12 +96,16 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 3. `form_complete` (step 8 for lead) - fires on final form submission with lead PII
 
 ## Quiz Step Definitions
-- **Lead-gen**: Landing(0) > Beneficiary(1) > State(2) > Budget(3) > Age(4) > Income(5) > Name(6) > Email(7) > Phone(8)
+- **Lead-gen (seniors)**: Landing(0) > Beneficiary(1) > State(2) > Budget(3) > Age(4) > Income(5) > Name(6) > Email(7) > Phone(8)
+- **Lead-gen (veterans)**: Landing(0) > Branch(1) > State(2) > Beneficiary(3) > Budget(4) > Age(5) > Income(6) > Name(7) > Email(8)
 - **Call-in**: Landing(0) > State(1) > Age(2) > Income(3) > Budget(4) > Purpose(5) > Call CTA(6)
+- **Note**: Step definitions vary by audience. The drilldown report uses composite stepKey (stepNumber:stepName) to avoid conflating different audiences' steps at the same step number.
 
 ## Reports Page Features
 - Funnel summary with horizontal step layout: Lands | S1 # / CVR / Land CVR | S2 ... | Form Complete
 - Drilldown report up to 3 levels deep by: Domain, Device Type, Audience, UTM Source/Campaign/Medium
+- Audience-aware step columns: uses composite stepKey to separate steps with same number but different names across audiences
+- Info banner when "All Audiences" selected warning about mixed step definitions
 - Compact text (10-11px) in drilldown tables for horizontal readability
 - Event logs with search, pagination, delete individual/session/all
 - Event log detail view shows all fields including Facebook ad params, quiz answers, and PII (form_complete only)

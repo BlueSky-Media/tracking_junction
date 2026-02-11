@@ -661,6 +661,7 @@ referrer,first_name,last_name,email,phone,event_timestamp
         {
           "stepNumber": 1,
           "stepName": "Beneficiary",
+          "stepKey": "1:Beneficiary",
           "completions": 95,
           "conversionFromPrev": 79.2,
           "conversionFromInitial": 79.2
@@ -668,6 +669,7 @@ referrer,first_name,last_name,email,phone,event_timestamp
         {
           "stepNumber": 2,
           "stepName": "State",
+          "stepKey": "2:State",
           "completions": 72,
           "conversionFromPrev": 75.8,
           "conversionFromInitial": 60.0
@@ -686,9 +688,10 @@ referrer,first_name,last_name,email,phone,event_timestamp
   "groupBy": "domain"
 }`}
         notes={[
+          "stepKey: composite key (stepNumber:stepName) used to uniquely identify steps across audiences.",
           "conversionFromPrev: step completions / previous step count * 100 (step-to-step CVR).",
           "conversionFromInitial: step completions / page lands * 100 (land-to-step CVR).",
-          "Steps array follows quiz step definitions for lead-gen (steps 1-8) or call-in (steps 1-6).",
+          "Steps are grouped by stepKey so different audiences with different step names at the same step number produce separate columns (e.g., '2:Budget' for seniors vs '2:State' for veterans).",
           "Valid groupBy values: domain, deviceType, utmSource, utmCampaign, utmMedium, page.",
         ]}
       />

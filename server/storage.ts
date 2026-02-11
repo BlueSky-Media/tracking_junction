@@ -103,6 +103,7 @@ interface ReferrerRow {
 interface DrilldownStepData {
   stepNumber: number;
   stepName: string;
+  stepKey: string;
   completions: number;
   conversionFromPrev: number;
   conversionFromInitial: number;
@@ -749,7 +750,7 @@ class DatabaseStorage implements IStorage {
 
     const results = (rows as any).rows || [];
 
-    const groupMap = new Map<string, { uniqueViews: number; grossViews: number; pageLands: number; formCompletions: number; stepsMap: Map<number, { stepName: string; completions: number }> }>();
+    const groupMap = new Map<string, { uniqueViews: number; grossViews: number; pageLands: number; formCompletions: number; stepsMap: Map<string, { stepNumber: number; stepName: string; completions: number }> }>();
 
     for (const r of results) {
       const gv = r.group_value as string;
@@ -763,30 +764,47 @@ class DatabaseStorage implements IStorage {
         });
       }
       if (r.step_number !== null && r.step_number !== undefined) {
-        groupMap.get(gv)!.stepsMap.set(Number(r.step_number), {
-          stepName: r.step_name as string,
-          completions: Number(r.completions),
-        });
+        const sn = Number(r.step_number);
+        const sName = r.step_name as string;
+        const stepKey = `${sn}:${sName}`;
+        const existing = groupMap.get(gv)!.stepsMap.get(stepKey);
+        if (existing) {
+          existing.completions += Number(r.completions);
+        } else {
+          groupMap.get(gv)!.stepsMap.set(stepKey, {
+            stepNumber: sn,
+            stepName: sName,
+            completions: Number(r.completions),
+          });
+        }
       }
     }
 
-    const allStepNumbers = new Set<number>();
+    const allStepKeys = new Set<string>();
     Array.from(groupMap.values()).forEach(g => {
-      Array.from(g.stepsMap.keys()).forEach(sn => allStepNumbers.add(sn));
+      Array.from(g.stepsMap.keys()).forEach(sk => allStepKeys.add(sk));
     });
-    const sortedSteps = Array.from(allStepNumbers).sort((a, b) => a - b);
+    const sortedStepKeys = Array.from(allStepKeys).sort((a, b) => {
+      const [aNum, ...aName] = a.split(":");
+      const [bNum, ...bName] = b.split(":");
+      const numDiff = Number(aNum) - Number(bNum);
+      if (numDiff !== 0) return numDiff;
+      return aName.join(":").localeCompare(bName.join(":"));
+    });
 
-    function buildSteps(uniqueViews: number, stepsMap: Map<number, { stepName: string; completions: number }>): DrilldownStepData[] {
+    function buildSteps(uniqueViews: number, stepsMap: Map<string, { stepNumber: number; stepName: string; completions: number }>): DrilldownStepData[] {
       let prevCount = uniqueViews;
-      return sortedSteps.map((sn) => {
-        const stepData = stepsMap.get(sn);
+      return sortedStepKeys.map((sk) => {
+        const stepData = stepsMap.get(sk);
         const completions = stepData?.completions || 0;
         const convFromPrev = prevCount > 0 ? (completions / prevCount) * 100 : 0;
         const convFromInitial = uniqueViews > 0 ? (completions / uniqueViews) * 100 : 0;
-        prevCount = completions;
+        if (completions > 0) prevCount = completions;
+        const [numStr, ...nameParts] = sk.split(":");
         return {
-          stepNumber: sn,
-          stepName: stepData?.stepName || `Step ${sn}`,
+          stepNumber: Number(numStr),
+          stepName: stepData?.stepName || nameParts.join(":") || `Step ${numStr}`,
+          stepKey: sk,
           completions,
           conversionFromPrev: Math.round(convFromPrev * 10) / 10,
           conversionFromInitial: Math.round(convFromInitial * 10) / 10,
@@ -813,14 +831,14 @@ class DatabaseStorage implements IStorage {
     const totalGrossViews = drilldownRows.reduce((s, r) => s + r.grossViews, 0);
     const totalPageLands = drilldownRows.reduce((s, r) => s + r.pageLands, 0);
     const totalFormCompletions = drilldownRows.reduce((s, r) => s + r.formCompletions, 0);
-    const totalsStepsMap = new Map<number, { stepName: string; completions: number }>();
+    const totalsStepsMap = new Map<string, { stepNumber: number; stepName: string; completions: number }>();
     for (const row of drilldownRows) {
       for (const step of row.steps) {
-        const existing = totalsStepsMap.get(step.stepNumber);
+        const existing = totalsStepsMap.get(step.stepKey);
         if (existing) {
           existing.completions += step.completions;
         } else {
-          totalsStepsMap.set(step.stepNumber, { stepName: step.stepName, completions: step.completions });
+          totalsStepsMap.set(step.stepKey, { stepNumber: step.stepNumber, stepName: step.stepName, completions: step.completions });
         }
       }
     }

@@ -15,7 +15,7 @@ import {
   CalendarIcon, ChevronLeft, ChevronsLeft, ChevronsRight,
   Filter, X, RefreshCw, Trash2,
   Play, Pause, Download, Ban, Phone, FileText, Clock,
-  MinusCircle, Save, Columns,
+  MinusCircle, Save, Columns, Info,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
@@ -31,6 +31,7 @@ const REFRESH_INTERVALS: { label: string; value: number }[] = [
 interface DrilldownStepData {
   stepNumber: number;
   stepName: string;
+  stepKey: string;
   completions: number;
   conversionFromPrev: number;
   conversionFromInitial: number;
@@ -408,8 +409,8 @@ function DrilldownTable({
             <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Lands</TableHead>
             <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Land CVR</TableHead>
             {allSteps.map((step) => (
-              <TableHead key={`step-${step.stepNumber}`} colSpan={3} className="text-[9px] text-center px-0 py-0 border-l border-border/30 whitespace-nowrap">
-                <span className="font-semibold">Step {step.stepNumber}</span>
+              <TableHead key={`step-${step.stepKey}`} colSpan={3} className="text-[9px] text-center px-0 py-0 border-l border-border/30 whitespace-nowrap">
+                <span className="font-semibold">S{step.stepNumber}</span>
                 <span className="text-muted-foreground ml-0.5 text-[8px]">{step.stepName}</span>
               </TableHead>
             ))}
@@ -422,7 +423,7 @@ function DrilldownTable({
             <TableHead className="px-1 py-0" />
             <TableHead className="px-1 py-0" />
             {allSteps.map((step) => (
-              <Fragment key={`sh-grp-${step.stepNumber}`}>
+              <Fragment key={`sh-grp-${step.stepKey}`}>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap border-l border-border/30">#</TableHead>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">CVR</TableHead>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">Drop-off</TableHead>
@@ -476,7 +477,7 @@ function DrilldownTable({
                 {data.totals.steps.map((step) => {
                   const dropOff = 100 - step.conversionFromPrev;
                   return (
-                    <Fragment key={`tc-grp-${step.stepNumber}`}>
+                    <Fragment key={`tc-grp-${step.stepKey}`}>
                       <TableCell className="text-right font-mono text-[10px] px-0.5 py-0 font-bold border-l border-border/30">{step.completions.toLocaleString()}</TableCell>
                       <TableCell className="text-right font-mono text-[9px] px-0.5 py-0">{step.conversionFromPrev.toFixed(1)}%</TableCell>
                       <TableCell className="text-right font-mono text-[9px] px-0.5 py-0 text-muted-foreground">{dropOff.toFixed(1)}%</TableCell>
@@ -593,12 +594,12 @@ function DrilldownRowComponent({
         <TableCell className="text-right font-mono text-[10px] px-1 py-0">{pageLands.toLocaleString()}</TableCell>
         <TableCell className="text-right font-mono text-[10px] px-1 py-0">{landCvr.toFixed(1)}%</TableCell>
         {allSteps.map((refStep) => {
-          const rowStep = row.steps.find(s => s.stepNumber === refStep.stepNumber);
+          const rowStep = row.steps.find(s => s.stepKey === refStep.stepKey);
           const count = rowStep?.completions || 0;
           const cvr = rowStep?.conversionFromPrev || 0;
           const dropOff = 100 - cvr;
           return (
-            <Fragment key={`rc-grp-${refStep.stepNumber}`}>
+            <Fragment key={`rc-grp-${refStep.stepKey}`}>
               <TableCell className="text-right font-mono text-[10px] px-0.5 py-0 border-l border-border/30">{count > 0 ? count.toLocaleString() : "\u2014"}</TableCell>
               <TableCell className={`text-right font-mono text-[9px] px-0.5 py-0 ${count > 0 ? "" : "text-muted-foreground"}`}>{count > 0 ? `${cvr.toFixed(1)}%` : ""}</TableCell>
               <TableCell className={`text-right font-mono text-[9px] px-0.5 py-0 text-muted-foreground`}>{count > 0 ? `${dropOff.toFixed(1)}%` : ""}</TableCell>
@@ -767,6 +768,13 @@ function FunnelReport({
               })}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {(!filters.page || filters.page === ALL_FILTER) && (
+        <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2 py-1 text-[10px] text-amber-800 dark:text-amber-300" data-testid="banner-mixed-audiences">
+          <Info className="w-3 h-3 shrink-0" />
+          <span>Step definitions differ by audience. Filter by a specific audience for accurate funnel step comparisons.</span>
         </div>
       )}
 
