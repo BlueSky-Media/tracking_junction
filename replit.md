@@ -92,13 +92,14 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 
 ## Event Flow Per Session
 1. `page_land` (step 0, "Landing") - fires once on page load
-2. `step_complete` (steps 1-7 for lead, 1-5 for call) - fires after each quiz answer
-3. `form_complete` (step 8 for lead) - fires on final form submission with lead PII
+2. `step_complete` (steps 1-8 for lead seniors, 1-8 for veterans/first-responders, 1-5 for call) - fires after each quiz answer
+3. `form_complete` (step 8 for seniors, step 9 for veterans/first-responders) - fires on final form submission with lead PII
 
 ## Quiz Step Definitions
-- **Lead-gen (seniors)**: Landing(0) > Beneficiary(1) > State(2) > Budget(3) > Age(4) > Income(5) > Name(6) > Email(7) > Phone(8)
-- **Lead-gen (veterans)**: Landing(0) > Branch(1) > State(2) > Beneficiary(3) > Budget(4) > Age(5) > Income(6) > Name(7) > Email(8)
-- **Call-in**: Landing(0) > State(1) > Age(2) > Income(3) > Budget(4) > Purpose(5) > Call CTA(6)
+- **Lead-gen (seniors)**: Landing(0) > Beneficiary(1) > State(2) > Budget Affordability(3) > Age(4) > Monthly Income(5) > Name(6) > Email(7) > Phone(8)
+- **Lead-gen (veterans)**: Landing(0) > Military Branch(1) > State(2) > Beneficiary(3) > Budget Affordability(4) > Age(5) > Monthly Income(6) > Name(7) > Email(8) > Phone(9)
+- **Lead-gen (first-responders)**: Landing(0) > First Responder Agency(1) > State(2) > Beneficiary(3) > Budget Affordability(4) > Age(5) > Monthly Income(6) > Name(7) > Email(8) > Phone(9)
+- **Call-in (all audiences)**: Landing(0) > State(1) > Age(2) > Monthly Income(3) > Budget(4) > Purpose(5) > Call CTA(6)
 - **Note**: Step definitions vary by audience. The drilldown report uses composite stepKey (stepNumber:stepName) to avoid conflating different audiences' steps at the same step number.
 
 ## Reports Page Features

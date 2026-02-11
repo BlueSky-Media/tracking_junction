@@ -172,24 +172,60 @@ export const insertBlockedNumberSchema = createInsertSchema(blockedNumbers).omit
 export type InsertBlockedNumber = z.infer<typeof insertBlockedNumberSchema>;
 export type BlockedNumber = typeof blockedNumbers.$inferSelect;
 
-export const LEAD_STEPS = [
+export const LEAD_STEPS_SENIORS = [
   { number: 0, name: "Landing" },
   { number: 1, name: "Beneficiary" },
   { number: 2, name: "State" },
-  { number: 3, name: "Budget" },
+  { number: 3, name: "Budget Affordability" },
   { number: 4, name: "Age" },
-  { number: 5, name: "Income" },
+  { number: 5, name: "Monthly Income" },
   { number: 6, name: "Name" },
   { number: 7, name: "Email" },
   { number: 8, name: "Phone" },
 ];
 
+export const LEAD_STEPS_VETERANS = [
+  { number: 0, name: "Landing" },
+  { number: 1, name: "Military Branch" },
+  { number: 2, name: "State" },
+  { number: 3, name: "Beneficiary" },
+  { number: 4, name: "Budget Affordability" },
+  { number: 5, name: "Age" },
+  { number: 6, name: "Monthly Income" },
+  { number: 7, name: "Name" },
+  { number: 8, name: "Email" },
+  { number: 9, name: "Phone" },
+];
+
+export const LEAD_STEPS_FIRST_RESPONDERS = [
+  { number: 0, name: "Landing" },
+  { number: 1, name: "First Responder Agency" },
+  { number: 2, name: "State" },
+  { number: 3, name: "Beneficiary" },
+  { number: 4, name: "Budget Affordability" },
+  { number: 5, name: "Age" },
+  { number: 6, name: "Monthly Income" },
+  { number: 7, name: "Name" },
+  { number: 8, name: "Email" },
+  { number: 9, name: "Phone" },
+];
+
+export const LEAD_STEPS = LEAD_STEPS_SENIORS;
+
 export const CALL_STEPS = [
   { number: 0, name: "Landing" },
   { number: 1, name: "State" },
   { number: 2, name: "Age" },
-  { number: 3, name: "Income" },
+  { number: 3, name: "Monthly Income" },
   { number: 4, name: "Budget" },
   { number: 5, name: "Purpose" },
   { number: 6, name: "Call CTA" },
 ];
+
+export function getLeadStepsForAudience(audience: string) {
+  switch (audience) {
+    case "veterans": return LEAD_STEPS_VETERANS;
+    case "first-responders": return LEAD_STEPS_FIRST_RESPONDERS;
+    default: return LEAD_STEPS_SENIORS;
+  }
+}

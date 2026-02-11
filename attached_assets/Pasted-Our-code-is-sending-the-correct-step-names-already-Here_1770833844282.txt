@@ -1,0 +1,57 @@
+Our code is sending the correct step names already. Here's what we're actually sending vs. what the other AI's prompt says:
+
+Our actual step names are correct:
+
+Seniors: Beneficiary, State, Budget Affordability, Age, Monthly Income
+Veterans: Military Branch, State, Beneficiary, Budget Affordability, Age, Monthly Income
+First Responders: First Responder Agency, State, Beneficiary, Budget Affordability, Age, Monthly Income
+Call-in (all): State, Age, Monthly Income, Budget, Purpose
+The other AI's prompt has some simplified names (e.g., "Branch" instead of "Military Branch", "Budget" instead of "Budget Affordability", "Occupation" instead of "First Responder Agency", "Income" instead of "Monthly Income").
+
+You should update that prompt to match what we're actually sending. Here are the corrected step definitions to give the other AI:
+
+Lead-gen funnel (seniors):
+
+Step 0: "Landing" (page_land)
+Step 1: "Beneficiary" (step_complete)
+Step 2: "State" (step_complete)
+Step 3: "Budget Affordability" (step_complete)
+Step 4: "Age" (step_complete)
+Step 5: "Monthly Income" (step_complete)
+Step 6: "Name" (step_complete)
+Step 7: "Email" (step_complete)
+Step 8: "Phone" (form_complete)
+Lead-gen funnel (veterans):
+
+Step 0: "Landing" (page_land)
+Step 1: "Military Branch" (step_complete)
+Step 2: "State" (step_complete)
+Step 3: "Beneficiary" (step_complete)
+Step 4: "Budget Affordability" (step_complete)
+Step 5: "Age" (step_complete)
+Step 6: "Monthly Income" (step_complete)
+Step 7: "Name" (step_complete)
+Step 8: "Email" (step_complete)
+Step 9: "Phone" (form_complete)
+Lead-gen funnel (first-responders):
+
+Step 0: "Landing" (page_land)
+Step 1: "First Responder Agency" (step_complete)
+Step 2: "State" (step_complete)
+Step 3: "Beneficiary" (step_complete)
+Step 4: "Budget Affordability" (step_complete)
+Step 5: "Age" (step_complete)
+Step 6: "Monthly Income" (step_complete)
+Step 7: "Name" (step_complete)
+Step 8: "Email" (step_complete)
+Step 9: "Phone" (form_complete)
+Call-in funnel (all audiences):
+
+Step 0: "Landing" (page_land)
+Step 1: "State" (step_complete)
+Step 2: "Age" (step_complete)
+Step 3: "Monthly Income" (step_complete)
+Step 4: "Budget" (step_complete)
+Step 5: "Purpose" (step_complete)
+Step 6: "Call CTA" (step_complete)
+The key corrections from the other AI's prompt: "Military Branch" not "Branch", "First Responder Agency" not "Occupation", "Budget Affordability" not "Budget" (for lead-gen), and "Monthly Income" not "Income". These are the exact strings our pages send, so the TrackingJunction dashboard should expect these exact values.
