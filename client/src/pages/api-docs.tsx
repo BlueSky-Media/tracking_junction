@@ -196,26 +196,46 @@ export default function ApiDocsPage() {
         description="Record a tracking event. Called from your landing page JavaScript when a visitor lands, completes a quiz step, or submits a form."
         auth={false}
         requestBody={`{
+  "session_id": "a50e8400-e29b-41d4-a716-446655440001",
+  "event_id": "evt_1770771632583_3veonwsk5qt",
   "page": "seniors",
   "page_type": "lead",
   "domain": "blueskylife.net",
-  "step_number": 2,
-  "step_name": "State",
-  "selected_value": "Florida",
-  "session_id": "a50e8400-e29b-41d4-a716-446655440001",
+  "step_number": 3,
+  "step_name": "Budget",
+  "selected_value": "$50-$100/month",
   "event_type": "step_complete",
   "time_on_step": 8,
-  "utm_source": "google",
-  "utm_campaign": "spring-2025",
-  "utm_medium": "cpc",
-  "utm_content": "hero-banner",
   "device_type": "mobile",
   "os": "iOS",
-  "browser": "Safari",
-  "placement": "feed",
+  "browser": "Facebook",
+  "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5...)",
+  "referrer": "https://facebook.com",
+  "ip_address": "2600:387:15:401b::4",
+  "external_id": "extid_1770771927490_9kur...",
   "geo_state": "FL",
-  "ip_address": "203.0.113.42",
-  "referrer": "https://google.com/search?q=..."
+  "utm_source": "fb",
+  "utm_medium": "paid",
+  "utm_campaign": "120240154423180716",
+  "utm_content": "120240223154270716",
+  "utm_term": "120240223154240716",
+  "utm_id": "120240154423180716",
+  "placement": "Facebook_Mobile_Feed",
+  "media_type": "facebook",
+  "campaign_name": "Leads - ABO 1",
+  "campaign_id": "120240154423180716",
+  "ad_name": "VFE080",
+  "ad_id": "120240223154270716",
+  "adset_name": "Test 2",
+  "adset_id": "120240223154240716",
+  "fbclid": "IwZXh0bgNhZW0BMABhZGlk...",
+  "fbc": "fb.1.1770771633796.IwZXh0bg...",
+  "fbp": "fb.1.1770771632669.73516071...",
+  "quiz_answers": {
+    "beneficiary": "Spouse",
+    "state": "Florida",
+    "budget": "$50-$100/month"
+  }
 }`}
         responseExample={`{ "ok": true }`}
         notes={[
@@ -225,9 +245,12 @@ export default function ApiDocsPage() {
           'event_type: "page_land" when visitor first arrives, "step_complete" after each quiz answer, "form_complete" for final form submission.',
           'time_on_step: Seconds (0-3600) the visitor spent on this step before clicking. Optional.',
           'session_id: A UUID v4 generated client-side per visitor session.',
+          'event_id: Unique ID per event (different from external_id which is per session).',
           'selected_value: The option the visitor chose at this step (e.g., "Florida", "66-70").',
+          'quiz_answers: JSON object that accumulates quiz answers as user progresses. Lead keys: beneficiary, state, budget, age, income. Call keys: state, age, income, budget, purpose.',
           'PII fields (first_name, last_name, email, phone) are only stored when event_type is "form_complete". They are silently ignored for other event types.',
-          'UTM fields, device_type, os, browser, placement, geo_state, ip_address, and referrer are all optional.',
+          'Facebook ad fields (campaign_name, campaign_id, ad_name, ad_id, adset_name, adset_id, media_type, fbclid, fbc, fbp) come from URL params or cookies -- absent for organic traffic.',
+          'All fields except page, page_type, domain, step_number, step_name, and session_id are optional.',
         ]}
       />
 
@@ -267,10 +290,25 @@ export default function ApiDocsPage() {
                 { field: "device_type", type: "string", required: "No", desc: '"mobile", "desktop", or "tablet"' },
                 { field: "os", type: "string", required: "No", desc: '"Windows", "macOS", "iOS", "Android", "Linux", "ChromeOS", or "Unknown"' },
                 { field: "browser", type: "string", required: "No", desc: '"Chrome", "Safari", "Firefox", "Edge", "Opera", "Facebook", "Instagram", or "Unknown"' },
-                { field: "placement", type: "string", required: "No", desc: "Facebook ad placement (e.g., \"feed\", \"story\", \"reels\")" },
+                { field: "placement", type: "string", required: "No", desc: "Facebook ad placement (e.g., \"Facebook_Mobile_Feed\")" },
                 { field: "geo_state", type: "string", required: "No", desc: "2-letter US state code from geo-IP (e.g., \"FL\", \"CA\")" },
-                { field: "ip_address", type: "string", required: "No", desc: "Visitor IP address" },
+                { field: "ip_address", type: "string", required: "No", desc: "Visitor IP address (IPv4 or IPv6)" },
                 { field: "referrer", type: "string", required: "No", desc: "Full referrer URL" },
+                { field: "event_id", type: "string", required: "No", desc: "Unique ID per event (e.g., \"evt_1770771632583_3veon...\")" },
+                { field: "external_id", type: "string", required: "No", desc: "External ID per session (raw, not hashed)" },
+                { field: "utm_term", type: "string", required: "No", desc: "UTM term parameter (maps to adset_id)" },
+                { field: "utm_id", type: "string", required: "No", desc: "UTM ID parameter (maps to campaign_id)" },
+                { field: "media_type", type: "string", required: "No", desc: "Media type (e.g., \"facebook\")" },
+                { field: "campaign_name", type: "string", required: "No", desc: "Facebook campaign name (e.g., \"Leads - ABO 1\")" },
+                { field: "campaign_id", type: "string", required: "No", desc: "Facebook campaign ID" },
+                { field: "ad_name", type: "string", required: "No", desc: "Facebook ad name (e.g., \"VFE080\")" },
+                { field: "ad_id", type: "string", required: "No", desc: "Facebook ad ID" },
+                { field: "adset_name", type: "string", required: "No", desc: "Facebook adset name (e.g., \"Test 2\")" },
+                { field: "adset_id", type: "string", required: "No", desc: "Facebook adset ID" },
+                { field: "fbclid", type: "string", required: "No", desc: "Facebook click ID from URL" },
+                { field: "fbc", type: "string", required: "No", desc: "Facebook _fbc cookie value" },
+                { field: "fbp", type: "string", required: "No", desc: "Facebook _fbp cookie value" },
+                { field: "quiz_answers", type: "object", required: "No", desc: "JSON object of quiz answers so far (e.g., {\"state\": \"Florida\", \"age\": \"66-70\"})" },
                 { field: "first_name", type: "string", required: "No", desc: "Lead first name (form_complete only)" },
                 { field: "last_name", type: "string", required: "No", desc: "Lead last name (form_complete only)" },
                 { field: "email", type: "string", required: "No", desc: "Lead email address (form_complete only)" },
@@ -592,10 +630,11 @@ referrer,first_name,last_name,email,phone,event_timestamp
       </div>
 
       <Card className="p-5">
-        <CodeBlock language="javascript" code={`// Generate a session ID once per visitor
+        <CodeBlock language="javascript" code={`// Generate a session ID and event helper
 const SESSION_ID = crypto.randomUUID();
+const params = new URLSearchParams(location.search);
 
-// Detect OS and browser
+// Detect OS and browser from user agent
 function detectOS() {
   const ua = navigator.userAgent;
   if (/iPhone|iPad|iPod/.test(ua)) return "iOS";
@@ -617,6 +656,38 @@ function detectBrowser() {
   if (/Firefox/.test(ua)) return "Firefox";
   return "Unknown";
 }
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return m ? m[2] : undefined;
+}
+function genEventId() {
+  return "evt_" + Date.now() + "_" + Math.random().toString(36).slice(2, 15);
+}
+
+// Collect all URL params + cookies once on load
+const adParams = {
+  utm_source: params.get("utm_source") || undefined,
+  utm_medium: params.get("utm_medium") || undefined,
+  utm_campaign: params.get("utm_campaign") || undefined,
+  utm_content: params.get("utm_content") || undefined,
+  utm_term: params.get("utm_term") || undefined,
+  utm_id: params.get("utm_id") || undefined,
+  placement: params.get("placement") || undefined,
+  media_type: params.get("media_type") || undefined,
+  campaign_name: params.get("campaign_name") || undefined,
+  campaign_id: params.get("campaign_id") || undefined,
+  ad_name: params.get("ad_name") || undefined,
+  ad_id: params.get("ad_id") || undefined,
+  adset_name: params.get("adset_name") || undefined,
+  adset_id: params.get("adset_id") || undefined,
+  fbclid: params.get("fbclid") || undefined,
+  fbc: getCookie("_fbc") || undefined,
+  fbp: getCookie("_fbp") || undefined,
+  external_id: params.get("external_id") || undefined,
+};
+
+// Accumulate quiz answers as the user progresses
+const quizAnswers = {};
 
 // Helper to send a tracking event
 async function trackEvent(data) {
@@ -625,53 +696,48 @@ async function trackEvent(data) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...data,
+      ...adParams,
       session_id: SESSION_ID,
-      page: "seniors",           // audience
-      page_type: "lead",         // funnel type
-      domain: "blueskylife.net",
+      event_id: genEventId(),
+      page: params.get("angle") || "seniors",
+      page_type: "lead",
+      domain: location.hostname,
       device_type: /Mobi/i.test(navigator.userAgent)
         ? "mobile" : /Tablet|iPad/i.test(navigator.userAgent)
         ? "tablet" : "desktop",
       os: detectOS(),
       browser: detectBrowser(),
+      user_agent: navigator.userAgent,
       referrer: document.referrer || undefined,
-      // Include UTM params from URL
-      ...Object.fromEntries(
-        ["utm_source","utm_campaign","utm_medium","utm_content"]
-          .map(k => [k, new URLSearchParams(location.search).get(k)])
-          .filter(([,v]) => v)
-      ),
+      quiz_answers: { ...quizAnswers },
     }),
   });
 }
 
 // Track page landing
-trackEvent({
-  step_number: 0,
-  step_name: "Landing",
-  event_type: "page_land",
-});
+trackEvent({ step_number: 0, step_name: "Landing",
+  event_type: "page_land" });
 
 // Track quiz step completion with timing
 let stepStart = Date.now();
-function onStepComplete(stepNumber, stepName, selectedValue) {
+function onStepComplete(stepNum, stepName, selectedValue) {
   const timeOnStep = Math.round((Date.now() - stepStart) / 1000);
+  quizAnswers[stepName.toLowerCase()] = selectedValue;
   trackEvent({
-    step_number: stepNumber,
+    step_number: stepNum,
     step_name: stepName,
     selected_value: selectedValue,
     event_type: "step_complete",
     time_on_step: Math.min(timeOnStep, 3600),
   });
-  stepStart = Date.now(); // reset for next step
+  stepStart = Date.now();
 }
 
 // Track form submission (final step) with PII
 function onFormComplete(formData) {
   const timeOnStep = Math.round((Date.now() - stepStart) / 1000);
   trackEvent({
-    step_number: 8,
-    step_name: "Phone",
+    step_number: 8, step_name: "Phone",
     event_type: "form_complete",
     time_on_step: Math.min(timeOnStep, 3600),
     first_name: formData.firstName,

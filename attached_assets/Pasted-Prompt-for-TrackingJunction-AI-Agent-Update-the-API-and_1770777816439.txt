@@ -1,0 +1,73 @@
+Prompt for TrackingJunction AI Agent:
+
+Update the API and database to accept all these fields from POST /api/events. Here are the exact JSON field names the landing pages send:
+
+Fields sent with EVERY event:
+
+{
+  "session_id": "a50e8400-e29b-41d4-a716-446655440001",
+  "event_id": "evt_1770771632583_3veonwsk5qt",
+  "page": "seniors",
+  "page_type": "lead",
+  "domain": "blueskylife.net",
+  "step_number": 3,
+  "step_name": "Budget",
+  "selected_value": "$50-$100/month",
+  "event_type": "step_complete",
+  "time_on_step": 8,
+  "device_type": "mobile",
+  "os": "iOS",
+  "browser": "Facebook",
+  "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5...) [FBAN/FBIOS...]",
+  "referrer": "https://facebook.com",
+  "ip_address": "2600:387:15:401b::4",
+  "external_id": "extid_1770771927490_9kur9u33ohac6bb336n8xk",
+  "geo_state": "FL",
+  "utm_source": "fb",
+  "utm_medium": "paid",
+  "utm_campaign": "120240154423180716",
+  "utm_content": "120240223154270716",
+  "utm_term": "120240223154240716",
+  "utm_id": "120240154423180716",
+  "placement": "Facebook_Mobile_Feed",
+  "media_type": "facebook",
+  "campaign_name": "Leads - ABO 1",
+  "campaign_id": "120240154423180716",
+  "ad_name": "VFE080",
+  "ad_id": "120240223154270716",
+  "adset_name": "Test 2",
+  "adset_id": "120240223154240716",
+  "fbclid": "IwZXh0bgNhZW0BMABhZGlk...",
+  "fbc": "fb.1.1770771633796.IwZXh0bg...",
+  "fbp": "fb.1.1770771632669.73516071...",
+  "quiz_answers": {
+    "beneficiary": "Spouse",
+    "state": "Florida",
+    "budget": "$50-$100/month",
+    "age": "66-70",
+    "income": "$1,500-$2,500/month"
+  }
+}
+Additional fields ONLY on form_complete events:
+
+{
+  "first_name": "John",
+  "last_name": "Smith",
+  "email": "john@example.com",
+  "phone": "5551234567"
+}
+Key notes:
+
+quiz_answers is a JSON object that accumulates as the user progresses. At step 1 it has 1 key, at step 5 it has 5 keys, etc.
+Lead-gen quiz answer keys: beneficiary, state, budget, age, income
+Call-in quiz answer keys: state, age, income, budget, purpose
+event_id is unique per event (different from external_id which is per session)
+external_id is the RAW value (not hashed) — only present on lead-gen funnels
+All Facebook ad params (utm_*, campaign_*, ad_*, adset_*, media_type, fbclid, fbc, fbp, placement) come from URL query strings or cookies — they may be absent for organic traffic
+geo_state is 2-letter code from geo-IP; quiz_answers.state is the full state name the user selected
+PII fields (first_name, last_name, email, phone) MUST only be stored when event_type === 'form_complete'
+Step sequences:
+
+Lead-gen: Landing(0) → Beneficiary(1) → State(2) → Budget(3) → Age(4) → Income(5) → Name(6) → Email(7) → Phone/form_complete(8)
+
+Call-in: Landing(0) → State(1) → Age(2) → Income(3) → Budget(4) → Purpose(5) → Call CTA(6)

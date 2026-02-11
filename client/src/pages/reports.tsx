@@ -75,6 +75,21 @@ interface EventLog {
   lastName: string | null;
   email: string | null;
   phone: string | null;
+  eventId: string | null;
+  externalId: string | null;
+  utmTerm: string | null;
+  utmId: string | null;
+  mediaType: string | null;
+  campaignName: string | null;
+  campaignId: string | null;
+  adName: string | null;
+  adId: string | null;
+  adsetName: string | null;
+  adsetId: string | null;
+  fbclid: string | null;
+  fbc: string | null;
+  fbp: string | null;
+  quizAnswers: Record<string, string> | null;
 }
 
 interface EventLogResult {
@@ -1014,8 +1029,29 @@ function EventLogRow({
                 <DetailField label="UTM Campaign" value={event.utmCampaign || "\u2014"} />
                 <DetailField label="UTM Medium" value={event.utmMedium || "\u2014"} />
                 <DetailField label="UTM Content" value={event.utmContent || "\u2014"} />
+                <DetailField label="UTM Term" value={event.utmTerm || "\u2014"} />
+                <DetailField label="UTM ID" value={event.utmId || "\u2014"} />
+                <DetailField label="Media Type" value={event.mediaType || "\u2014"} />
+                <DetailField label="Campaign Name" value={event.campaignName || "\u2014"} />
+                <DetailField label="Campaign ID" value={event.campaignId || "\u2014"} />
+                <DetailField label="Ad Name" value={event.adName || "\u2014"} />
+                <DetailField label="Ad ID" value={event.adId || "\u2014"} />
+                <DetailField label="Adset Name" value={event.adsetName || "\u2014"} />
+                <DetailField label="Adset ID" value={event.adsetId || "\u2014"} />
+                <DetailField label="FBCLID" value={event.fbclid || "\u2014"} />
+                <DetailField label="FBC" value={event.fbc || "\u2014"} />
+                <DetailField label="FBP" value={event.fbp || "\u2014"} />
+                <DetailField label="Event ID" value={event.eventId || "\u2014"} />
+                <DetailField label="External ID" value={event.externalId || "\u2014"} />
                 <DetailField label="Referrer" value={event.referrer || "\u2014"} />
                 <DetailField label="Timestamp" value={formattedDate} />
+                {event.quizAnswers && Object.keys(event.quizAnswers).length > 0 && (
+                  <>
+                    {Object.entries(event.quizAnswers).map(([key, val]) => (
+                      <DetailField key={key} label={`Quiz: ${key.charAt(0).toUpperCase() + key.slice(1)}`} value={val} />
+                    ))}
+                  </>
+                )}
                 {event.eventType === "form_complete" && (
                   <>
                     <DetailField label="First Name" value={event.firstName || "\u2014"} />

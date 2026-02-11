@@ -1,6 +1,6 @@
 export * from "./models/auth";
 
-import { pgTable, text, varchar, integer, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -34,6 +34,21 @@ export const trackingEvents = pgTable("tracking_events", {
   lastName: varchar("last_name", { length: 100 }),
   email: varchar("email", { length: 200 }),
   phone: varchar("phone", { length: 20 }),
+  eventId: varchar("event_id", { length: 100 }),
+  externalId: varchar("external_id", { length: 200 }),
+  utmTerm: varchar("utm_term", { length: 200 }),
+  utmId: varchar("utm_id", { length: 200 }),
+  mediaType: varchar("media_type", { length: 50 }),
+  campaignName: varchar("campaign_name", { length: 200 }),
+  campaignId: varchar("campaign_id", { length: 200 }),
+  adName: varchar("ad_name", { length: 200 }),
+  adId: varchar("ad_id", { length: 200 }),
+  adsetName: varchar("adset_name", { length: 200 }),
+  adsetId: varchar("adset_id", { length: 200 }),
+  fbclid: text("fbclid"),
+  fbc: text("fbc"),
+  fbp: text("fbp"),
+  quizAnswers: jsonb("quiz_answers"),
 }, (table) => [
   index("idx_events_session").on(table.sessionId),
   index("idx_events_page_type").on(table.page, table.pageType),
@@ -77,6 +92,21 @@ export const trackingEventApiSchema = z.object({
   last_name: z.string().max(100).optional(),
   email: z.string().max(200).optional(),
   phone: z.string().max(20).optional(),
+  event_id: z.string().max(100).optional(),
+  external_id: z.string().max(200).optional(),
+  utm_term: z.string().max(200).optional(),
+  utm_id: z.string().max(200).optional(),
+  media_type: z.string().max(50).optional(),
+  campaign_name: z.string().max(200).optional(),
+  campaign_id: z.string().max(200).optional(),
+  ad_name: z.string().max(200).optional(),
+  ad_id: z.string().max(200).optional(),
+  adset_name: z.string().max(200).optional(),
+  adset_id: z.string().max(200).optional(),
+  fbclid: z.string().optional(),
+  fbc: z.string().optional(),
+  fbp: z.string().optional(),
+  quiz_answers: z.record(z.string(), z.string()).optional(),
 });
 
 export type InsertTrackingEvent = z.infer<typeof insertTrackingEventSchema>;

@@ -17,6 +17,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `server/db.ts` - Database connection
 - `client/src/pages/dashboard.tsx` - Main dashboard page
 - `client/src/pages/reports.tsx` - Funnel reports with drilldown + event logs
+- `client/src/pages/api-docs.tsx` - API documentation page
 - `client/src/pages/landing.tsx` - Landing/login page
 - `client/src/components/` - Dashboard components (filters, funnel chart, funnel table, step breakdown, stats cards, campaign table, device breakdown, time heatmap, contact funnel, referrer breakdown, csv export)
 
@@ -40,6 +41,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 
 ## Event Schema Fields
+### Core Fields
 - `page` - Audience name: "seniors", "veterans", or "first-responders"
 - `pageType` - Funnel type: "lead" or "call"
 - `domain` - "blueskylife.net" or "blueskylife.io"
@@ -48,14 +50,33 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `timeOnStep` - Seconds spent on each step before clicking (integer, 0-3600)
 - `eventType` - "page_land", "step_complete", or "form_complete"
 - `sessionId` - UUID per visitor session
-- UTM fields: `utmSource`, `utmCampaign`, `utmMedium`, `utmContent`
+- `eventId` - Unique ID per event (different from externalId)
+
+### UTM & Ad Fields
+- `utmSource`, `utmCampaign`, `utmMedium`, `utmContent`, `utmTerm`, `utmId`
+- `mediaType` - Media type (e.g., "facebook")
+- `campaignName` / `campaignId` - Facebook campaign name and ID
+- `adName` / `adId` - Facebook ad name and ID
+- `adsetName` / `adsetId` - Facebook adset name and ID
+- `placement` - Facebook ad placement (e.g., "Facebook_Mobile_Feed")
+
+### Device & Visitor Fields
 - `deviceType` - "mobile", "desktop", or "tablet"
 - `os` - Operating system (Windows, macOS, iOS, Android, Linux, ChromeOS, Unknown)
 - `browser` - Browser name (Chrome, Safari, Firefox, Edge, Opera, Facebook, Instagram, Unknown)
-- `placement` - Facebook ad placement (optional)
 - `geoState` - 2-letter state code from geo-IP (optional)
 - `ipAddress` - Visitor IP address (optional)
+- `userAgent` - Full user agent string
 - `referrer` - Full referrer URL
+
+### Facebook Tracking Fields
+- `fbclid` - Facebook click ID
+- `fbc` - Facebook _fbc cookie value
+- `fbp` - Facebook _fbp cookie value
+- `externalId` - External ID per session (raw, not hashed)
+
+### Quiz & PII Fields
+- `quizAnswers` - JSON object of accumulated quiz answers (e.g., {"state": "Florida", "age": "66-70"})
 - PII fields (form_complete only): `firstName`, `lastName`, `email`, `phone`
 
 ## Event Flow Per Session
@@ -72,6 +93,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - Drilldown report up to 3 levels deep by: Domain, Device Type, Audience, UTM Source/Campaign/Medium
 - Compact text (10-11px) in drilldown tables for horizontal readability
 - Event logs with search, pagination, delete individual/session/all
+- Event log detail view shows all fields including Facebook ad params, quiz answers, and PII (form_complete only)
 - Filters: domain, device type, audience, UTM source/campaign/medium, date range
 - Refresh controls: manual refresh, auto-refresh (30s/1m/5m/Off)
 
@@ -84,7 +106,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - Contact form mini-funnel (Name > Email > Phone)
 - Top referrers table
 - Step breakdown with selected value distributions
-- CSV export
+- CSV export (includes all fields)
 
 ## Database
 - PostgreSQL with Drizzle ORM

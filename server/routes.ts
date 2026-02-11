@@ -93,6 +93,21 @@ export async function registerRoutes(
         lastName: isFormComplete ? (data.last_name || null) : null,
         email: isFormComplete ? (data.email || null) : null,
         phone: isFormComplete ? (data.phone || null) : null,
+        eventId: data.event_id || null,
+        externalId: data.external_id || null,
+        utmTerm: data.utm_term || null,
+        utmId: data.utm_id || null,
+        mediaType: data.media_type || null,
+        campaignName: data.campaign_name || null,
+        campaignId: data.campaign_id || null,
+        adName: data.ad_name || null,
+        adId: data.ad_id || null,
+        adsetName: data.adset_name || null,
+        adsetId: data.adset_id || null,
+        fbclid: data.fbclid || null,
+        fbc: data.fbc || null,
+        fbp: data.fbp || null,
+        quizAnswers: data.quiz_answers || null,
       });
 
       res.status(200).json({ ok: true });

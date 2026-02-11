@@ -555,11 +555,14 @@ class DatabaseStorage implements IStorage {
       .limit(10000);
 
     const headers = [
-      "id", "session_id", "event_type", "page", "page_type", "domain",
+      "id", "session_id", "event_id", "event_type", "page", "page_type", "domain",
       "step_number", "step_name", "selected_value", "time_on_step",
-      "utm_source", "utm_campaign", "utm_medium", "utm_content",
+      "utm_source", "utm_campaign", "utm_medium", "utm_content", "utm_term", "utm_id",
       "device_type", "os", "browser", "geo_state", "ip_address", "placement",
-      "referrer", "first_name", "last_name", "email", "phone", "event_timestamp"
+      "media_type", "campaign_name", "campaign_id", "ad_name", "ad_id",
+      "adset_name", "adset_id", "fbclid", "fbc", "fbp", "external_id",
+      "quiz_answers", "referrer",
+      "first_name", "last_name", "email", "phone", "event_timestamp"
     ];
 
     const csvRows = [headers.join(",")];
@@ -568,6 +571,7 @@ class DatabaseStorage implements IStorage {
       const values = [
         row.id,
         row.sessionId,
+        row.eventId || "",
         row.eventType || "step_complete",
         row.page,
         row.pageType,
@@ -580,12 +584,26 @@ class DatabaseStorage implements IStorage {
         `"${(row.utmCampaign || '').replace(/"/g, '""')}"`,
         row.utmMedium || "",
         `"${(row.utmContent || '').replace(/"/g, '""')}"`,
+        row.utmTerm || "",
+        row.utmId || "",
         row.deviceType || "",
         row.os || "",
         row.browser || "",
         row.geoState || "",
         row.ipAddress || "",
         `"${(row.placement || '').replace(/"/g, '""')}"`,
+        row.mediaType || "",
+        `"${(row.campaignName || '').replace(/"/g, '""')}"`,
+        row.campaignId || "",
+        `"${(row.adName || '').replace(/"/g, '""')}"`,
+        row.adId || "",
+        `"${(row.adsetName || '').replace(/"/g, '""')}"`,
+        row.adsetId || "",
+        `"${(row.fbclid || '').replace(/"/g, '""')}"`,
+        `"${(row.fbc || '').replace(/"/g, '""')}"`,
+        `"${(row.fbp || '').replace(/"/g, '""')}"`,
+        row.externalId || "",
+        `"${JSON.stringify(row.quizAnswers || {}).replace(/"/g, '""')}"`,
         `"${(row.referrer || '').replace(/"/g, '""')}"`,
         `"${(row.firstName || '').replace(/"/g, '""')}"`,
         `"${(row.lastName || '').replace(/"/g, '""')}"`,
