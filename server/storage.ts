@@ -1,10 +1,12 @@
 import {
   trackingEvents,
   requestLogs,
+  blockedNumbers,
   type InsertTrackingEvent,
   type TrackingEvent,
   type InsertRequestLog,
   type RequestLog,
+  type BlockedNumber,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or } from "drizzle-orm";
@@ -183,6 +185,10 @@ export interface IStorage {
     search?: string;
   }, page: number, limit: number): Promise<{ logs: RequestLog[]; total: number; page: number; limit: number; totalPages: number }>;
   deleteRequestLogs(beforeDate?: string): Promise<number>;
+  getBlockedNumbers(): Promise<BlockedNumber[]>;
+  isPhoneBlocked(phone: string): Promise<boolean>;
+  blockPhone(phone: string, reason?: string): Promise<BlockedNumber>;
+  unblockPhone(phone: string): Promise<void>;
 }
 
 function buildConditions(filters: AnalyticsFilters) {
@@ -1075,6 +1081,25 @@ class DatabaseStorage implements IStorage {
     }
     const result = await db.delete(requestLogs).returning({ id: requestLogs.id });
     return result.length;
+  }
+
+  async getBlockedNumbers(): Promise<BlockedNumber[]> {
+    return db.select().from(blockedNumbers).orderBy(desc(blockedNumbers.blockedAt));
+  }
+
+  async isPhoneBlocked(phone: string): Promise<boolean> {
+    const normalized = phone.replace(/\D/g, "");
+    const results = await db.select().from(blockedNumbers);
+    return results.some(b => b.phone.replace(/\D/g, "") === normalized);
+  }
+
+  async blockPhone(phone: string, reason?: string): Promise<BlockedNumber> {
+    const [result] = await db.insert(blockedNumbers).values({ phone, reason: reason || null }).returning();
+    return result;
+  }
+
+  async unblockPhone(phone: string): Promise<void> {
+    await db.delete(blockedNumbers).where(eq(blockedNumbers.phone, phone));
   }
 }
 

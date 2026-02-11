@@ -430,5 +430,158 @@ export async function registerRoutes(
     }
   });
 
+  const RETELL_API_KEY = process.env.retell_api_key;
+
+  app.get("/api/retell/calls", isAuthenticated, async (req, res) => {
+    try {
+      if (!RETELL_API_KEY) return res.status(500).json({ message: "Retell API key not configured" });
+      const phone = req.query.phone as string;
+      if (!phone) return res.status(400).json({ message: "phone parameter required" });
+
+      const normalized = phone.replace(/\D/g, "");
+      const e164 = normalized.startsWith("1") ? `+${normalized}` : `+1${normalized}`;
+      const normWith1 = normalized.startsWith("1") ? normalized : `1${normalized}`;
+
+      const matchPhone = (num: string) => {
+        const d = (num || "").replace(/\D/g, "");
+        return d === normWith1 || d === normalized;
+      };
+
+      let matched: any[] = [];
+      let paginationKey: string | undefined;
+      let pages = 0;
+      const MAX_PAGES = 5;
+
+      while (pages < MAX_PAGES) {
+        const body: any = {
+          filter_criteria: { call_type: ["phone_call"] },
+          sort_order: "descending",
+          limit: 200,
+        };
+        if (paginationKey) body.pagination_key = paginationKey;
+
+        const response = await fetch("https://api.retellai.com/v2/list-calls", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${RETELL_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          console.error("Retell API error:", response.status, text);
+          return res.status(response.status).json({ message: "Retell API error", detail: text });
+        }
+
+        const batch: any[] = await response.json();
+        if (batch.length === 0) break;
+
+        for (const c of batch) {
+          if (matchPhone(c.to_number) || matchPhone(c.from_number)) {
+            matched.push(c);
+          }
+        }
+
+        if (batch.length < 200) break;
+        paginationKey = batch[batch.length - 1].call_id;
+        pages++;
+      }
+
+      const isBlocked = await storage.isPhoneBlocked(phone);
+
+      const calls = matched.map((c: any) => ({
+        callId: c.call_id,
+        callType: c.call_type,
+        direction: c.direction || "outbound",
+        fromNumber: c.from_number,
+        toNumber: c.to_number,
+        callStatus: c.call_status,
+        agentName: c.agent_name,
+        startTimestamp: c.start_timestamp,
+        endTimestamp: c.end_timestamp,
+        durationMs: c.duration_ms,
+        transcript: c.transcript,
+        recordingUrl: c.recording_url,
+        disconnectionReason: c.disconnection_reason,
+        callAnalysis: c.call_analysis ? {
+          callSummary: c.call_analysis.call_summary,
+          userSentiment: c.call_analysis.user_sentiment,
+          callSuccessful: c.call_analysis.call_successful,
+          inVoicemail: c.call_analysis.in_voicemail,
+        } : null,
+        callCost: c.call_cost ? {
+          totalDurationSeconds: c.call_cost.total_duration_seconds,
+          combinedCost: c.call_cost.combined_cost,
+        } : null,
+      }));
+
+      res.json({ calls, isBlocked, phone: e164 });
+    } catch (error) {
+      console.error("Error fetching Retell calls:", error);
+      res.status(500).json({ message: "Failed to fetch Retell call data" });
+    }
+  });
+
+  app.get("/api/retell/recording/:callId", isAuthenticated, async (req, res) => {
+    try {
+      if (!RETELL_API_KEY) return res.status(500).json({ message: "Retell API key not configured" });
+
+      const response = await fetch(`https://api.retellai.com/v2/get-call/${req.params.callId}`, {
+        headers: { "Authorization": `Bearer ${RETELL_API_KEY}` },
+      });
+
+      if (!response.ok) {
+        return res.status(response.status).json({ message: "Retell API error" });
+      }
+
+      const call: any = await response.json();
+      res.json({
+        recordingUrl: call.recording_url,
+        transcript: call.transcript,
+        callAnalysis: call.call_analysis,
+      });
+    } catch (error) {
+      console.error("Error fetching Retell recording:", error);
+      res.status(500).json({ message: "Failed to fetch recording" });
+    }
+  });
+
+  app.get("/api/retell/blocked", isAuthenticated, async (_req, res) => {
+    try {
+      const numbers = await storage.getBlockedNumbers();
+      res.json(numbers);
+    } catch (error) {
+      console.error("Error fetching blocked numbers:", error);
+      res.status(500).json({ message: "Failed to fetch blocked numbers" });
+    }
+  });
+
+  app.post("/api/retell/block", isAuthenticated, async (req, res) => {
+    try {
+      const { phone, reason } = req.body;
+      if (!phone) return res.status(400).json({ message: "phone required" });
+      const blocked = await storage.blockPhone(phone, reason);
+      res.json(blocked);
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ message: "Phone number already blocked" });
+      }
+      console.error("Error blocking number:", error);
+      res.status(500).json({ message: "Failed to block number" });
+    }
+  });
+
+  app.delete("/api/retell/block/:phone", isAuthenticated, async (req, res) => {
+    try {
+      await storage.unblockPhone(decodeURIComponent(req.params.phone));
+      res.json({ message: "Number unblocked" });
+    } catch (error) {
+      console.error("Error unblocking number:", error);
+      res.status(500).json({ message: "Failed to unblock number" });
+    }
+  });
+
   return httpServer;
 }

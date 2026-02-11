@@ -14,6 +14,7 @@ import {
   BarChart3, ChevronDown, ChevronRight, Search,
   CalendarIcon, ChevronLeft, ChevronsLeft, ChevronsRight,
   Filter, X, RefreshCw, Trash2,
+  Play, Pause, Download, Ban, Phone, FileText, Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
@@ -1170,6 +1171,12 @@ function SessionLogRow({
                 </div>
               )}
 
+              {(() => {
+                const fcEvent = session.events.find(e => e.eventType === "form_complete" && e.phone);
+                if (!fcEvent?.phone) return null;
+                return <RetellCallSection phone={fcEvent.phone} />;
+              })()}
+
               {session.events.some(e => e.quizAnswers && Object.keys(e.quizAnswers).length > 0) && (
                 <div>
                   <h4 className="text-[10px] font-semibold mb-1">Quiz Answers</h4>
@@ -1210,6 +1217,276 @@ function DetailField({ label, value }: { label: string; value: string }) {
     <div className="leading-tight">
       <span className="text-muted-foreground text-[9px]">{label}</span>
       <p className="font-mono break-all text-[10px]">{value}</p>
+    </div>
+  );
+}
+
+interface RetellCall {
+  callId: string;
+  callType: string;
+  direction: string;
+  fromNumber: string;
+  toNumber: string;
+  callStatus: string;
+  agentName: string;
+  startTimestamp: number;
+  endTimestamp: number;
+  durationMs: number;
+  transcript: string | null;
+  recordingUrl: string | null;
+  disconnectionReason: string | null;
+  callAnalysis: {
+    callSummary: string;
+    userSentiment: string;
+    callSuccessful: boolean;
+    inVoicemail: boolean;
+  } | null;
+  callCost: {
+    totalDurationSeconds: number;
+    combinedCost: number;
+  } | null;
+}
+
+function RetellCallSection({ phone }: { phone: string }) {
+  const [calls, setCalls] = useState<RetellCall[]>([]);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [expandedTranscript, setExpandedTranscript] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/retell/calls?phone=${encodeURIComponent(phone)}`, { credentials: "include" })
+      .then(r => {
+        if (!r.ok) throw new Error("Failed");
+        return r.json();
+      })
+      .then(data => {
+        if (!cancelled) {
+          setCalls(data.calls || []);
+          setIsBlocked(data.isBlocked || false);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) { setError("Could not load call data"); setLoading(false); }
+      });
+    return () => { cancelled = true; };
+  }, [phone]);
+
+  const togglePlay = (call: RetellCall) => {
+    if (!call.recordingUrl) return;
+    if (playingId === call.callId) {
+      audioRef.current?.pause();
+      setPlayingId(null);
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audio = new Audio(call.recordingUrl);
+    audio.onended = () => setPlayingId(null);
+    audio.onerror = () => { toast({ title: "Could not play recording", variant: "destructive" }); setPlayingId(null); };
+    audio.play();
+    audioRef.current = audio;
+    setPlayingId(call.callId);
+  };
+
+  const downloadRecording = (call: RetellCall) => {
+    if (!call.recordingUrl) return;
+    const a = document.createElement("a");
+    a.href = call.recordingUrl;
+    a.download = `retell-call-${call.callId}.wav`;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const toggleBlock = async () => {
+    try {
+      if (isBlocked) {
+        await fetch(`/api/retell/block/${encodeURIComponent(phone)}`, { method: "DELETE", credentials: "include" });
+        setIsBlocked(false);
+        toast({ title: `Unblocked ${phone}` });
+      } else {
+        await fetch("/api/retell/block", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ phone, reason: "Blocked from session logs" }),
+        });
+        setIsBlocked(true);
+        toast({ title: `Blocked ${phone}` });
+      }
+    } catch {
+      toast({ title: "Failed to update block status", variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-1">
+        <h4 className="text-[10px] font-semibold flex items-center gap-1">
+          <Phone className="w-3 h-3" /> Retell Calls
+        </h4>
+        <Skeleton className="h-6 w-48" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-1">
+        <h4 className="text-[10px] font-semibold flex items-center gap-1">
+          <Phone className="w-3 h-3" /> Retell Calls
+        </h4>
+        <p className="text-[10px] text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
+
+  const formatDuration = (ms: number) => {
+    const secs = Math.floor(ms / 1000);
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const sentimentColor = (s: string) => {
+    if (s === "Positive") return "text-green-600 dark:text-green-400";
+    if (s === "Negative") return "text-red-600 dark:text-red-400";
+    return "text-muted-foreground";
+  };
+
+  return (
+    <div className="space-y-1.5" data-testid="section-retell-calls">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-[10px] font-semibold flex items-center gap-1">
+          <Phone className="w-3 h-3" /> Retell Calls ({calls.length})
+        </h4>
+        <Button
+          variant={isBlocked ? "destructive" : "outline"}
+          size="sm"
+          onClick={(e) => { e.stopPropagation(); toggleBlock(); }}
+          data-testid="button-toggle-block"
+        >
+          <Ban className="w-3 h-3 mr-1" />
+          <span className="text-[10px]">{isBlocked ? "Unblock Number" : "Block Number"}</span>
+        </Button>
+      </div>
+
+      {calls.length === 0 ? (
+        <p className="text-[10px] text-muted-foreground">No Retell calls found for {phone}</p>
+      ) : (
+        <div className="space-y-1.5">
+          {calls.map((call) => (
+            <div key={call.callId} className="border rounded-md p-2 bg-background/50 space-y-1" data-testid={`retell-call-${call.callId}`}>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 text-[10px]">
+                  <Badge variant="secondary" className="text-[8px] py-0">
+                    {call.direction}
+                  </Badge>
+                  <span className="font-mono text-muted-foreground">{call.fromNumber} &rarr; {call.toNumber}</span>
+                  {call.durationMs > 0 && (
+                    <span className="flex items-center gap-0.5 text-muted-foreground">
+                      <Clock className="w-2.5 h-2.5" />
+                      {formatDuration(call.durationMs)}
+                    </span>
+                  )}
+                  {call.startTimestamp && (
+                    <span className="text-muted-foreground">
+                      {format(new Date(call.startTimestamp), "MMM d h:mm a")}
+                    </span>
+                  )}
+                  {call.agentName && <span className="text-muted-foreground">{call.agentName}</span>}
+                </div>
+                <div className="flex items-center gap-1">
+                  {call.recordingUrl && (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={(e) => { e.stopPropagation(); togglePlay(call); }}
+                        data-testid={`button-play-${call.callId}`}
+                      >
+                        {playingId === call.callId ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={(e) => { e.stopPropagation(); downloadRecording(call); }}
+                        data-testid={`button-download-${call.callId}`}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </Button>
+                    </>
+                  )}
+                  {call.transcript && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={(e) => { e.stopPropagation(); setExpandedTranscript(expandedTranscript === call.callId ? null : call.callId); }}
+                      data-testid={`button-transcript-${call.callId}`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {call.callAnalysis && (
+                <div className="flex items-center gap-3 text-[9px]">
+                  {call.callAnalysis.userSentiment && (
+                    <span className={sentimentColor(call.callAnalysis.userSentiment)}>
+                      Sentiment: {call.callAnalysis.userSentiment}
+                    </span>
+                  )}
+                  {call.callAnalysis.callSuccessful !== undefined && (
+                    <span className={call.callAnalysis.callSuccessful ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                      {call.callAnalysis.callSuccessful ? "Successful" : "Unsuccessful"}
+                    </span>
+                  )}
+                  {call.callAnalysis.inVoicemail && (
+                    <span className="text-yellow-600 dark:text-yellow-400">Voicemail</span>
+                  )}
+                  {call.disconnectionReason && (
+                    <span className="text-muted-foreground">Ended: {call.disconnectionReason.replace(/_/g, " ")}</span>
+                  )}
+                </div>
+              )}
+
+              {call.callAnalysis?.callSummary && (
+                <p className="text-[9px] text-muted-foreground leading-tight">{call.callAnalysis.callSummary}</p>
+              )}
+
+              {call.callCost && (
+                <div className="text-[9px] text-muted-foreground">
+                  Cost: ${(call.callCost.combinedCost / 100).toFixed(2)} | Duration: {call.callCost.totalDurationSeconds}s
+                </div>
+              )}
+
+              {expandedTranscript === call.callId && call.transcript && (
+                <div className="mt-1 p-1.5 bg-muted/50 rounded text-[9px] font-mono whitespace-pre-wrap max-h-[200px] overflow-y-auto leading-tight" data-testid={`transcript-${call.callId}`}>
+                  {call.transcript}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

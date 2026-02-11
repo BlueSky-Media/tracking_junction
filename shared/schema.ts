@@ -145,6 +145,23 @@ export type InsertTrackingEvent = z.infer<typeof insertTrackingEventSchema>;
 export type TrackingEvent = typeof trackingEvents.$inferSelect;
 export type TrackingEventApi = z.infer<typeof trackingEventApiSchema>;
 
+export const blockedNumbers = pgTable("blocked_numbers", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  phone: varchar("phone", { length: 50 }).notNull().unique(),
+  reason: text("reason"),
+  blockedAt: timestamp("blocked_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_blocked_phone").on(table.phone),
+]);
+
+export const insertBlockedNumberSchema = createInsertSchema(blockedNumbers).omit({
+  id: true as const,
+  blockedAt: true as const,
+});
+
+export type InsertBlockedNumber = z.infer<typeof insertBlockedNumberSchema>;
+export type BlockedNumber = typeof blockedNumbers.$inferSelect;
+
 export const LEAD_STEPS = [
   { number: 0, name: "Landing" },
   { number: 1, name: "Beneficiary" },

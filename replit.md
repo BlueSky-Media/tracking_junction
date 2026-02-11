@@ -41,6 +41,12 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `DELETE /api/analytics/all-events` - Delete all events (protected)
 - `GET /api/server-logs` - Paginated server request logs with filters (protected)
 - `DELETE /api/server-logs` - Clear all server logs (protected)
+- `DELETE /api/analytics/events/sessions` - Bulk delete multiple sessions (protected, body: {sessionIds: string[]})
+- `GET /api/retell/calls?phone=...` - Search Retell call history by phone number (protected)
+- `GET /api/retell/recording/:callId` - Get Retell call recording/transcript (protected)
+- `GET /api/retell/blocked` - List blocked phone numbers (protected)
+- `POST /api/retell/block` - Block a phone number (protected, body: {phone, reason?})
+- `DELETE /api/retell/block/:phone` - Unblock a phone number (protected)
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 
 ## Event Schema Fields
@@ -113,5 +119,12 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 
 ## Database
 - PostgreSQL with Drizzle ORM
-- Tables: tracking_events, users, sessions
+- Tables: tracking_events, users, sessions, blocked_numbers
 - Indexed on session_id, page/page_type, domain, timestamp, step, event_type, utm_campaign, device_type
+
+## Retell AI Integration
+- Uses `retell_api_key` secret for API authentication
+- Proxies Retell API v2 calls through backend (never exposes key to frontend)
+- Matches calls by phone number from form_complete events
+- Features: play recording, download .wav, view transcript, call summary/sentiment, block/unblock numbers
+- Local blocked_numbers table for phone number blocking (Retell doesn't have per-number block API)
