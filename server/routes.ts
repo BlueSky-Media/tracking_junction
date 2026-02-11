@@ -34,32 +34,27 @@ export async function registerRoutes(
   registerAuthRoutes(app);
 
   app.options("/api/events", (req, res) => {
-    const origin = req.headers.origin;
+    const origin = req.headers.origin || "*";
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type");
+    res.header("Access-Control-Max-Age", "86400");
     res.header("Vary", "Origin");
-    if (origin && ALLOWED_ORIGINS.includes(origin)) {
-      res.header("Access-Control-Allow-Origin", origin);
-      res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
-      res.header("Access-Control-Allow-Headers", "Content-Type");
-      res.header("Access-Control-Max-Age", "86400");
-      res.status(204).end();
-    } else {
-      res.status(403).end();
-    }
+    res.status(204).end();
   });
 
   app.post("/api/events", async (req, res) => {
-    const origin = req.headers.origin;
+    const origin = req.headers.origin || "*";
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Methods", "POST");
+    res.header("Access-Control-Allow-Headers", "Content-Type");
     res.header("Vary", "Origin");
-    if (origin && ALLOWED_ORIGINS.includes(origin)) {
-      res.header("Access-Control-Allow-Origin", origin);
-      res.header("Access-Control-Allow-Methods", "POST");
-      res.header("Access-Control-Allow-Headers", "Content-Type");
-    }
 
     try {
       const parsed = trackingEventApiSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ ok: false, error: "Invalid event data" });
+        console.error("Event validation failed:", JSON.stringify(parsed.error.issues), "Body:", JSON.stringify(req.body).substring(0, 500));
+        return res.status(400).json({ ok: false, error: "Invalid event data", details: parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`) });
       }
 
       const data = parsed.data;

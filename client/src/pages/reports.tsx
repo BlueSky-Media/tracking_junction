@@ -289,21 +289,6 @@ function FilterBar({
   );
 }
 
-function StepCvrCell({ completions, prevStepCvr, pageLandCvr, isHeader }: { completions: number; prevStepCvr: number; pageLandCvr: number; isHeader?: boolean }) {
-  const isLowStep = prevStepCvr < 50 && prevStepCvr > 0;
-  return (
-    <TableCell className="text-center px-0.5 py-0">
-      <p className={`font-mono text-[10px] leading-tight ${isHeader ? "font-semibold" : ""}`}>{completions.toLocaleString()}</p>
-      <p className={`font-mono text-[9px] leading-tight ${isLowStep ? "text-destructive" : "text-muted-foreground"}`}>
-        {prevStepCvr.toFixed(1)}%
-      </p>
-      <p className="font-mono text-[9px] leading-tight text-muted-foreground">
-        {pageLandCvr.toFixed(1)}%
-      </p>
-    </TableCell>
-  );
-}
-
 function DrilldownTable({
   parentFilters,
   dateRange,
@@ -364,7 +349,8 @@ function DrilldownTable({
   }
 
   const dimLabel = DRILL_DIMENSIONS.find(d => d.value === groupBy)?.label || groupBy;
-  const hasFormComplete = data.totals.formCompletions > 0 || data.rows.some(r => r.formCompletions > 0);
+
+  const totalLands = data.totals.pageLands || data.totals.uniqueViews;
 
   return (
     <div className="overflow-x-auto">
@@ -373,17 +359,10 @@ function DrilldownTable({
           <TableRow className="h-6">
             {depth < 3 && availableNextDimensions.length > 0 && <TableHead className="w-4 px-0.5 py-0" />}
             <TableHead className="text-[10px] min-w-[70px] px-1 py-0">{dimLabel}</TableHead>
-            <TableHead className="text-[10px] text-center px-0.5 py-0 min-w-[40px]">Lands</TableHead>
-            {data.totals.steps.map((s) => (
-              <TableHead key={`h-${s.stepNumber}-${s.stepName}`} className="text-center px-0.5 py-0 min-w-[42px]" colSpan={1}>
-                <span className="text-[9px] font-semibold">S{s.stepNumber}</span>
-              </TableHead>
-            ))}
-            {hasFormComplete && (
-              <TableHead className="text-center px-0.5 py-0 min-w-[42px]">
-                <span className="text-[9px] font-semibold">Form</span>
-              </TableHead>
-            )}
+            <TableHead className="text-[10px] text-right px-2 py-0">Lands</TableHead>
+            <TableHead className="text-[10px] text-right px-2 py-0">Land CVR</TableHead>
+            <TableHead className="text-[10px] text-right px-2 py-0">Form Complete</TableHead>
+            <TableHead className="text-[10px] text-right px-2 py-0">Form CVR</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -391,6 +370,9 @@ function DrilldownTable({
             const isExpanded = !!expandedRows[row.groupValue];
             const canDrill = depth < 3 && availableNextDimensions.length > 0;
             const selectedSubDim = expandedRows[row.groupValue] || "";
+            const rowLands = row.pageLands || row.uniqueViews;
+            const landCvr = totalLands > 0 ? (rowLands / totalLands) * 100 : 0;
+            const formCvr = rowLands > 0 ? (row.formCompletions / rowLands) * 100 : 0;
 
             return (
               <DrilldownRowComponent
@@ -400,7 +382,6 @@ function DrilldownTable({
                 isExpanded={isExpanded}
                 selectedSubDim={selectedSubDim}
                 availableNextDimensions={availableNextDimensions}
-                allSteps={data.totals.steps}
                 parentFilters={parentFilters}
                 dateRange={dateRange}
                 globalFilters={globalFilters}
@@ -410,58 +391,29 @@ function DrilldownTable({
                 onToggle={() => toggleRowDrill(row.groupValue, availableNextDimensions[0]?.value || "")}
                 onChangeDim={(dim) => setRowDimension(row.groupValue, dim)}
                 dimLabel={dimLabel}
-                hasFormComplete={hasFormComplete}
+                pageLands={rowLands}
+                landCvr={landCvr}
+                formCvr={formCvr}
               />
             );
           })}
-          <TotalsRow
-            totals={data.totals}
-            canDrill={depth < 3 && availableNextDimensions.length > 0}
-            groupBy={groupBy}
-            depth={depth}
-            hasFormComplete={hasFormComplete}
-          />
+          {(() => {
+            const totCvr = totalLands > 0 ? (data.totals.formCompletions / totalLands) * 100 : 0;
+            const canDrill = depth < 3 && availableNextDimensions.length > 0;
+            return (
+              <TableRow className="bg-muted/50 font-semibold border-t h-6" data-testid={`row-totals-${groupBy}-depth${depth}`}>
+                {canDrill && <TableCell className="px-0.5 py-0" />}
+                <TableCell className="text-[10px] font-bold px-1 py-0">Totals</TableCell>
+                <TableCell className="text-right font-mono text-[10px] px-2 py-0 font-bold">{totalLands.toLocaleString()}</TableCell>
+                <TableCell className="text-right font-mono text-[10px] px-2 py-0 font-bold">100.0%</TableCell>
+                <TableCell className="text-right font-mono text-[10px] px-2 py-0 font-bold">{data.totals.formCompletions.toLocaleString()}</TableCell>
+                <TableCell className={`text-right font-mono text-[10px] px-2 py-0 font-bold ${totCvr > 0 ? "" : "text-muted-foreground"}`}>{totCvr.toFixed(1)}%</TableCell>
+              </TableRow>
+            );
+          })()}
         </TableBody>
       </Table>
     </div>
-  );
-}
-
-function TotalsRow({ totals, canDrill, groupBy, depth, hasFormComplete }: {
-  totals: DrilldownRow;
-  canDrill: boolean;
-  groupBy: string;
-  depth: number;
-  hasFormComplete: boolean;
-}) {
-  const pageLands = totals.pageLands || totals.uniqueViews;
-  return (
-    <TableRow className="bg-muted/50 font-semibold border-t h-6" data-testid={`row-totals-${groupBy}-depth${depth}`}>
-      {canDrill && <TableCell className="px-0.5 py-0" />}
-      <TableCell className="text-[10px] font-bold px-1 py-0">Totals</TableCell>
-      <TableCell className="text-center font-mono text-[10px] px-0.5 py-0">{pageLands.toLocaleString()}</TableCell>
-      {totals.steps.map((step) => {
-        const plCvr = pageLands > 0 ? (step.completions / pageLands) * 100 : 0;
-        return (
-          <StepCvrCell
-            key={`tot-${step.stepNumber}-${step.stepName}`}
-            completions={step.completions}
-            prevStepCvr={step.conversionFromPrev}
-            pageLandCvr={plCvr}
-            isHeader
-          />
-        );
-      })}
-      {hasFormComplete && (
-        <StepCvrCell
-          completions={totals.formCompletions}
-          prevStepCvr={totals.steps.length > 0 && totals.steps[totals.steps.length - 1].completions > 0
-            ? (totals.formCompletions / totals.steps[totals.steps.length - 1].completions) * 100 : 0}
-          pageLandCvr={pageLands > 0 ? (totals.formCompletions / pageLands) * 100 : 0}
-          isHeader
-        />
-      )}
-    </TableRow>
   );
 }
 
@@ -471,7 +423,6 @@ function DrilldownRowComponent({
   isExpanded,
   selectedSubDim,
   availableNextDimensions,
-  allSteps,
   parentFilters,
   dateRange,
   globalFilters,
@@ -481,14 +432,15 @@ function DrilldownRowComponent({
   onToggle,
   onChangeDim,
   dimLabel,
-  hasFormComplete,
+  pageLands,
+  landCvr,
+  formCvr,
 }: {
   row: DrilldownRow;
   canDrill: boolean;
   isExpanded: boolean;
   selectedSubDim: string;
   availableNextDimensions: typeof DRILL_DIMENSIONS;
-  allSteps: DrilldownStepData[];
   parentFilters: Record<string, string>;
   dateRange: DateRange | undefined;
   globalFilters: Filters;
@@ -498,10 +450,11 @@ function DrilldownRowComponent({
   onToggle: () => void;
   onChangeDim: (dim: string) => void;
   dimLabel: string;
-  hasFormComplete: boolean;
+  pageLands: number;
+  landCvr: number;
+  formCvr: number;
 }) {
-  const colSpan = 2 + allSteps.length + (canDrill ? 1 : 0) + (hasFormComplete ? 1 : 0);
-  const pageLands = row.pageLands || row.uniqueViews;
+  const colSpan = 6 + (canDrill ? 1 : 0);
 
   return (
     <>
@@ -516,26 +469,10 @@ function DrilldownRowComponent({
           </TableCell>
         )}
         <TableCell className="text-[10px] font-medium px-1 py-0">{row.groupValue}</TableCell>
-        <TableCell className="text-center font-mono text-[10px] px-0.5 py-0">{pageLands.toLocaleString()}</TableCell>
-        {row.steps.map((step) => {
-          const plCvr = pageLands > 0 ? (step.completions / pageLands) * 100 : 0;
-          return (
-            <StepCvrCell
-              key={`${row.groupValue}-${step.stepNumber}-${step.stepName}`}
-              completions={step.completions}
-              prevStepCvr={step.conversionFromPrev}
-              pageLandCvr={plCvr}
-            />
-          );
-        })}
-        {hasFormComplete && (
-          <StepCvrCell
-            completions={row.formCompletions}
-            prevStepCvr={row.steps.length > 0 && row.steps[row.steps.length - 1].completions > 0
-              ? (row.formCompletions / row.steps[row.steps.length - 1].completions) * 100 : 0}
-            pageLandCvr={pageLands > 0 ? (row.formCompletions / pageLands) * 100 : 0}
-          />
-        )}
+        <TableCell className="text-right font-mono text-[10px] px-2 py-0">{pageLands.toLocaleString()}</TableCell>
+        <TableCell className="text-right font-mono text-[10px] px-2 py-0">{landCvr.toFixed(1)}%</TableCell>
+        <TableCell className="text-right font-mono text-[10px] px-2 py-0">{row.formCompletions.toLocaleString()}</TableCell>
+        <TableCell className={`text-right font-mono text-[10px] px-2 py-0 ${formCvr > 0 ? "" : "text-muted-foreground"}`}>{formCvr.toFixed(1)}%</TableCell>
       </TableRow>
       {isExpanded && canDrill && (
         <TableRow data-testid={`row-drilldown-${groupBy}-${row.groupValue}`}>
@@ -612,84 +549,30 @@ function FunnelReport({
   const totals = summaryData.totals;
   const pageLands = totals.pageLands || totals.uniqueViews;
   const lastStep = totals.steps[totals.steps.length - 1];
-  const hasFormComplete = totals.formCompletions > 0;
-  const finalCount = hasFormComplete ? totals.formCompletions : (lastStep?.completions || 0);
+  const finalCount = totals.formCompletions > 0 ? totals.formCompletions : (lastStep?.completions || 0);
   const overallConversion = pageLands > 0 ? (finalCount / pageLands) * 100 : 0;
 
   return (
     <div data-testid="card-funnel-report">
       <h3 className="text-[11px] font-semibold mb-1" data-testid="text-funnel-title">Funnel Summary</h3>
-      <div className="grid grid-cols-4 gap-2 mb-2">
-        <div>
-          <p className="text-[10px] text-muted-foreground">Page Lands</p>
-          <p className="text-base font-bold font-mono" data-testid="text-page-lands">{pageLands.toLocaleString()}</p>
-        </div>
-        <div>
-          <p className="text-[10px] text-muted-foreground">Total Events</p>
-          <p className="text-base font-bold font-mono" data-testid="text-total-events">{totals.grossViews.toLocaleString()}</p>
-        </div>
-        <div>
-          <p className="text-[10px] text-muted-foreground">Overall Conversion</p>
-          <p className="text-base font-bold font-mono" data-testid="text-overall-conversion">{overallConversion.toFixed(1)}%</p>
-        </div>
-        <div>
-          <p className="text-[10px] text-muted-foreground">Funnel Steps</p>
-          <p className="text-base font-bold font-mono" data-testid="text-total-steps">{totals.steps.length}</p>
-        </div>
-      </div>
-
       <div className="overflow-x-auto border rounded-md mb-2">
         <Table>
           <TableHeader>
             <TableRow className="h-6">
-              <TableHead className="text-center px-0.5 py-0 min-w-[42px]">
-                <span className="text-[9px] font-semibold">Lands</span>
-              </TableHead>
-              {totals.steps.map((s) => (
-                <TableHead key={`sum-${s.stepNumber}-${s.stepName}`} className="text-center px-0.5 py-0 min-w-[42px]">
-                  <div className="flex flex-col items-center leading-none">
-                    <span className="text-[9px] font-semibold">S{s.stepNumber}</span>
-                    <span className="text-[8px] text-muted-foreground">{s.stepName}</span>
-                  </div>
-                </TableHead>
-              ))}
-              {hasFormComplete && (
-                <TableHead className="text-center px-0.5 py-0 min-w-[42px]">
-                  <div className="flex flex-col items-center leading-none">
-                    <span className="text-[9px] font-semibold">Form</span>
-                    <span className="text-[8px] text-muted-foreground">Complete</span>
-                  </div>
-                </TableHead>
-              )}
+              <TableHead className="text-[10px] text-right px-2 py-0">Lands</TableHead>
+              <TableHead className="text-[10px] text-right px-2 py-0">Total Events</TableHead>
+              <TableHead className="text-[10px] text-right px-2 py-0">Form Complete</TableHead>
+              <TableHead className="text-[10px] text-right px-2 py-0">Form CVR</TableHead>
+              <TableHead className="text-[10px] text-right px-2 py-0">Steps</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow className="h-6">
-              <TableCell className="text-center px-0.5 py-0">
-                <p className="font-mono text-[10px] font-semibold leading-tight">{pageLands.toLocaleString()}</p>
-                <p className="font-mono text-[9px] text-muted-foreground leading-tight">&mdash;</p>
-                <p className="font-mono text-[9px] text-muted-foreground leading-tight">100.0%</p>
-              </TableCell>
-              {totals.steps.map((s) => {
-                const plCvr = pageLands > 0 ? (s.completions / pageLands) * 100 : 0;
-                return (
-                  <StepCvrCell
-                    key={`sumv-${s.stepNumber}-${s.stepName}`}
-                    completions={s.completions}
-                    prevStepCvr={s.conversionFromPrev}
-                    pageLandCvr={plCvr}
-                    isHeader
-                  />
-                );
-              })}
-              {hasFormComplete && (
-                <StepCvrCell
-                  completions={totals.formCompletions}
-                  prevStepCvr={lastStep && lastStep.completions > 0 ? (totals.formCompletions / lastStep.completions) * 100 : 0}
-                  pageLandCvr={pageLands > 0 ? (totals.formCompletions / pageLands) * 100 : 0}
-                  isHeader
-                />
-              )}
+              <TableCell className="text-right font-mono text-[11px] font-bold px-2 py-0" data-testid="text-page-lands">{pageLands.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-mono text-[11px] font-bold px-2 py-0" data-testid="text-total-events">{totals.grossViews.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-mono text-[11px] font-bold px-2 py-0" data-testid="text-overall-conversion">{finalCount.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-mono text-[11px] font-bold px-2 py-0">{overallConversion.toFixed(1)}%</TableCell>
+              <TableCell className="text-right font-mono text-[11px] font-bold px-2 py-0" data-testid="text-total-steps">{totals.steps.length}</TableCell>
             </TableRow>
           </TableBody>
         </Table>

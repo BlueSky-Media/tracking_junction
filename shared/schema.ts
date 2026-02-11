@@ -33,7 +33,7 @@ export const trackingEvents = pgTable("tracking_events", {
   firstName: varchar("first_name", { length: 100 }),
   lastName: varchar("last_name", { length: 100 }),
   email: varchar("email", { length: 200 }),
-  phone: varchar("phone", { length: 20 }),
+  phone: varchar("phone", { length: 50 }),
   eventId: varchar("event_id", { length: 100 }),
   externalId: varchar("external_id", { length: 200 }),
   utmTerm: varchar("utm_term", { length: 200 }),
@@ -66,23 +66,23 @@ export const insertTrackingEventSchema = createInsertSchema(trackingEvents).omit
 });
 
 export const trackingEventApiSchema = z.object({
-  page: z.enum(["seniors", "veterans", "first-responders"]),
-  page_type: z.enum(["lead", "call"]),
-  domain: z.enum(["blueskylife.net", "blueskylife.io"]),
-  step_number: z.number().int().min(0).max(20),
+  page: z.string().min(1).max(50),
+  page_type: z.string().min(1).max(20),
+  domain: z.string().min(1).max(100),
+  step_number: z.preprocess((v) => (typeof v === "string" ? parseInt(v, 10) : v), z.number().int().min(0).max(20)),
   step_name: z.string().min(1).max(100),
   selected_value: z.string().optional(),
-  session_id: z.string().uuid(),
+  session_id: z.string().min(1).max(64),
   timestamp: z.string().optional(),
   user_agent: z.string().optional(),
-  event_type: z.enum(["page_land", "step_complete", "form_complete"]).optional(),
+  event_type: z.string().max(30).optional(),
   utm_source: z.string().max(200).optional(),
   utm_campaign: z.string().max(200).optional(),
   utm_medium: z.string().max(100).optional(),
   utm_content: z.string().max(200).optional(),
-  device_type: z.enum(["mobile", "desktop", "tablet"]).optional(),
+  device_type: z.string().max(20).optional(),
   referrer: z.string().optional(),
-  time_on_step: z.number().int().min(0).max(3600).optional(),
+  time_on_step: z.preprocess((v) => (typeof v === "string" ? parseInt(v, 10) : v), z.number().int().min(0).max(3600).optional()),
   os: z.string().max(50).optional(),
   browser: z.string().max(50).optional(),
   placement: z.string().max(200).optional(),
@@ -91,7 +91,7 @@ export const trackingEventApiSchema = z.object({
   first_name: z.string().max(100).optional(),
   last_name: z.string().max(100).optional(),
   email: z.string().max(200).optional(),
-  phone: z.string().max(20).optional(),
+  phone: z.string().max(50).optional(),
   event_id: z.string().max(100).optional(),
   external_id: z.string().max(200).optional(),
   utm_term: z.string().max(200).optional(),
@@ -106,8 +106,8 @@ export const trackingEventApiSchema = z.object({
   fbclid: z.string().optional(),
   fbc: z.string().optional(),
   fbp: z.string().optional(),
-  quiz_answers: z.record(z.string(), z.string()).optional(),
-});
+  quiz_answers: z.record(z.string(), z.any()).optional(),
+}).passthrough();
 
 export type InsertTrackingEvent = z.infer<typeof insertTrackingEventSchema>;
 export type TrackingEvent = typeof trackingEvents.$inferSelect;
