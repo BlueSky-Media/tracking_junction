@@ -360,6 +360,20 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/analytics/events/sessions", isAuthenticated, async (req, res) => {
+    try {
+      const { sessionIds } = req.body;
+      if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
+        return res.status(400).json({ message: "sessionIds array required" });
+      }
+      const count = await storage.deleteEventsBySessions(sessionIds);
+      res.json({ message: `Deleted ${count} events for ${sessionIds.length} sessions`, count });
+    } catch (error) {
+      console.error("Error bulk deleting sessions:", error);
+      res.status(500).json({ message: "Failed to bulk delete sessions" });
+    }
+  });
+
   app.delete("/api/analytics/events/session/:sessionId", isAuthenticated, async (req, res) => {
     try {
       const count = await storage.deleteEventsBySession(req.params.sessionId as string);

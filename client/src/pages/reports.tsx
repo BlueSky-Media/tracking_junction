@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -658,6 +659,90 @@ function FunnelReport({
   );
 }
 
+const DEFAULT_COL_WIDTHS: Record<string, number> = {
+  checkbox: 28,
+  expand: 24,
+  lastActivity: 140,
+  sessionId: 110,
+  events: 60,
+  furthestStep: 110,
+  status: 80,
+  audience: 80,
+  domain: 110,
+  device: 60,
+  os: 60,
+  browser: 60,
+};
+
+const SESSION_COLUMNS = [
+  { key: "checkbox", label: "", resizable: false },
+  { key: "expand", label: "", resizable: false },
+  { key: "lastActivity", label: "Last Activity", resizable: true },
+  { key: "sessionId", label: "Session ID", resizable: true },
+  { key: "events", label: "Events", resizable: true },
+  { key: "furthestStep", label: "Furthest Step", resizable: true },
+  { key: "status", label: "Status", resizable: true },
+  { key: "audience", label: "Audience", resizable: true },
+  { key: "domain", label: "Domain", resizable: true },
+  { key: "device", label: "Device", resizable: true },
+  { key: "os", label: "OS", resizable: true },
+  { key: "browser", label: "Browser", resizable: true },
+];
+
+function ResizableHeader({
+  colKey,
+  label,
+  width,
+  resizable,
+  onResize,
+}: {
+  colKey: string;
+  label: string;
+  width: number;
+  resizable: boolean;
+  onResize: (key: string, width: number) => void;
+}) {
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startX.current = e.clientX;
+    startWidth.current = width;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const diff = ev.clientX - startX.current;
+      const newWidth = Math.max(30, startWidth.current + diff);
+      onResize(colKey, newWidth);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [colKey, width, onResize]);
+
+  return (
+    <th
+      className="text-[10px] px-1 py-0 relative select-none font-medium text-muted-foreground"
+      style={{ width: `${width}px`, minWidth: `${width}px` }}
+    >
+      {label}
+      {resizable && (
+        <span
+          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30"
+          onMouseDown={onMouseDown}
+          data-testid={`resize-${colKey}`}
+        />
+      )}
+    </th>
+  );
+}
+
 function EventLogsSection({
   dateRange,
   filters,
@@ -670,20 +755,27 @@ function EventLogsSection({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [colWidths, setColWidths] = useState<Record<string, number>>({ ...DEFAULT_COL_WIDTHS });
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [deletingSession, setDeletingSession] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
       setLogPage(1);
+      setSelectedSessions(new Set());
     }, 400);
     return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    setSelectedSessions(new Set());
+  }, [logPage]);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [deletingSession, setDeletingSession] = useState<string | null>(null);
-  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
-  const [deletingAll, setDeletingAll] = useState(false);
 
   const logsQueryStr = buildLogsQuery(dateRange, filters, logPage, debouncedSearch);
   const sessionsQuery = useQuery<SessionLogResult>({
@@ -696,12 +788,40 @@ function EventLogsSection({
     enabled: expanded,
   });
 
+  const currentSessionIds = sessionsQuery.data?.sessions.map(s => s.sessionId) ?? [];
+  const allSelected = currentSessionIds.length > 0 && currentSessionIds.every(id => selectedSessions.has(id));
+  const someSelected = selectedSessions.size > 0;
+
   const toggleSession = (sessionId: string) => {
     setExpandedSessions(prev => {
       const next = new Set(prev);
       if (next.has(sessionId)) next.delete(sessionId); else next.add(sessionId);
       return next;
     });
+  };
+
+  const toggleSelect = (sessionId: string) => {
+    setSelectedSessions(prev => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId); else next.add(sessionId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedSessions(prev => {
+        const next = new Set(prev);
+        currentSessionIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedSessions(prev => {
+        const next = new Set(prev);
+        currentSessionIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
   };
 
   const invalidateAnalytics = () => {
@@ -713,6 +833,10 @@ function EventLogsSection({
     });
   };
 
+  const handleResizeCol = useCallback((key: string, width: number) => {
+    setColWidths(prev => ({ ...prev, [key]: width }));
+  }, []);
+
   const deleteSession = async (sessionId: string) => {
     setDeletingSession(sessionId);
     try {
@@ -720,6 +844,7 @@ function EventLogsSection({
       if (!res.ok) throw new Error("Failed to delete");
       const data = await res.json();
       toast({ title: `Deleted ${data.count} events for this session` });
+      setSelectedSessions(prev => { const n = new Set(prev); n.delete(sessionId); return n; });
       invalidateAnalytics();
     } catch {
       toast({ title: "Failed to delete session events", variant: "destructive" });
@@ -728,20 +853,31 @@ function EventLogsSection({
     }
   };
 
-  const deleteAll = async () => {
-    setDeletingAll(true);
+  const bulkDeleteSelected = async () => {
+    if (selectedSessions.size === 0) return;
+    setBulkDeleting(true);
     try {
-      const res = await fetch("/api/analytics/all-events", { method: "DELETE", credentials: "include" });
+      const sessionIds = Array.from(selectedSessions);
+      const res = await fetch("/api/analytics/events/sessions", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sessionIds }),
+      });
       if (!res.ok) throw new Error("Failed to delete");
-      toast({ title: "All events deleted" });
-      setConfirmDeleteAll(false);
+      const data = await res.json();
+      toast({ title: `Deleted ${data.count} events from ${sessionIds.length} sessions` });
+      setSelectedSessions(new Set());
+      setConfirmBulkDelete(false);
       invalidateAnalytics();
     } catch {
-      toast({ title: "Failed to delete all events", variant: "destructive" });
+      toast({ title: "Failed to bulk delete sessions", variant: "destructive" });
     } finally {
-      setDeletingAll(false);
+      setBulkDeleting(false);
     }
   };
+
+  const totalCols = SESSION_COLUMNS.length;
 
   return (
     <div className="border-t pt-2" data-testid="card-event-logs">
@@ -757,21 +893,21 @@ function EventLogsSection({
             <Badge variant="secondary" className="text-[9px] py-0 ml-1">{sessionsQuery.data.total.toLocaleString()} sessions</Badge>
           )}
         </button>
-        {expanded && sessionsQuery.data && sessionsQuery.data.total > 0 && (
-          confirmDeleteAll ? (
+        {expanded && someSelected && (
+          confirmBulkDelete ? (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-destructive font-medium">Delete all events?</span>
-              <Button variant="destructive" size="sm" onClick={deleteAll} disabled={deletingAll} data-testid="button-confirm-delete-all">
-                {deletingAll ? "..." : "Yes"}
+              <span className="text-[10px] text-destructive font-medium">Delete {selectedSessions.size} selected session{selectedSessions.size > 1 ? "s" : ""}?</span>
+              <Button variant="destructive" size="sm" onClick={bulkDeleteSelected} disabled={bulkDeleting} data-testid="button-confirm-bulk-delete">
+                {bulkDeleting ? "..." : "Yes"}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setConfirmDeleteAll(false)} data-testid="button-cancel-delete-all">
+              <Button variant="outline" size="sm" onClick={() => setConfirmBulkDelete(false)} data-testid="button-cancel-bulk-delete">
                 No
               </Button>
             </div>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => setConfirmDeleteAll(true)} data-testid="button-delete-all">
+            <Button variant="outline" size="sm" onClick={() => setConfirmBulkDelete(true)} data-testid="button-bulk-delete">
               <Trash2 className="w-3 h-3 mr-1" />
-              <span className="text-[10px]">Delete All</span>
+              <span className="text-[10px]">Delete {selectedSessions.size} selected</span>
             </Button>
           )
         )}
@@ -799,35 +935,53 @@ function EventLogsSection({
           ) : sessionsQuery.data && sessionsQuery.data.sessions.length > 0 ? (
             <>
               <div className="overflow-x-auto border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="h-6">
-                      <TableHead className="w-5 px-0.5 py-0" />
-                      <TableHead className="text-[10px] px-1 py-0">Last Activity</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Session ID</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Events</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Furthest Step</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Status</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Audience</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Domain</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Device</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">OS</TableHead>
-                      <TableHead className="text-[10px] px-1 py-0">Browser</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+                  <thead>
+                    <tr className="h-6 border-b bg-muted/50">
+                      <th
+                        className="px-0.5 py-0"
+                        style={{ width: `${colWidths.checkbox}px`, minWidth: `${colWidths.checkbox}px` }}
+                      >
+                        <Checkbox
+                          checked={allSelected}
+                          onCheckedChange={toggleSelectAll}
+                          className="h-3 w-3"
+                          data-testid="checkbox-select-all"
+                        />
+                      </th>
+                      <th
+                        className="px-0.5 py-0"
+                        style={{ width: `${colWidths.expand}px`, minWidth: `${colWidths.expand}px` }}
+                      />
+                      {SESSION_COLUMNS.slice(2).map(col => (
+                        <ResizableHeader
+                          key={col.key}
+                          colKey={col.key}
+                          label={col.label}
+                          width={colWidths[col.key]}
+                          resizable={col.resizable}
+                          onResize={handleResizeCol}
+                        />
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
                     {sessionsQuery.data.sessions.map((session) => (
                       <SessionLogRow
                         key={session.sessionId}
                         session={session}
                         isExpanded={expandedSessions.has(session.sessionId)}
+                        isSelected={selectedSessions.has(session.sessionId)}
                         onToggle={() => toggleSession(session.sessionId)}
+                        onSelect={() => toggleSelect(session.sessionId)}
                         onDeleteSession={() => deleteSession(session.sessionId)}
                         isDeletingSession={deletingSession === session.sessionId}
+                        colWidths={colWidths}
+                        totalCols={totalCols}
                       />
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
 
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -867,15 +1021,23 @@ function EventLogsSection({
 function SessionLogRow({
   session,
   isExpanded,
+  isSelected,
   onToggle,
+  onSelect,
   onDeleteSession,
   isDeletingSession,
+  colWidths,
+  totalCols,
 }: {
   session: SessionLogEntry;
   isExpanded: boolean;
+  isSelected: boolean;
   onToggle: () => void;
+  onSelect: () => void;
   onDeleteSession: () => void;
   isDeletingSession: boolean;
+  colWidths: Record<string, number>;
+  totalCols: number;
 }) {
   const ts = new Date(session.lastEventAt);
   const formattedDate = format(ts, "MMM d h:mm:ss a");
@@ -888,32 +1050,40 @@ function SessionLogRow({
 
   return (
     <>
-      <TableRow
-        className="cursor-pointer hover-elevate h-6"
+      <tr
+        className={`cursor-pointer hover-elevate h-6 border-b ${isSelected ? "bg-primary/5" : ""}`}
         onClick={onToggle}
         data-testid={`row-session-${session.sessionId}`}
       >
-        <TableCell className="w-5 px-0.5 py-0">
+        <td className="px-0.5 py-0" style={{ width: `${colWidths.checkbox}px` }} onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={onSelect}
+            className="h-3 w-3"
+            data-testid={`checkbox-session-${session.sessionId}`}
+          />
+        </td>
+        <td className="px-0.5 py-0" style={{ width: `${colWidths.expand}px` }}>
           {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        </TableCell>
-        <TableCell className="text-[10px] font-mono whitespace-nowrap px-1 py-0">{formattedDate}</TableCell>
-        <TableCell className="text-[10px] font-mono max-w-[100px] truncate px-1 py-0" title={session.sessionId}>
+        </td>
+        <td className="text-[10px] font-mono whitespace-nowrap px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.lastActivity}px` }}>{formattedDate}</td>
+        <td className="text-[10px] font-mono truncate px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.sessionId}px` }} title={session.sessionId}>
           {session.sessionId.substring(0, 10)}...
-        </TableCell>
-        <TableCell className="text-[10px] font-mono px-1 py-0 text-center">
+        </td>
+        <td className="text-[10px] font-mono px-1 py-0 text-center overflow-hidden" style={{ width: `${colWidths.events}px` }}>
           <Badge variant="outline" className="text-[9px] py-0">{session.eventCount}</Badge>
-        </TableCell>
-        <TableCell className="text-[10px] font-mono px-1 py-0">{session.maxStep}. {session.maxStepName}</TableCell>
-        <TableCell className="px-1 py-0">{statusBadge}</TableCell>
-        <TableCell className="text-[10px] px-1 py-0">{session.page}</TableCell>
-        <TableCell className="text-[10px] px-1 py-0">{session.domain}</TableCell>
-        <TableCell className="text-[10px] px-1 py-0">{session.deviceType || "\u2014"}</TableCell>
-        <TableCell className="text-[10px] px-1 py-0">{session.os || "\u2014"}</TableCell>
-        <TableCell className="text-[10px] px-1 py-0">{session.browser || "\u2014"}</TableCell>
-      </TableRow>
+        </td>
+        <td className="text-[10px] font-mono px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.furthestStep}px` }}>{session.maxStep}. {session.maxStepName}</td>
+        <td className="px-1 py-0 overflow-hidden" style={{ width: `${colWidths.status}px` }}>{statusBadge}</td>
+        <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.audience}px` }}>{session.page}</td>
+        <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.domain}px` }}>{session.domain}</td>
+        <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.device}px` }}>{session.deviceType || "\u2014"}</td>
+        <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.os}px` }}>{session.os || "\u2014"}</td>
+        <td className="text-[10px] px-1 py-0 overflow-hidden text-ellipsis" style={{ width: `${colWidths.browser}px` }}>{session.browser || "\u2014"}</td>
+      </tr>
       {isExpanded && (
-        <TableRow data-testid={`row-session-detail-${session.sessionId}`}>
-          <TableCell colSpan={11} className="p-0">
+        <tr data-testid={`row-session-detail-${session.sessionId}`}>
+          <td colSpan={totalCols} className="p-0">
             <div className="bg-muted/50 px-3 py-2 space-y-2">
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-x-3 gap-y-0.5 text-[10px]">
                 <DetailField label="Session ID" value={session.sessionId} />
@@ -1028,8 +1198,8 @@ function SessionLogRow({
                 </Button>
               </div>
             </div>
-          </TableCell>
-        </TableRow>
+          </td>
+        </tr>
       )}
     </>
   );
