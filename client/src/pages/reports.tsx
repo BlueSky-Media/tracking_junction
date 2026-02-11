@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -395,23 +395,47 @@ function DrilldownTable({
 
   const totalLands = data.totals.pageLands || data.totals.uniqueViews;
 
+  const allSteps = data.totals.steps || [];
+  const canDrillGlobal = depth < 3 && availableNextDimensions.length > 0;
+
   return (
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="h-6">
-            {depth < 3 && availableNextDimensions.length > 0 && <TableHead className="w-4 px-0.5 py-0" />}
+            {canDrillGlobal && <TableHead className="w-4 px-0.5 py-0" />}
             <TableHead className="text-[10px] min-w-[70px] px-1 py-0">{dimLabel}</TableHead>
-            <TableHead className="text-[10px] text-right px-2 py-0">Lands</TableHead>
-            <TableHead className="text-[10px] text-right px-2 py-0">Land CVR</TableHead>
-            <TableHead className="text-[10px] text-right px-2 py-0">Form Complete</TableHead>
-            <TableHead className="text-[10px] text-right px-2 py-0">Form CVR</TableHead>
+            <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Lands</TableHead>
+            <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Land CVR</TableHead>
+            {allSteps.map((step) => (
+              <TableHead key={`step-${step.stepNumber}`} colSpan={3} className="text-[9px] text-center px-0 py-0 border-l border-border/30 whitespace-nowrap">
+                <span className="font-semibold">Step {step.stepNumber}</span>
+                <span className="text-muted-foreground ml-0.5 text-[8px]">{step.stepName}</span>
+              </TableHead>
+            ))}
+            <TableHead className="text-[10px] text-right px-1 py-0 border-l border-border/30 whitespace-nowrap">Form Complete</TableHead>
+            <TableHead className="text-[10px] text-right px-1 py-0 whitespace-nowrap">Form CVR</TableHead>
+          </TableRow>
+          <TableRow className="h-4 bg-muted/30">
+            {canDrillGlobal && <TableHead className="px-0.5 py-0" />}
+            <TableHead className="px-1 py-0" />
+            <TableHead className="px-1 py-0" />
+            <TableHead className="px-1 py-0" />
+            {allSteps.map((step) => (
+              <Fragment key={`sh-grp-${step.stepNumber}`}>
+                <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap border-l border-border/30">#</TableHead>
+                <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">CVR</TableHead>
+                <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">Drop-off</TableHead>
+              </Fragment>
+            ))}
+            <TableHead className="px-1 py-0 border-l border-border/30" />
+            <TableHead className="px-1 py-0" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.rows.map((row) => {
             const isExpanded = !!expandedRows[row.groupValue];
-            const canDrill = depth < 3 && availableNextDimensions.length > 0;
+            const canDrill = canDrillGlobal;
             const selectedSubDim = expandedRows[row.groupValue] || "";
             const rowLands = row.pageLands || row.uniqueViews;
             const landCvr = totalLands > 0 ? (rowLands / totalLands) * 100 : 0;
@@ -437,20 +461,30 @@ function DrilldownTable({
                 pageLands={rowLands}
                 landCvr={landCvr}
                 formCvr={formCvr}
+                allSteps={allSteps}
               />
             );
           })}
           {(() => {
             const totCvr = totalLands > 0 ? (data.totals.formCompletions / totalLands) * 100 : 0;
-            const canDrill = depth < 3 && availableNextDimensions.length > 0;
             return (
               <TableRow className="bg-muted/50 font-semibold border-t h-6" data-testid={`row-totals-${groupBy}-depth${depth}`}>
-                {canDrill && <TableCell className="px-0.5 py-0" />}
+                {canDrillGlobal && <TableCell className="px-0.5 py-0" />}
                 <TableCell className="text-[10px] font-bold px-1 py-0">Totals</TableCell>
-                <TableCell className="text-right font-mono text-[10px] px-2 py-0 font-bold">{totalLands.toLocaleString()}</TableCell>
-                <TableCell className="text-right font-mono text-[10px] px-2 py-0 font-bold">100.0%</TableCell>
-                <TableCell className="text-right font-mono text-[10px] px-2 py-0 font-bold">{data.totals.formCompletions.toLocaleString()}</TableCell>
-                <TableCell className={`text-right font-mono text-[10px] px-2 py-0 font-bold ${totCvr > 0 ? "" : "text-muted-foreground"}`}>{totCvr.toFixed(1)}%</TableCell>
+                <TableCell className="text-right font-mono text-[10px] px-1 py-0 font-bold">{totalLands.toLocaleString()}</TableCell>
+                <TableCell className="text-right font-mono text-[10px] px-1 py-0 font-bold">100.0%</TableCell>
+                {data.totals.steps.map((step) => {
+                  const dropOff = 100 - step.conversionFromPrev;
+                  return (
+                    <Fragment key={`tc-grp-${step.stepNumber}`}>
+                      <TableCell className="text-right font-mono text-[10px] px-0.5 py-0 font-bold border-l border-border/30">{step.completions.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono text-[9px] px-0.5 py-0">{step.conversionFromPrev.toFixed(1)}%</TableCell>
+                      <TableCell className="text-right font-mono text-[9px] px-0.5 py-0 text-muted-foreground">{dropOff.toFixed(1)}%</TableCell>
+                    </Fragment>
+                  );
+                })}
+                <TableCell className="text-right font-mono text-[10px] px-1 py-0 font-bold border-l border-border/30">{data.totals.formCompletions.toLocaleString()}</TableCell>
+                <TableCell className={`text-right font-mono text-[10px] px-1 py-0 font-bold ${totCvr > 0 ? "" : "text-muted-foreground"}`}>{totCvr.toFixed(1)}%</TableCell>
               </TableRow>
             );
           })()}
@@ -478,6 +512,7 @@ function DrilldownRowComponent({
   pageLands,
   landCvr,
   formCvr,
+  allSteps,
 }: {
   row: DrilldownRow;
   canDrill: boolean;
@@ -496,8 +531,9 @@ function DrilldownRowComponent({
   pageLands: number;
   landCvr: number;
   formCvr: number;
+  allSteps: DrilldownStepData[];
 }) {
-  const colSpan = 6 + (canDrill ? 1 : 0);
+  const colSpan = 4 + (allSteps.length * 3) + 2 + (canDrill ? 1 : 0);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const subDimLabel = availableNextDimensions.find(d => d.value === selectedSubDim)?.label;
 
@@ -554,10 +590,23 @@ function DrilldownRowComponent({
             <span className="text-muted-foreground ml-1">- {subDimLabel}</span>
           )}
         </TableCell>
-        <TableCell className="text-right font-mono text-[10px] px-2 py-0">{pageLands.toLocaleString()}</TableCell>
-        <TableCell className="text-right font-mono text-[10px] px-2 py-0">{landCvr.toFixed(1)}%</TableCell>
-        <TableCell className="text-right font-mono text-[10px] px-2 py-0">{row.formCompletions.toLocaleString()}</TableCell>
-        <TableCell className={`text-right font-mono text-[10px] px-2 py-0 ${formCvr > 0 ? "" : "text-muted-foreground"}`}>{formCvr.toFixed(1)}%</TableCell>
+        <TableCell className="text-right font-mono text-[10px] px-1 py-0">{pageLands.toLocaleString()}</TableCell>
+        <TableCell className="text-right font-mono text-[10px] px-1 py-0">{landCvr.toFixed(1)}%</TableCell>
+        {allSteps.map((refStep) => {
+          const rowStep = row.steps.find(s => s.stepNumber === refStep.stepNumber);
+          const count = rowStep?.completions || 0;
+          const cvr = rowStep?.conversionFromPrev || 0;
+          const dropOff = 100 - cvr;
+          return (
+            <Fragment key={`rc-grp-${refStep.stepNumber}`}>
+              <TableCell className="text-right font-mono text-[10px] px-0.5 py-0 border-l border-border/30">{count > 0 ? count.toLocaleString() : "\u2014"}</TableCell>
+              <TableCell className={`text-right font-mono text-[9px] px-0.5 py-0 ${count > 0 ? "" : "text-muted-foreground"}`}>{count > 0 ? `${cvr.toFixed(1)}%` : ""}</TableCell>
+              <TableCell className={`text-right font-mono text-[9px] px-0.5 py-0 text-muted-foreground`}>{count > 0 ? `${dropOff.toFixed(1)}%` : ""}</TableCell>
+            </Fragment>
+          );
+        })}
+        <TableCell className="text-right font-mono text-[10px] px-1 py-0 border-l border-border/30">{row.formCompletions.toLocaleString()}</TableCell>
+        <TableCell className={`text-right font-mono text-[10px] px-1 py-0 ${formCvr > 0 ? "" : "text-muted-foreground"}`}>{formCvr.toFixed(1)}%</TableCell>
       </TableRow>
       {isExpanded && canDrill && selectedSubDim && (
         <TableRow data-testid={`row-drilldown-${groupBy}-${row.groupValue}`}>
