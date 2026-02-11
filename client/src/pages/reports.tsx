@@ -455,55 +455,86 @@ function DrilldownRowComponent({
   formCvr: number;
 }) {
   const colSpan = 6 + (canDrill ? 1 : 0);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const subDimLabel = availableNextDimensions.find(d => d.value === selectedSubDim)?.label;
+
+  const handleDimSelect = (dim: string) => {
+    setPopoverOpen(false);
+    if (selectedSubDim === dim && isExpanded) {
+      onToggle();
+    } else {
+      onChangeDim(dim);
+      if (!isExpanded) onToggle();
+    }
+  };
 
   return (
     <>
       <TableRow
-        className={`h-6 ${canDrill ? "cursor-pointer hover-elevate" : ""}`}
-        onClick={canDrill ? onToggle : undefined}
+        className="h-6"
         data-testid={`row-drill-${groupBy}-${row.groupValue}`}
       >
         {canDrill && (
           <TableCell className="w-4 px-0.5 py-0">
-            {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className="flex items-center justify-center w-4 h-4 cursor-pointer hover:text-foreground text-muted-foreground"
+                  data-testid={`btn-drill-${groupBy}-${row.groupValue}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isExpanded) {
+                      onToggle();
+                    } else {
+                      setPopoverOpen(true);
+                    }
+                  }}
+                >
+                  {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-1" align="start" side="bottom">
+                <div className="flex flex-col">
+                  {availableNextDimensions.map((d) => (
+                    <button
+                      key={d.value}
+                      className="text-left text-[10px] px-2 py-1 rounded-md hover-elevate cursor-pointer"
+                      data-testid={`btn-subdim-${d.value}-${row.groupValue}`}
+                      onClick={() => handleDimSelect(d.value)}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </TableCell>
         )}
-        <TableCell className="text-[10px] font-medium px-1 py-0">{row.groupValue}</TableCell>
+        <TableCell className="text-[10px] font-medium px-1 py-0">
+          {row.groupValue}
+          {isExpanded && subDimLabel && (
+            <span className="text-muted-foreground ml-1">- {subDimLabel}</span>
+          )}
+        </TableCell>
         <TableCell className="text-right font-mono text-[10px] px-2 py-0">{pageLands.toLocaleString()}</TableCell>
         <TableCell className="text-right font-mono text-[10px] px-2 py-0">{landCvr.toFixed(1)}%</TableCell>
         <TableCell className="text-right font-mono text-[10px] px-2 py-0">{row.formCompletions.toLocaleString()}</TableCell>
         <TableCell className={`text-right font-mono text-[10px] px-2 py-0 ${formCvr > 0 ? "" : "text-muted-foreground"}`}>{formCvr.toFixed(1)}%</TableCell>
       </TableRow>
-      {isExpanded && canDrill && (
+      {isExpanded && canDrill && selectedSubDim && (
         <TableRow data-testid={`row-drilldown-${groupBy}-${row.groupValue}`}>
           <TableCell colSpan={colSpan} className="p-0">
-            <div className="border-y bg-muted/20 px-2 py-1 space-y-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <Badge variant="outline" className="text-[9px] py-0">{dimLabel}: {row.groupValue}</Badge>
-                <span className="text-[10px] text-muted-foreground">drill down by</span>
-                <Select value={selectedSubDim} onValueChange={onChangeDim}>
-                  <SelectTrigger className="w-[130px] h-6 text-[10px]" data-testid={`select-subdim-${groupBy}-${row.groupValue}`}>
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableNextDimensions.map((d) => (
-                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="border-y bg-muted/20 px-1 py-0.5">
+              <div className="border rounded-md bg-background">
+                <DrilldownTable
+                  parentFilters={{ ...parentFilters, [groupBy]: row.groupValue }}
+                  dateRange={dateRange}
+                  globalFilters={globalFilters}
+                  groupBy={selectedSubDim}
+                  depth={depth + 1}
+                  usedDimensions={[...usedDimensions, selectedSubDim]}
+                />
               </div>
-              {selectedSubDim && (
-                <div className="border rounded-md bg-background">
-                  <DrilldownTable
-                    parentFilters={{ ...parentFilters, [groupBy]: row.groupValue }}
-                    dateRange={dateRange}
-                    globalFilters={globalFilters}
-                    groupBy={selectedSubDim}
-                    depth={depth + 1}
-                    usedDimensions={[...usedDimensions, selectedSubDim]}
-                  />
-                </div>
-              )}
             </div>
           </TableCell>
         </TableRow>
