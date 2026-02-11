@@ -16,7 +16,7 @@ import {
   CalendarIcon, ChevronLeft, ChevronsLeft, ChevronsRight,
   Filter, X, RefreshCw, Trash2,
   Play, Pause, Download, Ban, Phone, FileText, Clock,
-  MinusCircle, Save, Columns, Info,
+  MinusCircle, Save, Columns, Info, GripVertical,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
@@ -1101,6 +1101,7 @@ const DEFAULT_COL_WIDTHS: Record<string, number> = {
 };
 
 const COL_VISIBILITY_KEY = "trackingjunction_col_visibility";
+const COL_ORDER_KEY = "trackingjunction_col_order";
 
 function loadColVisibility(): Record<string, boolean> {
   try {
@@ -1302,6 +1303,28 @@ const SESSION_COLUMNS: SessionColumn[] = [
   { key: "language", label: "Language", resizable: true, optional: true, defaultVisible: false },
 ];
 
+const REORDERABLE_KEYS = SESSION_COLUMNS.filter(c => c.key !== "checkbox" && c.key !== "expand").map(c => c.key);
+
+function loadColOrder(): string[] {
+  try {
+    const raw = localStorage.getItem(COL_ORDER_KEY);
+    if (raw) {
+      const saved: string[] = JSON.parse(raw);
+      const savedSet = new Set(saved);
+      const missing = REORDERABLE_KEYS.filter(k => !savedSet.has(k));
+      const valid = saved.filter(k => REORDERABLE_KEYS.includes(k));
+      return [...valid, ...missing];
+    }
+  } catch {}
+  return [...REORDERABLE_KEYS];
+}
+
+function saveColOrder(order: string[]) {
+  try {
+    localStorage.setItem(COL_ORDER_KEY, JSON.stringify(order));
+  } catch {}
+}
+
 function ResizableHeader({
   colKey,
   label,
@@ -1379,7 +1402,10 @@ function EventLogsSection({
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const [colWidths, setColWidths] = useState<Record<string, number>>({ ...DEFAULT_COL_WIDTHS });
   const [colVisibility, setColVisibility] = useState<Record<string, boolean>>(loadColVisibility);
+  const [colOrder, setColOrder] = useState<string[]>(loadColOrder);
   const [colSelectorOpen, setColSelectorOpen] = useState(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [deletingSession, setDeletingSession] = useState<string | null>(null);
@@ -1464,12 +1490,33 @@ function EventLogsSection({
     });
   }, []);
 
-  const visibleColumns = SESSION_COLUMNS.filter(col => {
-    if (col.key === "checkbox" || col.key === "expand") return true;
-    return colVisibility[col.key] !== false;
-  });
+  const colMap = Object.fromEntries(SESSION_COLUMNS.map(c => [c.key, c]));
+  const visibleColumns = [
+    colMap["checkbox"],
+    colMap["expand"],
+    ...colOrder
+      .filter(key => {
+        const col = colMap[key];
+        if (!col) return false;
+        if (!col.optional) return true;
+        return colVisibility[key] !== false;
+      })
+      .map(key => colMap[key]),
+  ].filter(Boolean) as SessionColumn[];
 
   const visibleColumnKeys = visibleColumns.map(c => c.key);
+
+  const enabledOrderedKeys = colOrder.filter(key => {
+    const col = colMap[key];
+    if (!col) return false;
+    if (!col.optional) return true;
+    return colVisibility[key] !== false;
+  });
+
+  const disabledKeys = colOrder.filter(key => {
+    const col = colMap[key];
+    return col?.optional && colVisibility[key] === false;
+  });
 
   const handleResizeCol = useCallback((key: string, width: number) => {
     setColWidths(prev => ({ ...prev, [key]: width }));
@@ -1533,28 +1580,112 @@ function EventLogsSection({
             )}
           </button>
           {expanded && (
-            <Popover open={colSelectorOpen} onOpenChange={setColSelectorOpen}>
+            <Popover open={colSelectorOpen} onOpenChange={(open) => { setColSelectorOpen(open); if (!open) { setDragIdx(null); setDragOverIdx(null); } }}>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" data-testid="button-column-selector">
                   <Columns className="w-3.5 h-3.5" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[180px] p-1.5" align="start" data-testid="popover-column-selector">
-                <p className="text-[10px] font-semibold text-muted-foreground px-1 mb-1">Toggle Columns</p>
-                {SESSION_COLUMNS.filter(c => c.optional).map(col => (
-                  <label
-                    key={col.key}
-                    className="flex items-center gap-1.5 px-1 py-0.5 rounded-md hover-elevate cursor-pointer"
-                    data-testid={`toggle-col-${col.key}`}
-                  >
-                    <Checkbox
-                      checked={colVisibility[col.key] ?? col.defaultVisible ?? true}
-                      onCheckedChange={() => toggleColVisibility(col.key)}
-                      className="h-3 w-3"
-                    />
-                    <span className="text-[10px]">{col.label}</span>
-                  </label>
-                ))}
+              <PopoverContent className="w-[220px] p-2 max-h-[70vh] overflow-y-auto" align="start" data-testid="popover-column-selector">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] font-semibold">Manage Fields</p>
+                  <button onClick={() => setColSelectorOpen(false)} className="text-muted-foreground" data-testid="button-close-manage-fields">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <p className="text-[9px] text-muted-foreground font-medium px-0.5 mb-0.5">Fields in Table</p>
+                <div className="space-y-0.5 mb-2">
+                  {enabledOrderedKeys.map((key, idx) => {
+                    const col = colMap[key];
+                    if (!col) return null;
+                    const isFixed = !col.optional;
+                    return (
+                      <div
+                        key={key}
+                        draggable={!isFixed}
+                        onDragStart={(e) => {
+                          if (isFixed) { e.preventDefault(); return; }
+                          setDragIdx(idx);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          setDragOverIdx(idx);
+                        }}
+                        onDragLeave={() => setDragOverIdx(null)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return; }
+                          const allEnabled = colOrder.filter(k => {
+                            const c = colMap[k];
+                            if (!c) return false;
+                            if (!c.optional) return true;
+                            return colVisibility[k] !== false;
+                          });
+                          const dragKey = allEnabled[dragIdx];
+                          const newEnabled = allEnabled.filter((_, i) => i !== dragIdx);
+                          newEnabled.splice(idx, 0, dragKey);
+                          const disabledInOrder = colOrder.filter(k => {
+                            const c = colMap[k];
+                            return c?.optional && colVisibility[k] === false;
+                          });
+                          const newOrder = [...newEnabled, ...disabledInOrder];
+                          setColOrder(newOrder);
+                          saveColOrder(newOrder);
+                          setDragIdx(null);
+                          setDragOverIdx(null);
+                        }}
+                        onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
+                        className={`flex items-center gap-1 px-1 py-0.5 rounded-md ${
+                          dragOverIdx === idx ? "border border-primary bg-primary/10" : ""
+                        } ${dragIdx === idx ? "opacity-40" : ""} ${!isFixed ? "cursor-grab" : ""}`}
+                        data-testid={`field-enabled-${key}`}
+                      >
+                        {!isFixed && <GripVertical className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
+                        {isFixed && <div className="w-3 flex-shrink-0" />}
+                        <Checkbox
+                          checked={true}
+                          onCheckedChange={() => {
+                            if (isFixed) return;
+                            toggleColVisibility(key);
+                          }}
+                          disabled={isFixed}
+                          className="h-3 w-3 flex-shrink-0"
+                        />
+                        <span className="text-[10px] flex-1">{col.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {disabledKeys.length > 0 && (
+                  <>
+                    <p className="text-[9px] text-muted-foreground font-medium px-0.5 mb-0.5">Add Fields</p>
+                    <div className="space-y-0.5">
+                      {disabledKeys.map(key => {
+                        const col = colMap[key];
+                        if (!col) return null;
+                        return (
+                          <label
+                            key={key}
+                            className="flex items-center gap-1 px-1 py-0.5 rounded-md hover-elevate cursor-pointer"
+                            data-testid={`field-disabled-${key}`}
+                          >
+                            <div className="w-3 flex-shrink-0" />
+                            <Checkbox
+                              checked={false}
+                              onCheckedChange={() => toggleColVisibility(key)}
+                              className="h-3 w-3 flex-shrink-0"
+                            />
+                            <span className="text-[10px] flex-1">{col.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </PopoverContent>
             </Popover>
           )}
