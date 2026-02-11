@@ -60,6 +60,38 @@ export const trackingEvents = pgTable("tracking_events", {
   index("idx_events_device_type").on(table.deviceType),
 ]);
 
+export const requestLogs = pgTable("request_logs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  method: varchar("method", { length: 10 }).notNull(),
+  path: varchar("path", { length: 500 }).notNull(),
+  statusCode: integer("status_code").notNull(),
+  requestBody: jsonb("request_body"),
+  responseBody: jsonb("response_body"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  origin: varchar("origin", { length: 500 }),
+  contentType: varchar("content_type", { length: 200 }),
+  durationMs: integer("duration_ms"),
+  errorMessage: text("error_message"),
+  eventType: varchar("event_type", { length: 50 }),
+  domain: varchar("domain", { length: 100 }),
+  sessionId: varchar("session_id", { length: 64 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_request_logs_created").on(table.createdAt),
+  index("idx_request_logs_status").on(table.statusCode),
+  index("idx_request_logs_event_type").on(table.eventType),
+  index("idx_request_logs_domain").on(table.domain),
+]);
+
+export const insertRequestLogSchema = createInsertSchema(requestLogs).omit({
+  id: true as const,
+  createdAt: true as const,
+});
+
+export type InsertRequestLog = z.infer<typeof insertRequestLogSchema>;
+export type RequestLog = typeof requestLogs.$inferSelect;
+
 export const insertTrackingEventSchema = createInsertSchema(trackingEvents).omit({
   id: true as const,
   receivedAt: true as const,

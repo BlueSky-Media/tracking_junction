@@ -1,10 +1,13 @@
 import {
   trackingEvents,
+  requestLogs,
   type InsertTrackingEvent,
   type TrackingEvent,
+  type InsertRequestLog,
+  type RequestLog,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne } from "drizzle-orm";
+import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or } from "drizzle-orm";
 
 export interface AnalyticsFilters {
   page?: string;
@@ -145,6 +148,18 @@ export interface IStorage {
   deleteAllEvents(): Promise<void>;
   deleteEvent(id: number): Promise<void>;
   deleteEventsBySession(sessionId: string): Promise<number>;
+  insertRequestLog(log: InsertRequestLog): Promise<RequestLog>;
+  getRequestLogs(filters: {
+    startDate?: string;
+    endDate?: string;
+    startTime?: string;
+    endTime?: string;
+    statusCode?: number;
+    eventType?: string;
+    domain?: string;
+    search?: string;
+  }, page: number, limit: number): Promise<{ logs: RequestLog[]; total: number; page: number; limit: number; totalPages: number }>;
+  deleteRequestLogs(beforeDate?: string): Promise<number>;
 }
 
 function buildConditions(filters: AnalyticsFilters) {
@@ -852,6 +867,94 @@ class DatabaseStorage implements IStorage {
 
   async deleteEventsBySession(sessionId: string): Promise<number> {
     const result = await db.delete(trackingEvents).where(eq(trackingEvents.sessionId, sessionId)).returning({ id: trackingEvents.id });
+    return result.length;
+  }
+
+  async insertRequestLog(log: InsertRequestLog): Promise<RequestLog> {
+    const [result] = await db.insert(requestLogs).values(log as any).returning();
+    return result;
+  }
+
+  async getRequestLogs(filters: {
+    startDate?: string;
+    endDate?: string;
+    startTime?: string;
+    endTime?: string;
+    statusCode?: number;
+    eventType?: string;
+    domain?: string;
+    search?: string;
+  }, page: number, limit: number): Promise<{ logs: RequestLog[]; total: number; page: number; limit: number; totalPages: number }> {
+    const conditions = [];
+
+    if (filters.startDate) {
+      const startHour = filters.startTime || "00:00";
+      const start = new Date(`${filters.startDate}T${startHour}:00.000Z`);
+      conditions.push(gte(requestLogs.createdAt, start));
+    }
+    if (filters.endDate) {
+      const endHour = filters.endTime || "24:00";
+      let end: Date;
+      if (endHour === "24:00") {
+        end = new Date(`${filters.endDate}T23:59:59.999Z`);
+      } else {
+        end = new Date(`${filters.endDate}T${endHour}:00.000Z`);
+      }
+      conditions.push(lte(requestLogs.createdAt, end));
+    }
+    if (filters.statusCode) {
+      conditions.push(eq(requestLogs.statusCode, filters.statusCode));
+    }
+    if (filters.eventType) {
+      conditions.push(eq(requestLogs.eventType, filters.eventType));
+    }
+    if (filters.domain) {
+      conditions.push(eq(requestLogs.domain, filters.domain));
+    }
+    if (filters.search) {
+      conditions.push(
+        or(
+          ilike(requestLogs.path, `%${filters.search}%`),
+          ilike(requestLogs.ipAddress, `%${filters.search}%`),
+          ilike(requestLogs.sessionId, `%${filters.search}%`),
+          ilike(requestLogs.origin, `%${filters.search}%`),
+        )
+      );
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [countResult] = await db
+      .select({ total: count() })
+      .from(requestLogs)
+      .where(where);
+
+    const total = Number(countResult?.total || 0);
+    const offset = (page - 1) * limit;
+
+    const logs = await db
+      .select()
+      .from(requestLogs)
+      .where(where)
+      .orderBy(desc(requestLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      logs,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async deleteRequestLogs(beforeDate?: string): Promise<number> {
+    if (beforeDate) {
+      const result = await db.delete(requestLogs).where(lte(requestLogs.createdAt, new Date(beforeDate))).returning({ id: requestLogs.id });
+      return result.length;
+    }
+    const result = await db.delete(requestLogs).returning({ id: requestLogs.id });
     return result.length;
   }
 }
