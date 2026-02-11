@@ -961,8 +961,8 @@ function FunnelReport({
         const audFormCvr = audLands > 0 ? (audFormComplete / audLands) * 100 : 0;
         const audienceName = audienceRow.groupValue;
         const validSteps = getLeadStepsForAudience(audienceName);
-        const validStepNames = new Set(validSteps.map(s => s.name));
-        const filteredSteps = audienceRow.steps.filter(step => validStepNames.has(step.stepName));
+        const validStepKeys = new Set(validSteps.map(s => `${s.number}:${s.name}`));
+        const filteredSteps = audienceRow.steps.filter(step => validStepKeys.has(step.stepKey));
         const audSteps = filteredSteps.map((step, idx) => {
             const prevCount = idx === 0 ? audLands : filteredSteps[idx - 1].completions;
             const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
