@@ -32,7 +32,7 @@ function parseMulti(val: string | undefined): string | string[] | undefined {
 
 function parseFilters(query: any) {
   return {
-    page: parseMulti(query.page as string | undefined) ?? parseMulti(query.audience as string | undefined),
+    page: parseMulti(query.audience as string | undefined),
     pageType: parseMulti(query.pageType as string | undefined),
     domain: parseMulti(query.domain as string | undefined),
     startDate: query.startDate as string | undefined,
