@@ -919,8 +919,7 @@ function FunnelReport({
 
   const totals = summaryData.totals;
   const pageLands = totals.pageLands || totals.uniqueViews;
-  const lastStep = totals.steps[totals.steps.length - 1];
-  const finalCount = totals.formCompletions > 0 ? totals.formCompletions : (lastStep?.completions || 0);
+  const finalCount = totals.formCompletions || 0;
   const overallConversion = pageLands > 0 ? (finalCount / pageLands) * 100 : 0;
 
   const audienceRows = (audienceData?.rows || [])
