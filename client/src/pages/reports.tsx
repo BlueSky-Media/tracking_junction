@@ -894,7 +894,17 @@ function FunnelReport({
     },
   });
 
-  if (summaryLoading) {
+  const audienceQuery = buildQueryParams(dateRange, filters, { groupBy: "page" });
+  const { data: audienceData, isLoading: audienceLoading } = useQuery<DrilldownResult>({
+    queryKey: ["/api/analytics/drilldown", "audience-funnel", audienceQuery],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/drilldown?${audienceQuery}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch audience funnel");
+      return res.json();
+    },
+  });
+
+  if (summaryLoading || audienceLoading) {
     return (
       <div data-testid="card-funnel-report">
         <Skeleton className="h-4 w-48 mb-2" />
@@ -915,13 +925,9 @@ function FunnelReport({
   const finalCount = totals.formCompletions > 0 ? totals.formCompletions : (lastStep?.completions || 0);
   const overallConversion = pageLands > 0 ? (finalCount / pageLands) * 100 : 0;
 
-  const stepsWithDropOff = totals.steps.map((step, idx) => {
-    const prevCount = idx === 0 ? pageLands : totals.steps[idx - 1].completions;
-    const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
-    const cvr = step.conversionFromInitial;
-    const scvr = prevCount > 0 ? (step.completions / prevCount) * 100 : 0;
-    return { ...step, dropOff, cvr, scvr, prevCount };
-  });
+  const audienceRows = (audienceData?.rows || [])
+    .filter(r => (r.pageLands || r.uniqueViews) > 0)
+    .sort((a, b) => (b.pageLands || b.uniqueViews) - (a.pageLands || a.uniqueViews));
 
   return (
     <div data-testid="card-funnel-report">
@@ -930,11 +936,11 @@ function FunnelReport({
         <Table>
           <TableHeader>
             <TableRow className="h-6">
-              <TableHead className="text-[10px] text-right px-2 py-0">Lands</TableHead>
+              <TableHead className="text-[10px] text-right px-2 py-0">Total Lands</TableHead>
               <TableHead className="text-[10px] text-right px-2 py-0">Total Events</TableHead>
               <TableHead className="text-[10px] text-right px-2 py-0">Form Complete</TableHead>
               <TableHead className="text-[10px] text-right px-2 py-0">Form CVR</TableHead>
-              <TableHead className="text-[10px] text-right px-2 py-0">Steps</TableHead>
+              <TableHead className="text-[10px] text-right px-2 py-0">Audiences</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -943,81 +949,96 @@ function FunnelReport({
               <TableCell className="text-right font-mono text-[11px] font-bold px-2 py-0" data-testid="text-total-events">{totals.grossViews.toLocaleString()}</TableCell>
               <TableCell className="text-right font-mono text-[11px] font-bold px-2 py-0" data-testid="text-overall-conversion">{finalCount.toLocaleString()}</TableCell>
               <TableCell className="text-right font-mono text-[11px] font-bold px-2 py-0">{overallConversion.toFixed(1)}%</TableCell>
-              <TableCell className="text-right font-mono text-[11px] font-bold px-2 py-0" data-testid="text-total-steps">{totals.steps.length}</TableCell>
+              <TableCell className="text-right font-mono text-[11px] font-bold px-2 py-0" data-testid="text-audience-count">{audienceRows.length}</TableCell>
             </TableRow>
           </TableBody>
         </Table>
       </div>
 
-      {stepsWithDropOff.length > 0 && (
-        <div className="overflow-x-auto border rounded-md mb-2">
-          <Table>
-            <TableHeader>
-              <TableRow className="h-5">
-                <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Step</TableHead>
-                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Count</TableHead>
-                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">CVR</TableHead>
-                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">SCVR</TableHead>
-                <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Drop-off</TableHead>
-                <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Drop-off Visual</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow className="h-5 bg-muted/20">
-                <TableCell className="font-mono text-[9px] px-1.5 py-0">0. Landing</TableCell>
-                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">{pageLands.toLocaleString()}</TableCell>
-                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">100.0%</TableCell>
-                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
-                <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
-                <TableCell className="px-1.5 py-0">
-                  <div className="w-full bg-muted rounded-sm h-2.5">
-                    <div className="h-2.5 rounded-sm bg-primary" style={{ width: "100%" }} />
-                  </div>
-                </TableCell>
-              </TableRow>
-              {stepsWithDropOff.map((step) => {
-                const barWidth = pageLands > 0 ? Math.max(1, (step.completions / pageLands) * 100) : 0;
-                const isHighDropOff = step.dropOff > 50;
-                const isMedDropOff = step.dropOff > 30;
-                return (
-                  <TableRow key={step.stepNumber} className="h-5" data-testid={`row-funnel-step-${step.stepNumber}`}>
-                    <TableCell className="font-mono text-[9px] px-1.5 py-0 whitespace-nowrap">
-                      {step.stepNumber}. {step.stepName}
-                    </TableCell>
-                    <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">
-                      {step.completions.toLocaleString()}
-                    </TableCell>
-                    <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.cvr < 30 ? "text-red-500" : step.cvr < 60 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
-                      {step.cvr.toFixed(1)}%
-                    </TableCell>
-                    <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.scvr < 50 ? "text-red-500" : step.scvr < 70 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
-                      {step.scvr.toFixed(1)}%
-                    </TableCell>
-                    <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${isHighDropOff ? "text-red-500 font-bold" : isMedDropOff ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}`}>
-                      {step.dropOff.toFixed(1)}%
-                    </TableCell>
-                    <TableCell className="px-1.5 py-0">
-                      <div className="w-full bg-muted rounded-sm h-2.5">
-                        <div
-                          className={`h-2.5 rounded-sm ${isHighDropOff ? "bg-red-500" : isMedDropOff ? "bg-yellow-500" : "bg-primary"}`}
-                          style={{ width: `${barWidth}%` }}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      {audienceRows.map((audienceRow) => {
+        const audLands = audienceRow.pageLands || audienceRow.uniqueViews;
+        const audFormComplete = audienceRow.formCompletions;
+        const audFormCvr = audLands > 0 ? (audFormComplete / audLands) * 100 : 0;
+        const audSteps = audienceRow.steps.map((step, idx) => {
+            const prevCount = idx === 0 ? audLands : audienceRow.steps[idx - 1].completions;
+            const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
+            const cvr = step.conversionFromInitial;
+            const scvr = prevCount > 0 ? (step.completions / prevCount) * 100 : 0;
+            return { ...step, dropOff, cvr, scvr, prevCount };
+          });
 
-      {(!Array.isArray(filters.page) || filters.page.length === 0 || filters.page.length > 1) && (
-        <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2 py-1 text-[10px] text-amber-800 dark:text-amber-300" data-testid="banner-mixed-audiences">
-          <Info className="w-3 h-3 shrink-0" />
-          <span>Step definitions differ by audience. Filter by a specific audience for accurate funnel step comparisons.</span>
-        </div>
-      )}
+        return (
+          <div key={audienceRow.groupValue} className="overflow-x-auto border rounded-md mb-2" data-testid={`funnel-audience-${audienceRow.groupValue}`}>
+            <Table>
+              <TableHeader>
+                <TableRow className="h-5 bg-muted/30">
+                  <TableHead colSpan={6} className="text-[10px] px-1.5 py-0 font-semibold capitalize">
+                    {audienceRow.groupValue}
+                    <span className="text-muted-foreground font-normal ml-2">
+                      Lands: {audLands.toLocaleString()}
+                      {audFormComplete > 0 && <> | Form Complete: {audFormComplete} | Form CVR: {audFormCvr.toFixed(1)}%</>}
+                    </span>
+                  </TableHead>
+                </TableRow>
+                <TableRow className="h-5">
+                  <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Step</TableHead>
+                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Count</TableHead>
+                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">CVR</TableHead>
+                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">SCVR</TableHead>
+                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Drop-off</TableHead>
+                  <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Drop-off Visual</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow className="h-5 bg-muted/20">
+                  <TableCell className="font-mono text-[9px] px-1.5 py-0">0. Landing</TableCell>
+                  <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">{audLands.toLocaleString()}</TableCell>
+                  <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">100.0%</TableCell>
+                  <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
+                  <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
+                  <TableCell className="px-1.5 py-0">
+                    <div className="w-full bg-muted rounded-sm h-2.5">
+                      <div className="h-2.5 rounded-sm bg-primary" style={{ width: "100%" }} />
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {audSteps.map((step) => {
+                  const barWidth = audLands > 0 ? Math.max(1, (step.completions / audLands) * 100) : 0;
+                  const isHighDropOff = step.dropOff > 50;
+                  const isMedDropOff = step.dropOff > 30;
+                  return (
+                    <TableRow key={step.stepKey} className="h-5" data-testid={`row-funnel-step-${audienceRow.groupValue}-${step.stepNumber}`}>
+                      <TableCell className="font-mono text-[9px] px-1.5 py-0 whitespace-nowrap">
+                        {step.stepNumber}. {step.stepName}
+                      </TableCell>
+                      <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">
+                        {step.completions.toLocaleString()}
+                      </TableCell>
+                      <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.cvr < 30 ? "text-red-500" : step.cvr < 60 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
+                        {step.cvr.toFixed(1)}%
+                      </TableCell>
+                      <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.scvr < 50 ? "text-red-500" : step.scvr < 70 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
+                        {step.scvr.toFixed(1)}%
+                      </TableCell>
+                      <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${isHighDropOff ? "text-red-500 font-bold" : isMedDropOff ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}`}>
+                        {step.dropOff.toFixed(1)}%
+                      </TableCell>
+                      <TableCell className="px-1.5 py-0">
+                        <div className="w-full bg-muted rounded-sm h-2.5">
+                          <div
+                            className={`h-2.5 rounded-sm ${isHighDropOff ? "bg-red-500" : isMedDropOff ? "bg-yellow-500" : "bg-primary"}`}
+                            style={{ width: `${barWidth}%` }}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        );
+      })}
 
       <div className="border-t pt-2 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
