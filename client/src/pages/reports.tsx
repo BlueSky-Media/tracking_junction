@@ -1582,29 +1582,36 @@ function SessionLogRow({
                 <DetailField label="Device" value={session.deviceType || "\u2014"} />
                 <DetailField label="OS" value={session.os || "\u2014"} />
                 <DetailField label="Browser" value={session.browser || "\u2014"} />
-                {session.events[0] && (
-                  <>
-                    <DetailField label="IP Address" value={session.events[0].ipAddress || "\u2014"} />
-                    <DetailField label="Geo State" value={session.events[0].geoState || "\u2014"} />
-                    <DetailField label="UTM Source" value={session.events[0].utmSource || "\u2014"} />
-                    <DetailField label="UTM Campaign" value={session.events[0].utmCampaign || "\u2014"} />
-                    <DetailField label="UTM Medium" value={session.events[0].utmMedium || "\u2014"} />
-                    <DetailField label="Referrer" value={session.events[0].referrer || "\u2014"} />
-                    <DetailField label="External ID" value={session.events[0].externalId || "\u2014"} />
-                    <DetailField label="FBCLID" value={session.events[0].fbclid || "\u2014"} />
-                    <DetailField label="FBC" value={session.events[0].fbc || "\u2014"} />
-                    <DetailField label="FBP" value={session.events[0].fbp || "\u2014"} />
-                    <DetailField label="Campaign Name" value={session.events[0].campaignName || "\u2014"} />
-                    <DetailField label="Ad Name" value={session.events[0].adName || "\u2014"} />
-                    <DetailField label="Adset Name" value={session.events[0].adsetName || "\u2014"} />
-                    <DetailField label="Placement" value={session.events[0].placement || "\u2014"} />
-                    <DetailField label="Page URL" value={session.events[0].pageUrl || "\u2014"} />
-                    <DetailField label="Screen Resolution" value={session.events[0].screenResolution || "\u2014"} />
-                    <DetailField label="Viewport" value={session.events[0].viewport || "\u2014"} />
-                    <DetailField label="Language" value={session.events[0].language || "\u2014"} />
-                    <DetailField label="Selected State" value={session.events[0].selectedState || "\u2014"} />
-                  </>
-                )}
+                {session.events.length > 0 && (() => {
+                  const ev = session.events;
+                  const find = (fn: (e: EventLog) => string | null | undefined) => {
+                    for (const e of ev) { const v = fn(e); if (v) return v; }
+                    return "\u2014";
+                  };
+                  return (
+                    <>
+                      <DetailField label="IP Address" value={find(e => e.ipAddress)} />
+                      <DetailField label="Geo State" value={find(e => e.geoState)} />
+                      <DetailField label="UTM Source" value={find(e => e.utmSource)} />
+                      <DetailField label="UTM Campaign" value={find(e => e.utmCampaign)} />
+                      <DetailField label="UTM Medium" value={find(e => e.utmMedium)} />
+                      <DetailField label="Referrer" value={find(e => e.referrer)} />
+                      <DetailField label="External ID" value={find(e => e.externalId)} />
+                      <DetailField label="FBCLID" value={find(e => e.fbclid)} />
+                      <DetailField label="FBC" value={find(e => e.fbc)} />
+                      <DetailField label="FBP" value={find(e => e.fbp)} />
+                      <DetailField label="Campaign Name" value={find(e => e.campaignName)} />
+                      <DetailField label="Ad Name" value={find(e => e.adName)} />
+                      <DetailField label="Adset Name" value={find(e => e.adsetName)} />
+                      <DetailField label="Placement" value={find(e => e.placement)} />
+                      <DetailField label="Page URL" value={find(e => e.pageUrl)} />
+                      <DetailField label="Screen Resolution" value={find(e => e.screenResolution)} />
+                      <DetailField label="Viewport" value={find(e => e.viewport)} />
+                      <DetailField label="Language" value={find(e => e.language)} />
+                      <DetailField label="Selected State" value={find(e => e.selectedState)} />
+                    </>
+                  );
+                })()}
               </div>
 
               <div>
