@@ -47,6 +47,8 @@ function parseFilters(query: any) {
     browser: parseMulti(query.browser as string | undefined),
     geoState: parseMulti(query.geoState as string | undefined),
     selectedState: parseMulti(query.selectedState as string | undefined),
+    startTime: query.startTime as string | undefined,
+    endTime: query.endTime as string | undefined,
   };
 }
 
@@ -318,7 +320,7 @@ export async function registerRoutes(
     try {
       const filters = parseFilters(req.query);
       const groupBy = (req.query.groupBy as string) || "domain";
-      const validGroups = ["domain", "deviceType", "utmSource", "utmCampaign", "utmMedium", "page", "geoState", "selectedState"];
+      const validGroups = ["domain", "deviceType", "utmSource", "utmCampaign", "utmMedium", "page", "geoState", "selectedState", "hourOfDay"];
       if (!validGroups.includes(groupBy)) {
         return res.status(400).json({ message: "Invalid groupBy parameter" });
       }

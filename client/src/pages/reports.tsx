@@ -190,7 +190,14 @@ const DRILL_DIMENSIONS = [
   { value: "utmSource", label: "UTM Source" },
   { value: "utmCampaign", label: "UTM Campaign" },
   { value: "utmMedium", label: "UTM Medium" },
+  { value: "hourOfDay", label: "Hour of Day" },
 ];
+
+const TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => {
+  const h = i.toString().padStart(2, "0");
+  const label12 = i === 0 ? "12:00 AM" : i < 12 ? `${i}:00 AM` : i === 12 ? "12:00 PM" : `${i - 12}:00 PM`;
+  return { value: `${h}:00`, label: label12 };
+});
 
 function setFilterParam(params: URLSearchParams, key: string, values: string[] | string | undefined) {
   if (!values) return;
@@ -202,10 +209,12 @@ function isFilterActive(values: string[]): boolean {
   return values.length > 0;
 }
 
-function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, extra?: Record<string, string>): string {
+function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, extra?: Record<string, string>, timeRange?: { startTime?: string; endTime?: string }): string {
   const params = new URLSearchParams();
   if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
   if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
+  if (timeRange?.startTime) params.set("startTime", timeRange.startTime);
+  if (timeRange?.endTime) params.set("endTime", timeRange.endTime);
   setFilterParam(params, "domain", filters.domain);
   setFilterParam(params, "deviceType", filters.deviceType);
   setFilterParam(params, "audience", filters.page);
@@ -224,12 +233,14 @@ function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, ex
   return params.toString();
 }
 
-function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logPage: number, search: string, logLimit: number = 25): string {
+function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logPage: number, search: string, logLimit: number = 25, timeRange?: { startTime?: string; endTime?: string }): string {
   const params = new URLSearchParams();
   params.set("page", logPage.toString());
   params.set("limit", logLimit.toString());
   if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
   if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
+  if (timeRange?.startTime) params.set("startTime", timeRange.startTime);
+  if (timeRange?.endTime) params.set("endTime", timeRange.endTime);
   setFilterParam(params, "domain", filters.domain);
   setFilterParam(params, "deviceType", filters.deviceType);
   setFilterParam(params, "audience", filters.page);
@@ -512,6 +523,7 @@ function DrilldownTable({
   groupBy,
   depth,
   usedDimensions,
+  timeRange,
 }: {
   parentFilters: Record<string, string>;
   dateRange: DateRange | undefined;
@@ -519,6 +531,7 @@ function DrilldownTable({
   groupBy: string;
   depth: number;
   usedDimensions: string[];
+  timeRange?: { startTime?: string; endTime?: string };
 }) {
   const [expandedRows, setExpandedRows] = useState<Record<string, string>>({});
   const [stepVisibility, setStepVisibility] = useState<Record<string, boolean>>(loadStepVisibility);
@@ -541,7 +554,7 @@ function DrilldownTable({
     });
   }, []);
 
-  const queryStr = buildQueryParams(dateRange, globalFilters, { groupBy, ...parentFilters });
+  const queryStr = buildQueryParams(dateRange, globalFilters, { groupBy, ...parentFilters }, timeRange);
 
   const { data, isLoading } = useQuery<DrilldownResult>({
     queryKey: ["/api/analytics/drilldown", queryStr],
@@ -695,6 +708,7 @@ function DrilldownTable({
                 showLandCvr={showLandCvr}
                 showFormComplete={showFormComplete}
                 showFormCvr={showFormCvr}
+                timeRange={timeRange}
               />
             );
           })}
@@ -775,6 +789,7 @@ function DrilldownRowComponent({
   showLandCvr: boolean;
   showFormComplete: boolean;
   showFormCvr: boolean;
+  timeRange?: { startTime?: string; endTime?: string };
 }) {
   const metricCount = (showLands ? 1 : 0) + (showLandCvr ? 1 : 0) + (showFormComplete ? 1 : 0) + (showFormCvr ? 1 : 0);
   const colSpan = 1 + metricCount + (allSteps.length * 4) + (canDrill ? 1 : 0);
@@ -866,6 +881,7 @@ function DrilldownRowComponent({
                   groupBy={selectedSubDim}
                   depth={depth + 1}
                   usedDimensions={[...usedDimensions, selectedSubDim]}
+                  timeRange={timeRange}
                 />
               </div>
             </div>
@@ -883,6 +899,7 @@ function FunnelReport({
   onDrillDimensionChange,
   filters,
   onFiltersChange,
+  timeRange,
 }: {
   dateRange: DateRange | undefined;
   filterOptions: FilterOptions | undefined;
@@ -890,9 +907,10 @@ function FunnelReport({
   onDrillDimensionChange: (d: string) => void;
   filters: Filters;
   onFiltersChange: (f: Filters) => void;
+  timeRange?: { startTime?: string; endTime?: string };
 }) {
 
-  const summaryQuery = buildQueryParams(dateRange, filters, { groupBy: "domain" });
+  const summaryQuery = buildQueryParams(dateRange, filters, { groupBy: "domain" }, timeRange);
   const { data: summaryData, isLoading: summaryLoading } = useQuery<DrilldownResult>({
     queryKey: ["/api/analytics/drilldown", "summary", summaryQuery],
     queryFn: async () => {
@@ -902,7 +920,7 @@ function FunnelReport({
     },
   });
 
-  const audienceQuery = buildQueryParams(dateRange, filters, { groupBy: "page" });
+  const audienceQuery = buildQueryParams(dateRange, filters, { groupBy: "page" }, timeRange);
   const { data: audienceData, isLoading: audienceLoading } = useQuery<DrilldownResult>({
     queryKey: ["/api/analytics/drilldown", "audience-funnel", audienceQuery],
     queryFn: async () => {
@@ -1076,6 +1094,7 @@ function FunnelReport({
             groupBy={drillDimension}
             depth={1}
             usedDimensions={[drillDimension]}
+            timeRange={timeRange}
           />
         </div>
       </div>
@@ -1237,6 +1256,8 @@ interface SavedViewState {
   logsFilters?: Filters;
   drillDimension: string;
   dateRange?: { from?: string; to?: string };
+  startTime?: string;
+  endTime?: string;
   refreshInterval: number;
   logsExpanded: boolean;
 }
@@ -1411,6 +1432,7 @@ function EventLogsSection({
   onFiltersChange,
   expanded,
   onToggleExpanded,
+  timeRange,
 }: {
   dateRange: DateRange | undefined;
   filterOptions: FilterOptions | undefined;
@@ -1418,6 +1440,7 @@ function EventLogsSection({
   onFiltersChange: (f: Filters) => void;
   expanded: boolean;
   onToggleExpanded: () => void;
+  timeRange?: { startTime?: string; endTime?: string };
 }) {
   const [logPage, setLogPage] = useState(1);
   const [logLimit, setLogLimit] = useState(25);
@@ -1451,7 +1474,7 @@ function EventLogsSection({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const logsQueryStr = buildLogsQuery(dateRange, filters, logPage, debouncedSearch, logLimit);
+  const logsQueryStr = buildLogsQuery(dateRange, filters, logPage, debouncedSearch, logLimit, timeRange);
   const sessionsQuery = useQuery<SessionLogResult>({
     queryKey: ["/api/analytics/sessions", logsQueryStr],
     queryFn: async () => {
@@ -2364,8 +2387,12 @@ export default function ReportsPage() {
   const [drillDimension, setDrillDimension] = useState<string>(() => savedView.current.drillDimension || "domain");
   const [refreshInterval, setRefreshInterval] = useState<number>(() => savedView.current.refreshInterval || 0);
   const [logsExpanded, setLogsExpanded] = useState<boolean>(() => savedView.current.logsExpanded || false);
+  const [startTime, setStartTime] = useState<string | undefined>(() => savedView.current.startTime);
+  const [endTime, setEndTime] = useState<string | undefined>(() => savedView.current.endTime);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const timeRange = (startTime || endTime) ? { startTime, endTime } : undefined;
 
   useEffect(() => {
     const state: SavedViewState = {
@@ -2376,11 +2403,13 @@ export default function ReportsPage() {
         from: dateRange.from?.toISOString(),
         to: dateRange.to?.toISOString(),
       } : undefined,
+      startTime,
+      endTime,
       refreshInterval,
       logsExpanded,
     };
     saveViewState(state);
-  }, [reportFilters, logsFilters, drillDimension, dateRange, refreshInterval, logsExpanded]);
+  }, [reportFilters, logsFilters, drillDimension, dateRange, startTime, endTime, refreshInterval, logsExpanded]);
 
   const { data: filterOptions } = useQuery<FilterOptions>({
     queryKey: ["/api/analytics/filter-options"],
@@ -2458,19 +2487,54 @@ export default function ReportsPage() {
             <Button variant="outline" size="sm" data-testid="button-date-range">
               <CalendarIcon className="w-3 h-3 mr-1.5" />
               {dateRange?.from ? (
-                dateRange.to ? (
-                  <span className="text-[10px]">
-                    {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
-                  </span>
-                ) : (
-                  <span className="text-[10px]">{format(dateRange.from, "MMM d, yyyy")}</span>
-                )
+                <span className="text-[10px]">
+                  {format(dateRange.from, "MMM d, yyyy")}
+                  {startTime ? ` ${TIME_OPTIONS.find(t => t.value === startTime)?.label || startTime}` : ""}
+                  {dateRange.to ? ` - ${format(dateRange.to, "MMM d, yyyy")}` : ""}
+                  {dateRange.to && endTime ? ` ${TIME_OPTIONS.find(t => t.value === endTime)?.label || endTime}` : ""}
+                </span>
               ) : (
                 <span className="text-[10px]">All Time</span>
               )}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
+            {dateRange?.from && (
+              <div className="p-2 border-b flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">From</span>
+                  <span className="text-[10px] font-medium">{format(dateRange.from, "yyyy-MM-dd")}</span>
+                  <Select value={startTime || "__none__"} onValueChange={(v) => setStartTime(v === "__none__" ? undefined : v)}>
+                    <SelectTrigger className="w-[100px] h-6 text-[10px]" data-testid="select-start-time">
+                      <SelectValue placeholder="Start time" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      <SelectItem value="__none__">Any time</SelectItem>
+                      {TIME_OPTIONS.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {dateRange.to && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">To</span>
+                    <span className="text-[10px] font-medium">{format(dateRange.to, "yyyy-MM-dd")}</span>
+                    <Select value={endTime || "__none__"} onValueChange={(v) => setEndTime(v === "__none__" ? undefined : v)}>
+                      <SelectTrigger className="w-[100px] h-6 text-[10px]" data-testid="select-end-time">
+                        <SelectValue placeholder="End time" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        <SelectItem value="__none__">Any time</SelectItem>
+                        {TIME_OPTIONS.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
             <Calendar
               mode="range"
               selected={dateRange}
@@ -2479,8 +2543,8 @@ export default function ReportsPage() {
               data-testid="calendar-date-range"
             />
             {dateRange && (
-              <div className="p-2 border-t flex justify-end">
-                <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)} data-testid="button-clear-dates">
+              <div className="p-2 border-t flex justify-end gap-1">
+                <Button variant="ghost" size="sm" onClick={() => { setDateRange(undefined); setStartTime(undefined); setEndTime(undefined); }} data-testid="button-clear-dates">
                   Clear
                 </Button>
               </div>
@@ -2489,7 +2553,7 @@ export default function ReportsPage() {
         </Popover>
       </div>
 
-      <FunnelReport dateRange={dateRange} filterOptions={filterOptions} filters={reportFilters} onFiltersChange={setReportFilters} drillDimension={drillDimension} onDrillDimensionChange={setDrillDimension} />
+      <FunnelReport dateRange={dateRange} filterOptions={filterOptions} filters={reportFilters} onFiltersChange={setReportFilters} drillDimension={drillDimension} onDrillDimensionChange={setDrillDimension} timeRange={timeRange} />
 
       <EventLogsSection
         dateRange={dateRange}
@@ -2498,6 +2562,7 @@ export default function ReportsPage() {
         onFiltersChange={setLogsFilters}
         expanded={logsExpanded}
         onToggleExpanded={() => setLogsExpanded(prev => !prev)}
+        timeRange={timeRange}
       />
     </div>
   );

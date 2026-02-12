@@ -17,6 +17,8 @@ export interface AnalyticsFilters {
   domain?: string | string[];
   startDate?: string;
   endDate?: string;
+  startTime?: string;
+  endTime?: string;
   utmSource?: string | string[];
   utmCampaign?: string | string[];
   utmMedium?: string | string[];
@@ -227,10 +229,22 @@ function buildConditions(filters: AnalyticsFilters) {
   addFilterCondition(conditions, trackingEvents.page, filters.page);
   addFilterCondition(conditions, trackingEvents.pageType, filters.pageType);
   addFilterCondition(conditions, trackingEvents.domain, filters.domain);
-  if (filters.startDate) conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
+  if (filters.startDate) {
+    const start = new Date(filters.startDate);
+    if (filters.startTime) {
+      const [h, m] = filters.startTime.split(":").map(Number);
+      start.setHours(h || 0, m || 0, 0, 0);
+    }
+    conditions.push(gte(trackingEvents.eventTimestamp, start));
+  }
   if (filters.endDate) {
     const end = new Date(filters.endDate);
-    end.setHours(23, 59, 59, 999);
+    if (filters.endTime) {
+      const [h, m] = filters.endTime.split(":").map(Number);
+      end.setHours(h || 23, m || 59, 59, 999);
+    } else {
+      end.setHours(23, 59, 59, 999);
+    }
     conditions.push(lte(trackingEvents.eventTimestamp, end));
   }
   addFilterCondition(conditions, trackingEvents.utmSource, filters.utmSource);
@@ -733,6 +747,7 @@ class DatabaseStorage implements IStorage {
       page: sql`COALESCE(${trackingEvents.page}, '(unknown)')`,
       geoState: sql`COALESCE(${trackingEvents.geoState}, '(unknown)')`,
       selectedState: sql`COALESCE(${trackingEvents.selectedState}, '(unknown)')`,
+      hourOfDay: sql`LPAD(EXTRACT(HOUR FROM ${trackingEvents.eventTimestamp})::text, 2, '0') || ':00'`,
     };
 
     const groupCol = groupColumn[groupBy] || groupColumn.domain;
@@ -879,7 +894,11 @@ class DatabaseStorage implements IStorage {
       });
     });
 
-    drilldownRows.sort((a, b) => b.uniqueViews - a.uniqueViews);
+    if (groupBy === "hourOfDay") {
+      drilldownRows.sort((a, b) => a.groupValue.localeCompare(b.groupValue));
+    } else {
+      drilldownRows.sort((a, b) => b.uniqueViews - a.uniqueViews);
+    }
 
     const totalUniqueViews = drilldownRows.reduce((s, r) => s + r.uniqueViews, 0);
     const totalGrossViews = drilldownRows.reduce((s, r) => s + r.grossViews, 0);
@@ -928,10 +947,22 @@ class DatabaseStorage implements IStorage {
     addFilterCondition(conditions, trackingEvents.page, filters.page);
     addFilterCondition(conditions, trackingEvents.pageType, filters.pageType);
     addFilterCondition(conditions, trackingEvents.domain, filters.domain);
-    if (filters.startDate) conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
+    if (filters.startDate) {
+      const start = new Date(filters.startDate);
+      if (filters.startTime) {
+        const [h, m] = filters.startTime.split(":").map(Number);
+        start.setHours(h || 0, m || 0, 0, 0);
+      }
+      conditions.push(gte(trackingEvents.eventTimestamp, start));
+    }
     if (filters.endDate) {
       const end = new Date(filters.endDate);
-      end.setHours(23, 59, 59, 999);
+      if (filters.endTime) {
+        const [h, m] = filters.endTime.split(":").map(Number);
+        end.setHours(h || 23, m || 59, 59, 999);
+      } else {
+        end.setHours(23, 59, 59, 999);
+      }
       conditions.push(lte(trackingEvents.eventTimestamp, end));
     }
     addFilterCondition(conditions, trackingEvents.utmSource, filters.utmSource);
