@@ -1,0 +1,41 @@
+Issue: Investigate why Seniors funnel shows only 10.2% conversion from Landing (step 0) to Beneficiary (step 1) — verify events are being received and stored correctly
+
+Context:
+The landing page at blueskylife.net sends tracking events via POST to /api/events on TrackingJunction. The Seniors lead funnel shows 49 page_land events but only 5 step_complete events for step 1 (Beneficiary). I need you to verify the receiving/storage side is working correctly.
+
+What the landing page sends:
+
+page_land event (step 0, "Landing"):
+
+Fires once per session after geo-IP detection completes
+event_type: "page_land", page: "seniors", page_type: "lead", step_number: 0, step_name: "Landing"
+step_complete event (step 1, "Beneficiary"):
+
+Fires immediately when the user clicks a beneficiary button (Spouse, Children, Grandchildren, Family Member, or Other)
+event_type: "step_complete", page: "seniors", page_type: "lead", step_number: 1, step_name: "Beneficiary", selected_value: "<the option clicked>"
+Both events share the same session_id (a UUID generated once per browser session via crypto.randomUUID() and stored in sessionStorage). Each event has a unique event_id in the format evt_{timestamp}_{random}.
+
+What to check on your end:
+
+Are all incoming POST requests to /api/events being logged/stored, or could some be dropped silently (e.g., rate limiting, validation rejecting payloads, timeouts)?
+
+Check the raw event log for sessions where page: "seniors" and page_type: "lead" — are there any step_complete events with step_number: 1 that might not be linking to their page_land session correctly? (e.g., mismatched session_id grouping)
+
+Is the funnel report filtering or deduplicating events in a way that could under-count step 1? For example, if two step_complete events arrive for the same step in the same session, does it count as 1 or 2?
+
+Check if any events are being rejected due to payload validation — the landing page sends fields like quiz_answers (object), screen_resolution, viewport, language, page_url, selected_state, plus UTM/Facebook params. Could any of these cause a validation failure that silently drops the event?
+
+Run this query or equivalent: For all sessions where page = 'seniors' AND page_type = 'lead' AND there exists a page_land event, how many also have at least one step_complete event? Compare this ratio against what the funnel chart shows.
+
+Expected step flow for Seniors lead page:
+
+Step 0: Landing (page_land)
+Step 1: Beneficiary (step_complete)
+Step 2: State (step_complete)
+Step 3: Budget Affordability (step_complete)
+Step 4: Age (step_complete)
+Step 5: Monthly Income (step_complete)
+Step 6: Name (step_complete)
+Step 7: Email (step_complete)
+Step 8: Phone (form_complete)
+The 89.8% drop-off from Landing to Beneficiary could be legitimate (cold Facebook mobile traffic bouncing), but I want to rule out any server-side event loss or misattribution before concluding it's a UX/conversion issue.
