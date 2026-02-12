@@ -25,6 +25,7 @@ export interface AnalyticsFilters {
   os?: string | string[];
   browser?: string | string[];
   geoState?: string | string[];
+  selectedState?: string | string[];
 }
 
 interface FunnelStep {
@@ -235,6 +236,7 @@ function buildConditions(filters: AnalyticsFilters) {
   addFilterCondition(conditions, trackingEvents.os, filters.os);
   addFilterCondition(conditions, trackingEvents.browser, filters.browser);
   addFilterCondition(conditions, trackingEvents.geoState, filters.geoState);
+  addFilterCondition(conditions, trackingEvents.selectedState, filters.selectedState);
   return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
@@ -721,6 +723,7 @@ class DatabaseStorage implements IStorage {
       utmMedium: sql`COALESCE(${trackingEvents.utmMedium}, '(none)')`,
       page: sql`COALESCE(${trackingEvents.page}, '(unknown)')`,
       geoState: sql`COALESCE(${trackingEvents.geoState}, '(unknown)')`,
+      selectedState: sql`COALESCE(${trackingEvents.selectedState}, '(unknown)')`,
     };
 
     const groupCol = groupColumn[groupBy] || groupColumn.domain;

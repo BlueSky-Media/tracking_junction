@@ -45,6 +45,7 @@ function parseFilters(query: any) {
     os: parseMulti(query.os as string | undefined),
     browser: parseMulti(query.browser as string | undefined),
     geoState: parseMulti(query.geoState as string | undefined),
+    selectedState: parseMulti(query.selectedState as string | undefined),
   };
 }
 
