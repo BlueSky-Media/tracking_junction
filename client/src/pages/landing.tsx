@@ -42,7 +42,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-background/80 border-b">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2.5" data-testid="text-logo">
-            <img src={logoLandscape} alt="TrackingJunction" className="h-8" />
+            <img src={logoLandscape} alt="TrackingJunction" className="h-12" />
           </div>
           <a href="/api/login">
             <Button data-testid="button-login">Sign In</Button>

@@ -42,9 +42,9 @@ export function AppSidebar() {
         <Link href="/">
           <div className="flex items-center gap-2.5 cursor-pointer" data-testid="sidebar-logo">
             {collapsed ? (
-              <img src={logoFavicon} alt="TrackingJunction" className="w-7 h-7 shrink-0" />
+              <img src={logoFavicon} alt="TrackingJunction" className="w-9 h-9 shrink-0" />
             ) : (
-              <img src={logoLandscape} alt="TrackingJunction" className="h-8 shrink-0" />
+              <img src={logoLandscape} alt="TrackingJunction" className="h-12 shrink-0" />
             )}
             {!collapsed && (
               <div className="flex flex-col leading-tight hidden">

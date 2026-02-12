@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef, Fragment, type ReactNode } from "react";
-import { getLeadStepsForAudience, CALL_STEPS } from "@shared/schema";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -988,12 +987,9 @@ function FunnelReport({
         const audLands = audienceRow.pageLands || audienceRow.uniqueViews;
         const audFormComplete = audienceRow.formCompletions;
         const audFormCvr = audLands > 0 ? (audFormComplete / audLands) * 100 : 0;
-        const audienceName = audienceRow.groupValue;
-        const validSteps = getLeadStepsForAudience(audienceName);
-        const validStepKeys = new Set(validSteps.map(s => `${s.number}:${s.name}`));
-        const filteredSteps = audienceRow.steps.filter(step => validStepKeys.has(step.stepKey));
-        const audSteps = filteredSteps.map((step, idx) => {
-            const prevCount = idx === 0 ? audLands : filteredSteps[idx - 1].completions;
+        const allSteps = [...audienceRow.steps].sort((a, b) => a.stepNumber - b.stepNumber || a.stepName.localeCompare(b.stepName));
+        const audSteps = allSteps.map((step, idx) => {
+            const prevCount = idx === 0 ? audLands : allSteps[idx - 1].completions;
             const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
             const cvr = audLands > 0 ? (step.completions / audLands) * 100 : 0;
             const scvr = prevCount > 0 ? (step.completions / prevCount) * 100 : 0;
