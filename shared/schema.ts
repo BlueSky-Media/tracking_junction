@@ -54,6 +54,9 @@ export const trackingEvents = pgTable("tracking_events", {
   viewport: varchar("viewport", { length: 30 }),
   language: varchar("language", { length: 20 }),
   selectedState: varchar("selected_state", { length: 10 }),
+  country: varchar("country", { length: 10 }),
+  browserVersion: varchar("browser_version", { length: 100 }),
+  ipType: varchar("ip_type", { length: 10 }),
 }, (table) => [
   index("idx_events_session").on(table.sessionId),
   index("idx_events_page_type").on(table.page, table.pageType),
@@ -149,6 +152,9 @@ export const trackingEventApiSchema = z.object({
   viewport: z.string().max(30).optional(),
   language: z.string().max(20).optional(),
   selected_state: z.string().max(10).optional(),
+  country: z.string().max(10).optional(),
+  browser_version: z.string().max(100).optional(),
+  ip_type: z.string().max(10).optional(),
 }).passthrough();
 
 export type InsertTrackingEvent = z.infer<typeof insertTrackingEventSchema>;

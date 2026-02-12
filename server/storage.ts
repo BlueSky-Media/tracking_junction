@@ -182,6 +182,10 @@ export interface IStorage {
       viewport: string | null;
       language: string | null;
       selectedState: string | null;
+      ipAddress: string | null;
+      country: string | null;
+      browserVersion: string | null;
+      ipType: string | null;
     }[];
     total: number;
     page: number;
@@ -653,7 +657,7 @@ class DatabaseStorage implements IStorage {
       "id", "session_id", "event_id", "event_type", "page", "page_type", "domain",
       "step_number", "step_name", "selected_value", "time_on_step",
       "utm_source", "utm_campaign", "utm_medium", "utm_content", "utm_term", "utm_id",
-      "device_type", "os", "browser", "geo_state", "ip_address", "placement",
+      "device_type", "os", "browser", "browser_version", "geo_state", "country", "ip_address", "ip_type", "placement",
       "media_type", "campaign_name", "campaign_id", "ad_name", "ad_id",
       "adset_name", "adset_id", "fbclid", "fbc", "fbp", "external_id",
       "quiz_answers", "referrer",
@@ -684,8 +688,11 @@ class DatabaseStorage implements IStorage {
         row.deviceType || "",
         row.os || "",
         row.browser || "",
+        `"${(row.browserVersion || '').replace(/"/g, '""')}"`,
         row.geoState || "",
+        row.country || "",
         row.ipAddress || "",
+        row.ipType || "",
         `"${(row.placement || '').replace(/"/g, '""')}"`,
         row.mediaType || "",
         `"${(row.campaignName || '').replace(/"/g, '""')}"`,
@@ -1084,6 +1091,9 @@ class DatabaseStorage implements IStorage {
         language: firstEvent.language,
         selectedState: events.find(e => e.selectedState)?.selectedState || null,
         ipAddress: firstEvent.ipAddress,
+        country: firstEvent.country,
+        browserVersion: firstEvent.browserVersion,
+        ipType: firstEvent.ipType,
         firstName: (() => { const fc = events.find(e => e.eventType === "form_complete"); return fc?.firstName || null; })(),
         lastName: (() => { const fc = events.find(e => e.eventType === "form_complete"); return fc?.lastName || null; })(),
         email: (() => { const fc = events.find(e => e.eventType === "form_complete"); return fc?.email || null; })(),

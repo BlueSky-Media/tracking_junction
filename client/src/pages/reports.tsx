@@ -100,6 +100,9 @@ interface EventLog {
   viewport: string | null;
   language: string | null;
   selectedState: string | null;
+  country: string | null;
+  browserVersion: string | null;
+  ipType: string | null;
 }
 
 interface EventLogResult {
@@ -136,6 +139,9 @@ interface SessionLogEntry {
   language: string | null;
   selectedState: string | null;
   ipAddress: string | null;
+  country: string | null;
+  browserVersion: string | null;
+  ipType: string | null;
   firstName: string | null;
   lastName: string | null;
   email: string | null;
@@ -1093,6 +1099,9 @@ const DEFAULT_COL_WIDTHS: Record<string, number> = {
   utmCampaign: 120,
   utmMedium: 90,
   geoState: 90,
+  country: 60,
+  ipType: 60,
+  browserVersion: 140,
   referrer: 160,
   pageUrl: 160,
   screenRes: 90,
@@ -1173,6 +1182,12 @@ function getCellRenderer(key: string, session: SessionLogEntry, colWidths: Recor
       return <td key={key} className={cls} style={style}>{session.utmMedium || "\u2014"}</td>;
     case "geoState":
       return <td key={key} className={cls} style={style}>{session.geoState || "\u2014"}</td>;
+    case "country":
+      return <td key={key} className={cls} style={style}>{session.country || "\u2014"}</td>;
+    case "ipType":
+      return <td key={key} className={cls} style={style}>{session.ipType || "\u2014"}</td>;
+    case "browserVersion":
+      return <td key={key} className={cls} style={style}>{session.browserVersion || "\u2014"}</td>;
     case "referrer":
       return <td key={key} className={`${cls} truncate`} style={style} title={session.referrer || ""}>{session.referrer || "\u2014"}</td>;
     case "pageUrl":
@@ -1284,6 +1299,9 @@ const SESSION_COLUMNS: SessionColumn[] = [
   { key: "browser", label: "Browser", resizable: true, optional: true, defaultVisible: true },
   { key: "ipAddress", label: "IP Address", resizable: true, optional: true, defaultVisible: false },
   { key: "geoState", label: "Geo State", resizable: true, optional: true, defaultVisible: false },
+  { key: "country", label: "Country", resizable: true, optional: true, defaultVisible: false },
+  { key: "ipType", label: "IP Type", resizable: true, optional: true, defaultVisible: false },
+  { key: "browserVersion", label: "Browser Version", resizable: true, optional: true, defaultVisible: false },
   { key: "selectedState", label: "User State", resizable: true, optional: true, defaultVisible: false },
   { key: "firstName", label: "First Name", resizable: true, optional: true, defaultVisible: false },
   { key: "lastName", label: "Last Name", resizable: true, optional: true, defaultVisible: false },
@@ -1890,6 +1908,7 @@ function SessionLogRow({
                 <DetailField label="Device" value={session.deviceType || "\u2014"} />
                 <DetailField label="OS" value={session.os || "\u2014"} />
                 <DetailField label="Browser" value={session.browser || "\u2014"} />
+                <DetailField label="Browser Version" value={session.browserVersion || "\u2014"} />
                 {session.events.length > 0 && (() => {
                   const ev = session.events;
                   const find = (fn: (e: EventLog) => string | null | undefined) => {
@@ -1899,7 +1918,9 @@ function SessionLogRow({
                   return (
                     <>
                       <DetailField label="IP Address" value={find(e => e.ipAddress)} />
+                      <DetailField label="IP Type" value={find(e => e.ipType)} />
                       <DetailField label="Geo State" value={find(e => e.geoState)} />
+                      <DetailField label="Country" value={find(e => e.country)} />
                       <DetailField label="UTM Source" value={find(e => e.utmSource)} />
                       <DetailField label="UTM Campaign" value={find(e => e.utmCampaign)} />
                       <DetailField label="UTM Medium" value={find(e => e.utmMedium)} />

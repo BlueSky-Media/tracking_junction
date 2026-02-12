@@ -87,8 +87,11 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `deviceType` - "mobile", "desktop", or "tablet"
 - `os` - Operating system (Windows, macOS, iOS, Android, Linux, ChromeOS, Unknown)
 - `browser` - Browser name (Chrome, Safari, Firefox, Edge, Opera, Facebook, Instagram, Unknown)
+- `browserVersion` - Full browser name + version (e.g., "Facebook 547.1.0", "Chrome 120.0.6099.130"). Defaults to "Unknown"
 - `geoState` - 2-letter state code from geo-IP (optional)
+- `country` - ISO 3166-1 alpha-2 country code from geo-IP (e.g., "US", "CA", "GB"). Optional, may be missing if both geo-IP services fail
 - `ipAddress` - Visitor IP address (optional)
+- `ipType` - "IPv4", "IPv6", or "Unknown". Only present when ipAddress is present
 - `userAgent` - Full user agent string
 - `referrer` - Full referrer URL
 

@@ -154,6 +154,9 @@ export async function registerRoutes(
         viewport: data.viewport || null,
         language: data.language || null,
         selectedState: data.selected_state || null,
+        country: data.country || null,
+        browserVersion: data.browser_version || null,
+        ipType: data.ip_type || null,
       });
 
       const successResponse = { ok: true };
