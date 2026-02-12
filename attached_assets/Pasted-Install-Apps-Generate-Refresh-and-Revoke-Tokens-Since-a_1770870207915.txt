@@ -1,0 +1,213 @@
+Install Apps, Generate, Refresh, and Revoke Tokens
+Since a system user represents server calls, it does not have Facebook login and cannot install an app or go through the standard Facebook oAuth flow to generate a token. You need to do this via API calls.
+
+Types of System Access Tokens
+Types	Non-expiring Access Tokens	Suggested Expiring Access Tokens
+Lifetime
+
+Never expires
+
+Valid for 60 days
+
+Need to refresh?
+
+No
+
+Yes
+
+Recommendation based on use cases
+
+You can tolerate the risk of leaked access tokens and want your third-party applications to have offline access to data.
+
+You want to limit the risk of leaked access tokens.
+
+Install Apps
+A system user or an admin system user must install the app that will be used for generating an access token. That means to allow the app to call APIs on behalf of this system user or admin system user.
+
+Both system user and app should belong to a same Business Manager. Only apps with Ads Management API standard access and above can be installed.
+
+To install an app for a system user, you need:
+
+access_token: of an admin user, admin system user, or another system user
+business_app: ID from the app being installed
+To install an application for system user, make a POST request:
+
+curl \
+-F "business_app=APP-ID" \
+-F "access_token=ACCESS-TOKEN" \
+"https://graph.facebook.com/API-VERSION/SYSTEM-USER-ID/applications"
+This call returns a boolean result, if installation is successful. If any of the restrictions are not met, you see an appropriate error message.
+
+Generate Access Token
+After the system user has installed the app, it can generate a persisting access token. Some restrictions apply:
+
+The system user must have installed the app passed in the parameter, as seen in the step above.
+Apps can only target businesses (or child businesses of those businesses) that have claimed them.
+The system user and the owner of the access token used during this token generation API call must belong to the same Business Manager.
+The app can be owned by the same Business Manager, or not. If not, there are some restrictions. See section below.
+Here are the parameters for the API call:
+
+business_app: the app owned by Business Manager that system user belongs to.
+appsecret_proof: calculated field for the app. This is required to ensure that the right server is making the API call. For more details, review Login Security.
+scope: comma separated string containing extended permissions.
+access_token: token belonging to Business Manager admin, admin system user or regular system user.
+set_token_expires_in_60_days: set to true to generate an expiring system user access token. Optional.
+Supported scopes for system users:
+
+ads_management
+ads_read
+attribution_read
+business_management
+catalog_management
+commerce_account_manage_orders
+commerce_account_read_orders
+commerce_account_read_settings
+instagram_basic
+instagram_branded_content_ads_brand
+instagram_branded_content_brand
+instagram_content_publish
+instagram_manage_comments
+instagram_manage_insights
+instagram_manage_messages
+instagram_shopping_tag_products
+leads_retrieval
+page_events
+pages_manage_ads
+pages_manage_cta
+pages_manage_engagement
+pages_manage_instant_articles
+pages_manage_metadata
+pages_manage_posts
+pages_messaging
+pages_read_engagement
+pages_read_user_content
+pages_show_list
+private_computation_access
+publish_video
+read_audience_network_insights
+read_insights
+read_page_mailboxes
+whatsapp_business_management
+whatsapp_business_messaging
+Deprecated Permission, only visible to apps created before April 24, 2018
+
+publish_actions
+
+Permissions Gated by Capabilities
+
+Capability	Permission
+business_creative_asset_management
+
+business_creative_management business_creative_insights
+business_creative_insights_share business_data_management
+
+commerce_public_api_beta_testing
+
+commerce_manage_accounts commerce_account_read_reports
+
+To generate an appsecret_proof, you can use PHP code:
+
+$appsecret_proof = hash_hmac(
+  'sha256',
+  $access_token_used_in_the_call,
+  $app_secret_for_the_app_used_in_the_call,
+);
+In the code sample above, app_secret_for_the_app_used_in_the_call refers to the app secret for the app used to generate the access token. Your app secret can be found in your App Dashboard.
+
+The hashed appsecret_proof should be a string like "1734d0d1e1ca62c9762c10bbc7321fdf89ecc7d819312b2f3".
+
+To generate a permanent system user access token, make a POST request:
+
+curl \
+-F "business_app=<APP_ID>" \
+-F "scope=ads_management,pages_read_engagement,pages_show_list" \
+-F "appsecret_proof=APPSECRET-PROOF" \
+-F "access_token=ACCESS-TOKEN" \
+"https://graph.facebook.com/API-VERSION/SYSTEM-USER-ID/access_tokens"
+To generate an expiring system user access token, make a POST request:
+
+curl \
+-F "business_app=<APP_ID>" \
+-F "scope=ads_management,pages_read_engagement,pages_show_list" \
+-F "set_token_expires_in_60_days=true" \
+-F "appsecret_proof=APPSECRET-PROOF" \
+-F "access_token=ACCESS-TOKEN" \
+"https://graph.facebook.com/API-VERSION/SYSTEM-USER-ID/access_tokens"
+The endpoint was previously named /SYSTEM-USER-ID/ads_access_token. A call to that name no longer works.
+
+The response returns the access token string. If any of the restrictions are not met, appropriate error codes are thrown. The response:
+
+{
+  "access_token": "CAAB3rQQzTFABANaYYCmOuLhbC]Fu8cAnmkcvT0ZBIDNm1d1fSp4Eg4XA79gmYumZCoSuiMSUILUjzG3y15BJlrYwXdqwd5c7y3lOUzu6aT7MkXL6HpISksSuLP4aFKWPmwb6iOgGeugRSn766xMZCN72vTiGGLUNqC2MKRL"
+}
+You can also generate a System User Access Token using the Business Manager UI.
+
+Refresh Access Token
+An expiring system user token is valid for 60 days from generated or refreshed date. To create continuity, the developer should refresh the access token within 60 days. - Failing to do so would result in forfeiting the access token and the developer needs to obtain a new one to regain API access.
+
+To refresh an expiring system user access token, you need:
+
+fb_exchange_token: A valid system user access token
+client_id: App ID
+client_secret: App Secret
+set_token_expires_in_60_days: set to true to refresh an expiring system user access token.
+Query the GET oauth/access_token endpoint.
+
+Sample Request
+
+curl -i -X GET 
+"https://graph.facebook.com/{graph-api-version}/oauth/access_token?  
+    grant_type=fb_exchange_token&          
+    client_id={app-id}&
+    client_secret={app-secret}&
+    set_token_expires_in_60_days=true&
+    fb_exchange_token={your-access-token}"
+Sample Response
+
+{
+  "access_token":"{expiring-system-user-access-token}",
+  "token_type": "bearer",
+  "expires_in": 5183944    // Time left in seconds until the token expires
+}
+Revoke Access Token
+This endpoint is intended for performing regular token rotation or revoking access tokens for compromised system users as a means to protect your system.
+
+To revoke a system user access token, you need:
+
+revoke_token: The access token to revoke
+
+client_id: App ID
+
+client_secret: App Secret
+
+access_token: Access token to identify the caller
+
+The requirements are as follows:
+
+The client_id must correspond to the actual app and ensure that the app is not throttled, disabled, or deleted.
+
+The client_id, along with the installed app of the revoke_token, the installed app of the access_token, and the client_secret, must all be the same.
+
+Query the GET oauth/revoke endpoint.
+
+Sample Request
+
+curl -i -X GET "https://graph.facebook.com/{graph-api-version}/oauth/revoke?   
+    client_id={app-id}&
+    client_secret={app-secret}&
+    revoke_token={system-user-access-token-to-revoke}&
+    access_token={your-access-token}"
+Sample Response
+
+{
+  "success":"true",
+}
+Access Token Rotation
+Token rotation is a security measure that can help mitigate risks, e.g., limiting the damage of leaked tokens. By regularly changing access tokens, the potential damage caused by a leaked or misplaced token can be limited, much like changing passwords. Currently, our system supports system user rotation without downtime. To do this, follow these instructions:
+
+Refresh the system user access token via the Refresh API, which will return a new system user access token that is valid for 60 days from the date it is refreshed. The old access token can still work until it expires (i.e., creation date + 60).
+
+Deploy the new system user access token.
+
+Revoke the old system user access token via the Revocation API. The invalidation takes place immediately, and the token cannot be used again after the revocation.
+

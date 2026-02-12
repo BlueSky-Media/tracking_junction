@@ -11,6 +11,7 @@ import ApiDocsPage from "@/pages/api-docs";
 import ReportsPage from "@/pages/reports";
 import ServerLogsPage from "@/pages/server-logs";
 import BlockListPage from "@/pages/block-list";
+import FacebookAdsPage from "@/pages/facebook-ads";
 import NotFound from "@/pages/not-found";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -42,6 +43,7 @@ function AuthenticatedLayout() {
               <Route path="/docs" component={ApiDocsPage} />
               <Route path="/logs" component={ServerLogsPage} />
               <Route path="/block-list" component={BlockListPage} />
+              <Route path="/facebook-ads" component={FacebookAdsPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

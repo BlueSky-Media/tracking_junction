@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { trackingEventApiSchema } from "@shared/schema";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import * as facebook from "./facebook";
 
 const PII_FIELDS = ["first_name", "last_name", "email", "phone", "firstName", "lastName"];
 
@@ -609,6 +610,138 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error unblocking number:", error);
       res.status(500).json({ message: "Failed to unblock number" });
+    }
+  });
+
+  app.get("/api/facebook/status", isAuthenticated, async (_req, res) => {
+    res.json({ configured: facebook.isConfigured() });
+  });
+
+  app.get("/api/facebook/ad-accounts", isAuthenticated, async (_req, res) => {
+    try {
+      if (!facebook.isConfigured()) {
+        return res.status(500).json({ message: "Facebook API not configured" });
+      }
+      const accounts = await facebook.listAdAccounts();
+      res.json(accounts);
+    } catch (error) {
+      if (error instanceof facebook.FacebookApiError) {
+        return res.status(error.httpStatus).json({ message: error.message, code: error.code });
+      }
+      console.error("Error fetching ad accounts:", error);
+      res.status(500).json({ message: "Failed to fetch ad accounts" });
+    }
+  });
+
+  app.get("/api/facebook/account-insights", isAuthenticated, async (req, res) => {
+    try {
+      if (!facebook.isConfigured()) {
+        return res.status(500).json({ message: "Facebook API not configured" });
+      }
+      const adAccountId = req.query.adAccountId as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!adAccountId || !startDate || !endDate) {
+        return res.status(400).json({ message: "adAccountId, startDate, endDate required" });
+      }
+      const insights = await facebook.getAccountInsights(adAccountId, startDate, endDate);
+      res.json(insights);
+    } catch (error) {
+      if (error instanceof facebook.FacebookApiError) {
+        return res.status(error.httpStatus).json({ message: error.message, code: error.code });
+      }
+      console.error("Error fetching account insights:", error);
+      res.status(500).json({ message: "Failed to fetch account insights" });
+    }
+  });
+
+  app.get("/api/facebook/campaigns", isAuthenticated, async (req, res) => {
+    try {
+      if (!facebook.isConfigured()) {
+        return res.status(500).json({ message: "Facebook API not configured" });
+      }
+      const adAccountId = req.query.adAccountId as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!adAccountId || !startDate || !endDate) {
+        return res.status(400).json({ message: "adAccountId, startDate, endDate required" });
+      }
+      const campaigns = await facebook.getCampaignInsights(adAccountId, startDate, endDate);
+      res.json(campaigns);
+    } catch (error) {
+      if (error instanceof facebook.FacebookApiError) {
+        return res.status(error.httpStatus).json({ message: error.message, code: error.code });
+      }
+      console.error("Error fetching campaign insights:", error);
+      res.status(500).json({ message: "Failed to fetch campaign insights" });
+    }
+  });
+
+  app.get("/api/facebook/adsets", isAuthenticated, async (req, res) => {
+    try {
+      if (!facebook.isConfigured()) {
+        return res.status(500).json({ message: "Facebook API not configured" });
+      }
+      const adAccountId = req.query.adAccountId as string;
+      const campaignId = req.query.campaignId as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!adAccountId || !campaignId || !startDate || !endDate) {
+        return res.status(400).json({ message: "adAccountId, campaignId, startDate, endDate required" });
+      }
+      const adsets = await facebook.getAdsetInsights(adAccountId, campaignId, startDate, endDate);
+      res.json(adsets);
+    } catch (error) {
+      if (error instanceof facebook.FacebookApiError) {
+        return res.status(error.httpStatus).json({ message: error.message, code: error.code });
+      }
+      console.error("Error fetching adset insights:", error);
+      res.status(500).json({ message: "Failed to fetch adset insights" });
+    }
+  });
+
+  app.get("/api/facebook/ads", isAuthenticated, async (req, res) => {
+    try {
+      if (!facebook.isConfigured()) {
+        return res.status(500).json({ message: "Facebook API not configured" });
+      }
+      const adAccountId = req.query.adAccountId as string;
+      const adsetId = req.query.adsetId as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!adAccountId || !adsetId || !startDate || !endDate) {
+        return res.status(400).json({ message: "adAccountId, adsetId, startDate, endDate required" });
+      }
+      const ads = await facebook.getAdInsights(adAccountId, adsetId, startDate, endDate);
+      res.json(ads);
+    } catch (error) {
+      if (error instanceof facebook.FacebookApiError) {
+        return res.status(error.httpStatus).json({ message: error.message, code: error.code });
+      }
+      console.error("Error fetching ad insights:", error);
+      res.status(500).json({ message: "Failed to fetch ad insights" });
+    }
+  });
+
+  app.get("/api/facebook/daily-insights", isAuthenticated, async (req, res) => {
+    try {
+      if (!facebook.isConfigured()) {
+        return res.status(500).json({ message: "Facebook API not configured" });
+      }
+      const adAccountId = req.query.adAccountId as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!adAccountId || !startDate || !endDate) {
+        return res.status(400).json({ message: "adAccountId, startDate, endDate required" });
+      }
+      const insights = await facebook.getDailyInsights(adAccountId, startDate, endDate);
+      res.json(insights);
+    } catch (error) {
+      if (error instanceof facebook.FacebookApiError) {
+        return res.status(error.httpStatus).json({ message: error.message, code: error.code });
+      }
+      console.error("Error fetching daily insights:", error);
+      res.status(500).json({ message: "Failed to fetch daily insights" });
     }
   });
 

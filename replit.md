@@ -12,7 +12,8 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 ## Key Files
 - `shared/schema.ts` - Data models (trackingEvents table, validation schemas, step definitions)
 - `shared/models/auth.ts` - Auth models (users, sessions tables)
-- `server/routes.ts` - API routes (event ingestion + analytics endpoints)
+- `server/routes.ts` - API routes (event ingestion + analytics + Facebook endpoints)
+- `server/facebook.ts` - Meta Marketing API v21.0 client (ad accounts, campaign/adset/ad insights)
 - `server/storage.ts` - Database operations (event insert, stats, funnel, breakdown, drilldown queries)
 - `server/db.ts` - Database connection
 - `client/src/pages/dashboard.tsx` - Main dashboard page
@@ -21,6 +22,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `client/src/pages/server-logs.tsx` - Stape-style server logs dashboard
 - `client/src/pages/block-list.tsx` - Block List management page
 - `client/src/pages/landing.tsx` - Landing/login page
+- `client/src/pages/facebook-ads.tsx` - Facebook Ads page (Meta Marketing API integration)
 - `client/src/components/` - Dashboard components (filters, funnel chart, funnel table, step breakdown, stats cards, campaign table, device breakdown, time heatmap, contact funnel, referrer breakdown, csv export)
 
 ## API Endpoints
@@ -49,6 +51,13 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `POST /api/retell/block` - Block a phone number (protected, body: {phone, reason?})
 - `POST /api/retell/bulk-unblock` - Bulk unblock phone numbers (protected, body: {phones: string[]})
 - `DELETE /api/retell/block/:phone` - Unblock a phone number (protected)
+- `GET /api/facebook/status` - Check if Facebook API is configured (protected)
+- `GET /api/facebook/ad-accounts` - List accessible ad accounts (protected)
+- `GET /api/facebook/account-insights?adAccountId&startDate&endDate` - Account-level summary metrics (protected)
+- `GET /api/facebook/campaigns?adAccountId&startDate&endDate` - Campaign-level insights (protected)
+- `GET /api/facebook/adsets?campaignId&startDate&endDate` - Ad set-level insights (protected)
+- `GET /api/facebook/ads?adsetId&startDate&endDate` - Ad-level insights (protected)
+- `GET /api/facebook/daily-insights?adAccountId&startDate&endDate` - Daily time-series insights (protected)
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 
 ## Event Schema Fields
