@@ -1,6 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { LayoutDashboard, BarChart3, FileText, LogOut, GitBranch, Server, Ban, Megaphone } from "lucide-react";
+import { LayoutDashboard, BarChart3, FileText, LogOut, Server, Ban, Megaphone } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,17 +15,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-
-function LogoMark({ size = 24 }: { size?: number }) {
-  return (
-    <div
-      className="shrink-0 flex items-center justify-center rounded-md bg-primary"
-      style={{ width: size, height: size }}
-    >
-      <GitBranch className="text-primary-foreground" style={{ width: size * 0.6, height: size * 0.6 }} />
-    </div>
-  );
-}
+import logoLandscape from "@assets/Tracking_junction_logo_(new)_16-9_1770929129062.png";
+import logoFavicon from "@assets/Tracking_Junction_logo_(new)_1-1_favicon_1770929129062.png";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard, testId: "nav-dashboard" },
@@ -50,9 +41,13 @@ export function AppSidebar() {
       <SidebarHeader className="p-3">
         <Link href="/">
           <div className="flex items-center gap-2.5 cursor-pointer" data-testid="sidebar-logo">
-            <LogoMark size={collapsed ? 28 : 32} />
+            {collapsed ? (
+              <img src={logoFavicon} alt="TrackingJunction" className="w-7 h-7 shrink-0" />
+            ) : (
+              <img src={logoLandscape} alt="TrackingJunction" className="h-8 shrink-0" />
+            )}
             {!collapsed && (
-              <div className="flex flex-col leading-tight">
+              <div className="flex flex-col leading-tight hidden">
                 <span className="text-base font-bold tracking-tight">
                   <span className="text-foreground">Tracking</span>
                   <span className="text-primary">Junction</span>
