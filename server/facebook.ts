@@ -254,3 +254,79 @@ export async function getDailyInsights(
 export function isConfigured(): boolean {
   return !!ACCESS_TOKEN;
 }
+
+export interface TokenRefreshResult {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export async function refreshAccessToken(): Promise<TokenRefreshResult> {
+  const appId = process.env.FACEBOOK_APP_ID;
+  const appSecret = process.env.FACEBOOK_APP_SECRET;
+  const currentToken = process.env.FACEBOOK_ACCESS_TOKEN;
+
+  if (!appId || !appSecret || !currentToken) {
+    throw new FacebookApiError(
+      "Missing FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, or FACEBOOK_ACCESS_TOKEN",
+      400,
+      400
+    );
+  }
+
+  const url = new URL(`${GRAPH_API_BASE}/oauth/access_token`);
+  url.searchParams.set("grant_type", "fb_exchange_token");
+  url.searchParams.set("client_id", appId);
+  url.searchParams.set("client_secret", appSecret);
+  url.searchParams.set("set_token_expires_in_60_days", "true");
+  url.searchParams.set("fb_exchange_token", currentToken);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    const text = await response.text();
+    let parsed: any;
+    try { parsed = JSON.parse(text); } catch { parsed = { error: { message: text } }; }
+    throw new FacebookApiError(
+      parsed?.error?.message || text,
+      parsed?.error?.code || response.status,
+      response.status
+    );
+  }
+
+  return response.json() as Promise<TokenRefreshResult>;
+}
+
+export async function revokeAccessToken(tokenToRevoke: string): Promise<boolean> {
+  const appId = process.env.FACEBOOK_APP_ID;
+  const appSecret = process.env.FACEBOOK_APP_SECRET;
+  const currentToken = process.env.FACEBOOK_ACCESS_TOKEN;
+
+  if (!appId || !appSecret || !currentToken) {
+    throw new FacebookApiError(
+      "Missing FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, or FACEBOOK_ACCESS_TOKEN",
+      400,
+      400
+    );
+  }
+
+  const url = new URL(`${GRAPH_API_BASE}/oauth/revoke`);
+  url.searchParams.set("client_id", appId);
+  url.searchParams.set("client_secret", appSecret);
+  url.searchParams.set("revoke_token", tokenToRevoke);
+  url.searchParams.set("access_token", currentToken);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    const text = await response.text();
+    let parsed: any;
+    try { parsed = JSON.parse(text); } catch { parsed = { error: { message: text } }; }
+    throw new FacebookApiError(
+      parsed?.error?.message || text,
+      parsed?.error?.code || response.status,
+      response.status
+    );
+  }
+
+  const result = await response.json();
+  return result.success === true || result.success === "true";
+}

@@ -1,11 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Check } from "lucide-react";
-import { useState } from "react";
+import { Copy, Check, RefreshCw, ShieldAlert, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -127,6 +127,197 @@ function EndpointSection({
           ))}
         </div>
       )}
+    </Card>
+  );
+}
+
+function FacebookTokenManager() {
+  const { toast } = useToast();
+  const [refreshing, setRefreshing] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [newToken, setNewToken] = useState<string | null>(null);
+  const [showToken, setShowToken] = useState(false);
+  const [expiresInDays, setExpiresInDays] = useState<number | null>(null);
+  const [oldTokenInput, setOldTokenInput] = useState("");
+  const [step, setStep] = useState<"idle" | "refreshed" | "deployed" | "revoked">("idle");
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const res = await apiRequest("POST", "/api/facebook/refresh-token");
+      const data = await res.json();
+      if (data.ok) {
+        setNewToken(data.newToken);
+        setExpiresInDays(data.expiresInDays);
+        setStep("refreshed");
+        toast({ title: "Token refreshed", description: `New token valid for ${data.expiresInDays} days.` });
+      } else {
+        toast({ title: "Refresh failed", description: data.message, variant: "destructive" });
+      }
+    } catch (err: any) {
+      const msg = err?.message || "Unknown error";
+      toast({ title: "Refresh failed", description: msg, variant: "destructive" });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleRevoke = async () => {
+    if (!oldTokenInput.trim()) {
+      toast({ title: "Missing token", description: "Paste the old token to revoke.", variant: "destructive" });
+      return;
+    }
+    setRevoking(true);
+    try {
+      const res = await apiRequest("POST", "/api/facebook/revoke-token", { token: oldTokenInput.trim() });
+      const data = await res.json();
+      if (data.ok) {
+        setStep("revoked");
+        setOldTokenInput("");
+        toast({ title: "Token revoked", description: "Old token has been invalidated." });
+      } else {
+        toast({ title: "Revoke failed", description: data.message, variant: "destructive" });
+      }
+    } catch (err: any) {
+      const msg = err?.message || "Unknown error";
+      toast({ title: "Revoke failed", description: msg, variant: "destructive" });
+    } finally {
+      setRevoking(false);
+    }
+  };
+
+  const maskedToken = newToken ? newToken.slice(0, 12) + "..." + newToken.slice(-8) : "";
+
+  return (
+    <Card className="p-5" data-testid="card-facebook-token-manager">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+          <div>
+            <h3 className="font-semibold text-sm">Token Rotation</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Your Facebook system user access token expires every 60 days. Follow these steps to rotate it securely:
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3 pl-8">
+          <div className="flex items-start gap-3">
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${step === "idle" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>1</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">Refresh the token</p>
+              <p className="text-xs text-muted-foreground mb-2">Generates a new token valid for 60 days. The old token continues working until its original expiry.</p>
+              <Button
+                onClick={handleRefresh}
+                disabled={refreshing || step !== "idle"}
+                data-testid="button-refresh-token"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
+                {refreshing ? "Refreshing..." : "Refresh Token"}
+              </Button>
+            </div>
+          </div>
+
+          {step !== "idle" && newToken && (
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${step === "refreshed" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>2</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Copy and deploy the new token</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Copy the new token below. Go to the Secrets tab and update <code className="text-xs font-mono bg-muted px-1 rounded">FACEBOOK_ACCESS_TOKEN</code> with this value. Expires in <strong>{expiresInDays} days</strong>.
+                </p>
+                <div className="bg-muted rounded-md p-3 flex items-center gap-2">
+                  <code className="text-xs font-mono flex-1 break-all" data-testid="text-new-token">
+                    {showToken ? newToken : maskedToken}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowToken(!showToken)}
+                    data-testid="button-toggle-token-visibility"
+                  >
+                    {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    data-testid="button-copy-new-token"
+                    onClick={() => {
+                      if (newToken) navigator.clipboard.writeText(newToken);
+                    }}
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => setStep("deployed")}
+                  disabled={step !== "refreshed"}
+                  data-testid="button-confirm-deployed"
+                >
+                  I've updated the secret
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {(step === "deployed" || step === "revoked") && (
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${step === "deployed" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>3</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Revoke the old token</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Paste the <strong>old</strong> token below to immediately invalidate it. This prevents misuse if it was ever leaked.
+                </p>
+                {step === "deployed" && (
+                  <div className="space-y-2">
+                    <textarea
+                      className="w-full bg-muted rounded-md p-3 text-xs font-mono resize-none h-16 border-0 focus:ring-1 focus:ring-ring"
+                      placeholder="Paste old FACEBOOK_ACCESS_TOKEN here..."
+                      value={oldTokenInput}
+                      onChange={(e) => setOldTokenInput(e.target.value)}
+                      data-testid="input-old-token"
+                    />
+                    <Button
+                      variant="destructive"
+                      onClick={handleRevoke}
+                      disabled={revoking || !oldTokenInput.trim()}
+                      data-testid="button-revoke-token"
+                    >
+                      <AlertTriangle className={`w-3.5 h-3.5 mr-1.5`} />
+                      {revoking ? "Revoking..." : "Revoke Old Token"}
+                    </Button>
+                  </div>
+                )}
+                {step === "revoked" && (
+                  <Badge variant="outline" className="text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700" data-testid="badge-rotation-complete">
+                    Rotation complete
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
+
+          {step === "revoked" && (
+            <div className="pt-2">
+              <Button variant="outline" onClick={() => { setStep("idle"); setNewToken(null); setExpiresInDays(null); }} data-testid="button-reset-rotation">
+                Start new rotation
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t pt-3 mt-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">How it works</h4>
+          <div className="text-xs text-muted-foreground space-y-1.5">
+            <p>1. <strong className="text-foreground">Refresh</strong> calls Meta's <code className="font-mono bg-muted px-1 rounded">oauth/access_token</code> endpoint to generate a new 60-day token.</p>
+            <p>2. <strong className="text-foreground">Deploy</strong> the new token by updating the <code className="font-mono bg-muted px-1 rounded">FACEBOOK_ACCESS_TOKEN</code> secret in Replit.</p>
+            <p>3. <strong className="text-foreground">Revoke</strong> calls Meta's <code className="font-mono bg-muted px-1 rounded">oauth/revoke</code> endpoint to immediately invalidate the old token.</p>
+            <p className="text-amber-600 dark:text-amber-400 mt-2">The old token keeps working until its original expiry, so there's no downtime during rotation.</p>
+          </div>
+        </div>
+      </div>
     </Card>
   );
 }
@@ -1005,6 +1196,13 @@ referrer,first_name,last_name,email,phone,event_timestamp
         auth={true}
         responseExample={`{ "ok": true }`}
       />
+
+      <div className="border-t pt-6">
+        <h2 className="text-lg font-semibold mb-1" data-testid="text-section-facebook-token">Facebook Token Management</h2>
+        <p className="text-sm text-muted-foreground mb-4">Refresh and rotate your Meta Marketing API access token. Tokens expire every 60 days.</p>
+      </div>
+
+      <FacebookTokenManager />
 
       <div className="border-t pt-6">
         <h2 className="text-lg font-semibold mb-1" data-testid="text-section-errors">Error Handling</h2>

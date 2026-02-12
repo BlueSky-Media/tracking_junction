@@ -745,5 +745,41 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/facebook/refresh-token", isAuthenticated, async (_req, res) => {
+    try {
+      const result = await facebook.refreshAccessToken();
+      const expiresInDays = Math.round(result.expires_in / 86400);
+      res.json({
+        ok: true,
+        newToken: result.access_token,
+        expiresInDays,
+        message: `Token refreshed successfully. New token expires in ${expiresInDays} days. Update the FACEBOOK_ACCESS_TOKEN secret with the new token value, then revoke the old one.`,
+      });
+    } catch (error) {
+      if (error instanceof facebook.FacebookApiError) {
+        return res.status(error.httpStatus).json({ message: error.message, code: error.code });
+      }
+      console.error("Error refreshing token:", error);
+      res.status(500).json({ message: "Failed to refresh token" });
+    }
+  });
+
+  app.post("/api/facebook/revoke-token", isAuthenticated, async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ message: "token is required in body" });
+      }
+      const success = await facebook.revokeAccessToken(token);
+      res.json({ ok: success, message: success ? "Token revoked successfully" : "Revocation returned false" });
+    } catch (error) {
+      if (error instanceof facebook.FacebookApiError) {
+        return res.status(error.httpStatus).json({ message: error.message, code: error.code });
+      }
+      console.error("Error revoking token:", error);
+      res.status(500).json({ message: "Failed to revoke token" });
+    }
+  });
+
   return httpServer;
 }

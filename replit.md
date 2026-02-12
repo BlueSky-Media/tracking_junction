@@ -59,6 +59,8 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `GET /api/facebook/adsets?adAccountId&campaignId&startDate&endDate` - Ad set-level insights (protected)
 - `GET /api/facebook/ads?adAccountId&adsetId&startDate&endDate` - Ad-level insights (protected)
 - `GET /api/facebook/daily-insights?adAccountId&startDate&endDate` - Daily time-series insights (protected)
+- `POST /api/facebook/refresh-token` - Refresh Facebook access token (protected, returns new token + expiry)
+- `POST /api/facebook/revoke-token` - Revoke old Facebook access token (protected, body: {token: string})
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 
 ## Event Schema Fields
