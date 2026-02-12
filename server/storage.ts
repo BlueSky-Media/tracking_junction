@@ -720,6 +720,7 @@ class DatabaseStorage implements IStorage {
       utmCampaign: sql`COALESCE(${trackingEvents.utmCampaign}, '(none)')`,
       utmMedium: sql`COALESCE(${trackingEvents.utmMedium}, '(none)')`,
       page: sql`COALESCE(${trackingEvents.page}, '(unknown)')`,
+      geoState: sql`COALESCE(${trackingEvents.geoState}, '(unknown)')`,
     };
 
     const groupCol = groupColumn[groupBy] || groupColumn.domain;

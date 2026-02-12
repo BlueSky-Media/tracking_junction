@@ -177,6 +177,7 @@ const DRILL_DIMENSIONS = [
   { value: "domain", label: "Domain" },
   { value: "deviceType", label: "Device Type" },
   { value: "page", label: "Audience" },
+  { value: "geoState", label: "State" },
   { value: "utmSource", label: "UTM Source" },
   { value: "utmCampaign", label: "UTM Campaign" },
   { value: "utmMedium", label: "UTM Medium" },
