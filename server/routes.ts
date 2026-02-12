@@ -156,6 +156,7 @@ export async function registerRoutes(
         selectedState: data.selected_state || null,
         country: data.country || null,
         browserVersion: data.browser_version || null,
+        osVersion: data.os_version || null,
         ipType: data.ip_type || null,
       });
 

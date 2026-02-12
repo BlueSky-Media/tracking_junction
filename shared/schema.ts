@@ -56,6 +56,7 @@ export const trackingEvents = pgTable("tracking_events", {
   selectedState: varchar("selected_state", { length: 10 }),
   country: varchar("country", { length: 10 }),
   browserVersion: varchar("browser_version", { length: 100 }),
+  osVersion: varchar("os_version", { length: 100 }),
   ipType: varchar("ip_type", { length: 10 }),
 }, (table) => [
   index("idx_events_session").on(table.sessionId),
@@ -154,6 +155,7 @@ export const trackingEventApiSchema = z.object({
   selected_state: z.string().max(10).optional(),
   country: z.string().max(10).optional(),
   browser_version: z.string().max(100).optional(),
+  os_version: z.string().max(100).optional(),
   ip_type: z.string().max(10).optional(),
 }).passthrough();
 

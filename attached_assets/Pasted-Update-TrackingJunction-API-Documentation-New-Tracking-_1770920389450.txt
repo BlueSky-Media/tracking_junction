@@ -1,0 +1,45 @@
+Update TrackingJunction API Documentation — New Tracking Fields (February 2026)
+
+We've made several updates to the tracking event payloads sent to the TrackingJunction API endpoint (POST /api/events). Please update the API documentation, database schemas/tables, and any dashboard configurations to include these new fields.
+
+New Fields Added to All Events (page_land, step_complete, form_complete)
+1. country (string, optional)
+
+Country code from geo-IP lookup in ISO 3166-1 alpha-2 format
+Examples: "US", "CA", "GB", "DE", "MX"
+May be empty/missing if both geo-IP services fail
+Use case: Filter international traffic vs. domestic, identify non-US visitors in reports, analyze ad targeting accuracy
+2. browser_version (string)
+
+Full browser name + version extracted from user agent
+Examples: "Facebook 547.1.0", "Instagram 312.0.0", "Chrome 120.0.6099.130", "Safari 17.2", "Edge 120.0.2210.91", "Firefox 121.0", "Opera 105.0.4970.29", "Unknown"
+Always present (defaults to "Unknown" if undetectable)
+Complements the existing browser field which continues to send just the browser name (e.g., "Facebook", "Chrome")
+Use case: Identify specific Facebook/Instagram in-app browser versions, debug browser-specific geo-IP failures
+3. os_version (string)
+
+Full OS name + version extracted from user agent
+Examples: "iOS 17.2.1", "macOS 14.2.1", "Android 14", "Windows 10/11", "Windows 8.1", "Windows 7", "Windows XP", "ChromeOS 120.0.6099.130", "Linux", "Unknown"
+Always present (defaults to "Unknown" if undetectable)
+Note: Windows 10 and Windows 11 share the same NT version (10.0), so they report as "Windows 10/11"
+Complements the existing os field which continues to send just the OS name (e.g., "iOS", "Windows")
+Use case: Analyze device demographics, debug OS-specific issues, correlate OS versions with geo-IP failure rates
+4. ip_type (string, optional)
+
+Values: "IPv4", "IPv6", or "Unknown"
+Only present when ip_address is also present in the payload
+Detection logic: IPv6 if IP contains :, IPv4 if it matches standard x.x.x.x dotted-decimal pattern
+Use case: Analyze whether IPv6 addresses correlate with failed geo-IP lookups (unknown geo_state)
+Updated Geo-IP Infrastructure
+The geo-IP lookup now has a fallback service to improve state/country detection rates:
+
+Primary service: ipapi.co (5-second timeout)
+Fallback service: ipwho.is (HTTPS, 5-second timeout)
+Flow: If primary fails or returns no state → wait 1.5 seconds → try fallback service
+Partial results: If neither service returns a state but one returns IP and/or country, those partial values are still sent. This means you may see events with country and ip_address but no geo_state.
+Summary of All Fields Now in Payload
+Existing (unchanged): session_id, event_id, page, page_type, domain, step_number, step_name, selected_value, event_type, time_on_step, device_type, os, browser, user_agent, referrer, ip_address, external_id, geo_state, selected_state, page_url, screen_resolution, viewport, language, fbc, fbp, quiz_answers, lead_info (first_name, last_name, email, phone), and all UTM/ad parameters (utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id, placement, media_type, campaign_name, campaign_id, ad_name, ad_id, adset_name, adset_id, fbclid).
+
+New: country, browser_version, os_version, ip_type
+
+Please update the API documentation with these additions and configure any dashboard reports to surface these new dimensions.

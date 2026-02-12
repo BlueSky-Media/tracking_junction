@@ -102,6 +102,7 @@ interface EventLog {
   selectedState: string | null;
   country: string | null;
   browserVersion: string | null;
+  osVersion: string | null;
   ipType: string | null;
 }
 
@@ -141,6 +142,7 @@ interface SessionLogEntry {
   ipAddress: string | null;
   country: string | null;
   browserVersion: string | null;
+  osVersion: string | null;
   ipType: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -1102,6 +1104,7 @@ const DEFAULT_COL_WIDTHS: Record<string, number> = {
   country: 60,
   ipType: 60,
   browserVersion: 140,
+  osVersion: 140,
   referrer: 160,
   pageUrl: 160,
   screenRes: 90,
@@ -1188,6 +1191,8 @@ function getCellRenderer(key: string, session: SessionLogEntry, colWidths: Recor
       return <td key={key} className={cls} style={style}>{session.ipType || "\u2014"}</td>;
     case "browserVersion":
       return <td key={key} className={cls} style={style}>{session.browserVersion || "\u2014"}</td>;
+    case "osVersion":
+      return <td key={key} className={cls} style={style}>{session.osVersion || "\u2014"}</td>;
     case "referrer":
       return <td key={key} className={`${cls} truncate`} style={style} title={session.referrer || ""}>{session.referrer || "\u2014"}</td>;
     case "pageUrl":
@@ -1302,6 +1307,7 @@ const SESSION_COLUMNS: SessionColumn[] = [
   { key: "country", label: "Country", resizable: true, optional: true, defaultVisible: false },
   { key: "ipType", label: "IP Type", resizable: true, optional: true, defaultVisible: false },
   { key: "browserVersion", label: "Browser Version", resizable: true, optional: true, defaultVisible: false },
+  { key: "osVersion", label: "OS Version", resizable: true, optional: true, defaultVisible: false },
   { key: "selectedState", label: "User State", resizable: true, optional: true, defaultVisible: false },
   { key: "firstName", label: "First Name", resizable: true, optional: true, defaultVisible: false },
   { key: "lastName", label: "Last Name", resizable: true, optional: true, defaultVisible: false },
@@ -1909,6 +1915,7 @@ function SessionLogRow({
                 <DetailField label="OS" value={session.os || "\u2014"} />
                 <DetailField label="Browser" value={session.browser || "\u2014"} />
                 <DetailField label="Browser Version" value={session.browserVersion || "\u2014"} />
+                <DetailField label="OS Version" value={session.osVersion || "\u2014"} />
                 {session.events.length > 0 && (() => {
                   const ev = session.events;
                   const find = (fn: (e: EventLog) => string | null | undefined) => {

@@ -185,6 +185,7 @@ export interface IStorage {
       ipAddress: string | null;
       country: string | null;
       browserVersion: string | null;
+      osVersion: string | null;
       ipType: string | null;
     }[];
     total: number;
@@ -657,7 +658,7 @@ class DatabaseStorage implements IStorage {
       "id", "session_id", "event_id", "event_type", "page", "page_type", "domain",
       "step_number", "step_name", "selected_value", "time_on_step",
       "utm_source", "utm_campaign", "utm_medium", "utm_content", "utm_term", "utm_id",
-      "device_type", "os", "browser", "browser_version", "geo_state", "country", "ip_address", "ip_type", "placement",
+      "device_type", "os", "os_version", "browser", "browser_version", "geo_state", "country", "ip_address", "ip_type", "placement",
       "media_type", "campaign_name", "campaign_id", "ad_name", "ad_id",
       "adset_name", "adset_id", "fbclid", "fbc", "fbp", "external_id",
       "quiz_answers", "referrer",
@@ -687,6 +688,7 @@ class DatabaseStorage implements IStorage {
         row.utmId || "",
         row.deviceType || "",
         row.os || "",
+        `"${(row.osVersion || '').replace(/"/g, '""')}"`,
         row.browser || "",
         `"${(row.browserVersion || '').replace(/"/g, '""')}"`,
         row.geoState || "",
@@ -1093,6 +1095,7 @@ class DatabaseStorage implements IStorage {
         ipAddress: firstEvent.ipAddress,
         country: firstEvent.country,
         browserVersion: firstEvent.browserVersion,
+        osVersion: firstEvent.osVersion,
         ipType: firstEvent.ipType,
         firstName: (() => { const fc = events.find(e => e.eventType === "form_complete"); return fc?.firstName || null; })(),
         lastName: (() => { const fc = events.find(e => e.eventType === "form_complete"); return fc?.lastName || null; })(),
