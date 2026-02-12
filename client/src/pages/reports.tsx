@@ -1474,12 +1474,13 @@ function EventLogsSection({
     }
   };
 
-  const invalidateAnalytics = () => {
-    queryClient.invalidateQueries({
+  const invalidateAnalytics = async () => {
+    await queryClient.invalidateQueries({
       predicate: (query) => {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/analytics");
       },
+      refetchType: "all",
     });
   };
 
@@ -1531,7 +1532,7 @@ function EventLogsSection({
       const data = await res.json();
       toast({ title: `Deleted ${data.count} events for this session` });
       setSelectedSessions(prev => { const n = new Set(prev); n.delete(sessionId); return n; });
-      invalidateAnalytics();
+      await invalidateAnalytics();
     } catch {
       toast({ title: "Failed to delete session events", variant: "destructive" });
     } finally {
@@ -1555,7 +1556,7 @@ function EventLogsSection({
       toast({ title: `Deleted ${data.count} events from ${sessionIds.length} sessions` });
       setSelectedSessions(new Set());
       setConfirmBulkDelete(false);
-      invalidateAnalytics();
+      await invalidateAnalytics();
     } catch {
       toast({ title: "Failed to bulk delete sessions", variant: "destructive" });
     } finally {
@@ -2369,6 +2370,7 @@ export default function ReportsPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/analytics");
       },
+      refetchType: "all",
     });
     setLastUpdated(new Date());
     setIsRefreshing(false);

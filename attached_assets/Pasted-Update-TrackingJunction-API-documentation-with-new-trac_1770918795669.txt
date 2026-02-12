@@ -1,0 +1,34 @@
+Update TrackingJunction API documentation with new tracking fields
+
+We've added 3 new fields to every tracking event payload sent to the TrackingJunction API endpoint (POST /api/events). Please map these out in the API documentation and update any data schemas accordingly.
+
+New fields added to all events (page_land, step_complete, form_complete):
+
+country (string, optional)
+
+Country code from geo-IP lookup (e.g., "US", "CA", "GB", "DE")
+ISO 3166-1 alpha-2 format
+May be empty/missing if both geo-IP services fail
+Use case: Filter international traffic vs. domestic, identify non-US visitors in reports
+browser_version (string)
+
+Full browser name + version extracted from user agent
+Examples: "Facebook 547.1.0", "Instagram 312.0.0", "Chrome 120.0.6099.130", "Safari 17.2", "Edge 120.0.2210.91", "Firefox 121.0", "Opera 105.0.4970.29", "Unknown"
+Always present (defaults to "Unknown" if undetectable)
+This is in addition to the existing browser field which still sends just the browser name (e.g., "Facebook", "Chrome")
+Use case: Identify specific Facebook/Instagram in-app browser versions, debug browser-specific issues
+ip_type (string, optional)
+
+Values: "IPv4", "IPv6", or "Unknown"
+Only present when ip_address is present
+Detection: IPv6 if IP contains :, IPv4 if it matches x.x.x.x pattern
+Use case: Analyze whether IPv6 addresses correlate with failed geo-IP lookups (unknown geo_state)
+Updated geo-IP infrastructure (affects ip_address, geo_state, country fields):
+
+Primary service: ipapi.co (5s timeout)
+Fallback service: ipwho.is (5s timeout, HTTPS)
+Flow: If primary fails or returns no state → 1.5 second delay → try fallback
+Partial results: If neither service returns a state but one returns IP/country, those partial values are still sent (so you may see events with country but no geo_state)
+No changes to existing fields — all previously documented fields (session_id, event_id, page, page_type, domain, step_number, step_name, selected_value, event_type, time_on_step, device_type, os, browser, user_agent, referrer, ip_address, external_id, geo_state, selected_state, page_url, screen_resolution, viewport, language, fbc, fbp, quiz_answers, lead_info, and all UTM/ad parameters) remain unchanged.
+
+Please update the API documentation, any database schemas/tables, and dashboard report configurations to include these new fields.

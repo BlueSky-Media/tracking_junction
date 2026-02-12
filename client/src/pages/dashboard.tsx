@@ -65,6 +65,7 @@ export default function DashboardPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/analytics");
       },
+      refetchType: "all",
     });
     setLastUpdated(new Date());
     setIsRefreshing(false);
