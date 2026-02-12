@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useRoute } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -12,6 +12,7 @@ import ReportsPage from "@/pages/reports";
 import ServerLogsPage from "@/pages/server-logs";
 import BlockListPage from "@/pages/block-list";
 import FacebookAdsPage from "@/pages/facebook-ads";
+import PrivacyPage from "@/pages/privacy";
 import NotFound from "@/pages/not-found";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -54,7 +55,12 @@ function AuthenticatedLayout() {
 }
 
 function Router() {
+  const [isPrivacy] = useRoute("/page/privacy");
   const { user, isLoading } = useAuth();
+
+  if (isPrivacy) {
+    return <PrivacyPage />;
+  }
 
   if (isLoading) {
     return null;

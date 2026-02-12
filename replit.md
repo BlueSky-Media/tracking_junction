@@ -23,6 +23,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `client/src/pages/block-list.tsx` - Block List management page
 - `client/src/pages/landing.tsx` - Landing/login page
 - `client/src/pages/facebook-ads.tsx` - Facebook Ads page (Meta Marketing API integration)
+- `client/src/pages/privacy.tsx` - Public privacy policy page (no auth required, at /page/privacy)
 - `client/src/components/` - Dashboard components (filters, funnel chart, funnel table, step breakdown, stats cards, campaign table, device breakdown, time heatmap, contact funnel, referrer breakdown, csv export)
 
 ## API Endpoints
@@ -55,8 +56,8 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `GET /api/facebook/ad-accounts` - List accessible ad accounts (protected)
 - `GET /api/facebook/account-insights?adAccountId&startDate&endDate` - Account-level summary metrics (protected)
 - `GET /api/facebook/campaigns?adAccountId&startDate&endDate` - Campaign-level insights (protected)
-- `GET /api/facebook/adsets?campaignId&startDate&endDate` - Ad set-level insights (protected)
-- `GET /api/facebook/ads?adsetId&startDate&endDate` - Ad-level insights (protected)
+- `GET /api/facebook/adsets?adAccountId&campaignId&startDate&endDate` - Ad set-level insights (protected)
+- `GET /api/facebook/ads?adAccountId&adsetId&startDate&endDate` - Ad-level insights (protected)
 - `GET /api/facebook/daily-insights?adAccountId&startDate&endDate` - Daily time-series insights (protected)
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 
@@ -144,3 +145,12 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - Matches calls by phone number from form_complete events
 - Features: play recording, download .wav, view transcript, call summary/sentiment, block/unblock numbers
 - Local blocked_numbers table for phone number blocking (Retell doesn't have per-number block API)
+
+## Meta/Facebook Marketing API
+- Uses FACEBOOK_ACCESS_TOKEN, FACEBOOK_APP_ID, FACEBOOK_APP_SECRET secrets
+- Token is valid for 60 days and needs manual refresh (generate new long-lived token via Graph API Explorer or Facebook Login flow)
+- All API calls use ad account endpoint with filtering (not campaign/adset node endpoints) for consistency
+- Drill-down: Account > Campaigns > Ad Sets > Ads with breadcrumb navigation
+
+## Public Pages
+- `/page/privacy` - Privacy policy page (no auth required, publicly accessible)
