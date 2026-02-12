@@ -2482,75 +2482,82 @@ export default function ReportsPage() {
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" data-testid="button-date-range">
-              <CalendarIcon className="w-3 h-3 mr-1.5" />
-              {dateRange?.from ? (
-                <span className="text-[10px]">
-                  {format(dateRange.from, "MMM d, yyyy")}
-                  {startTime ? ` ${TIME_OPTIONS.find(t => t.value === startTime)?.label || startTime}` : ""}
-                  {dateRange.to ? ` - ${format(dateRange.to, "MMM d, yyyy")}` : ""}
-                  {dateRange.to && endTime ? ` ${TIME_OPTIONS.find(t => t.value === endTime)?.label || endTime}` : ""}
-                </span>
-              ) : (
-                <span className="text-[10px]">All Time</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            {dateRange?.from && (
-              <div className="p-2 border-b flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">From</span>
-                  <span className="text-[10px] font-medium">{format(dateRange.from, "yyyy-MM-dd")}</span>
-                  <Select value={startTime || "__none__"} onValueChange={(v) => setStartTime(v === "__none__" ? undefined : v)}>
-                    <SelectTrigger className="w-[100px] h-6 text-[10px]" data-testid="select-start-time">
-                      <SelectValue placeholder="Start time" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px]">
-                      <SelectItem value="__none__">Any time</SelectItem>
-                      {TIME_OPTIONS.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+        <div className="flex items-center gap-1.5 border rounded-md px-2 py-1">
+          <CalendarIcon className="w-3 h-3 text-muted-foreground shrink-0" />
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="text-[11px] hover-elevate rounded px-1.5 py-0.5 min-w-[90px] text-left" data-testid="button-start-date">
+                {dateRange?.from ? format(dateRange.from, "MMM d, yyyy") : "Start date"}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+                data-testid="calendar-date-range"
+              />
+              {dateRange && (
+                <div className="p-2 border-t flex justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => { setDateRange(undefined); setStartTime(undefined); setEndTime(undefined); }} data-testid="button-clear-dates">
+                    Clear
+                  </Button>
                 </div>
-                {dateRange.to && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">To</span>
-                    <span className="text-[10px] font-medium">{format(dateRange.to, "yyyy-MM-dd")}</span>
-                    <Select value={endTime || "__none__"} onValueChange={(v) => setEndTime(v === "__none__" ? undefined : v)}>
-                      <SelectTrigger className="w-[100px] h-6 text-[10px]" data-testid="select-end-time">
-                        <SelectValue placeholder="End time" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[200px]">
-                        <SelectItem value="__none__">Any time</SelectItem>
-                        {TIME_OPTIONS.map((t) => (
-                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            )}
-            <Calendar
-              mode="range"
-              selected={dateRange}
-              onSelect={setDateRange}
-              numberOfMonths={2}
-              data-testid="calendar-date-range"
-            />
-            {dateRange && (
-              <div className="p-2 border-t flex justify-end gap-1">
-                <Button variant="ghost" size="sm" onClick={() => { setDateRange(undefined); setStartTime(undefined); setEndTime(undefined); }} data-testid="button-clear-dates">
-                  Clear
-                </Button>
-              </div>
-            )}
-          </PopoverContent>
-        </Popover>
+              )}
+            </PopoverContent>
+          </Popover>
+          {dateRange?.from && (
+            <Select value={startTime || "__none__"} onValueChange={(v) => setStartTime(v === "__none__" ? undefined : v)}>
+              <SelectTrigger className="w-[90px] h-7 text-[11px] border-dashed" data-testid="select-start-time">
+                <SelectValue placeholder="Any time" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[200px]">
+                <SelectItem value="__none__">Any time</SelectItem>
+                {TIME_OPTIONS.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <span className="text-[10px] text-muted-foreground px-0.5">to</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="text-[11px] hover-elevate rounded px-1.5 py-0.5 min-w-[90px] text-left" data-testid="button-end-date">
+                {dateRange?.to ? format(dateRange.to, "MMM d, yyyy") : "End date"}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+                data-testid="calendar-end-range"
+              />
+              {dateRange && (
+                <div className="p-2 border-t flex justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => { setDateRange(undefined); setStartTime(undefined); setEndTime(undefined); }} data-testid="button-clear-dates-end">
+                    Clear
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+          {dateRange?.to && (
+            <Select value={endTime || "__none__"} onValueChange={(v) => setEndTime(v === "__none__" ? undefined : v)}>
+              <SelectTrigger className="w-[90px] h-7 text-[11px] border-dashed" data-testid="select-end-time">
+                <SelectValue placeholder="Any time" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[200px]">
+                <SelectItem value="__none__">Any time</SelectItem>
+                {TIME_OPTIONS.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       <FunnelReport dateRange={dateRange} filterOptions={filterOptions} filters={reportFilters} onFiltersChange={setReportFilters} drillDimension={drillDimension} onDrillDimensionChange={setDrillDimension} timeRange={timeRange} />
