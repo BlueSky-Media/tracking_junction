@@ -580,7 +580,7 @@ export default function ApiDocsPage() {
         <Card className="p-5">
           <h3 className="font-semibold mb-3 flex items-center gap-2 flex-wrap">
             Lead-Gen: Seniors
-            <Badge variant="secondary" className="text-xs">9 steps (0-8)</Badge>
+            <Badge variant="secondary" className="text-xs">11 steps (0-10)</Badge>
           </h3>
           <ol className="space-y-1.5 text-sm">
             {[
@@ -590,9 +590,11 @@ export default function ApiDocsPage() {
               { n: 3, name: "Budget Affordability", type: "step_complete" },
               { n: 4, name: "Age", type: "step_complete" },
               { n: 5, name: "Monthly Income", type: "step_complete" },
-              { n: 6, name: "Name", type: "step_complete" },
-              { n: 7, name: "Email", type: "step_complete" },
-              { n: 8, name: "Phone", type: "form_complete" },
+              { n: 6, name: "Eligibility Check", type: "step_complete" },
+              { n: 7, name: "Contact First Name", type: "step_complete" },
+              { n: 8, name: "Contact Last Name", type: "step_complete" },
+              { n: 9, name: "Contact Email", type: "step_complete" },
+              { n: 10, name: "Contact Phone", type: "form_complete" },
             ].map((s) => (
               <li key={s.n} className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{s.n}</span>
@@ -605,7 +607,7 @@ export default function ApiDocsPage() {
         <Card className="p-5">
           <h3 className="font-semibold mb-3 flex items-center gap-2 flex-wrap">
             Lead-Gen: Veterans / First Responders
-            <Badge variant="secondary" className="text-xs">10 steps (0-9)</Badge>
+            <Badge variant="secondary" className="text-xs">12 steps (0-11)</Badge>
           </h3>
           <ol className="space-y-1.5 text-sm">
             {[
@@ -616,9 +618,11 @@ export default function ApiDocsPage() {
               { n: 4, name: "Budget Affordability", type: "step_complete" },
               { n: 5, name: "Age", type: "step_complete" },
               { n: 6, name: "Monthly Income", type: "step_complete" },
-              { n: 7, name: "Name", type: "step_complete" },
-              { n: 8, name: "Email", type: "step_complete" },
-              { n: 9, name: "Phone", type: "form_complete" },
+              { n: 7, name: "Eligibility Check", type: "step_complete" },
+              { n: 8, name: "Contact First Name", type: "step_complete" },
+              { n: 9, name: "Contact Last Name", type: "step_complete" },
+              { n: 10, name: "Contact Email", type: "step_complete" },
+              { n: 11, name: "Contact Phone", type: "form_complete" },
             ].map((s) => (
               <li key={s.n} className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">{s.n}</span>

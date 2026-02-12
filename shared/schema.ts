@@ -187,9 +187,11 @@ export const LEAD_STEPS_SENIORS = [
   { number: 3, name: "Budget Affordability" },
   { number: 4, name: "Age" },
   { number: 5, name: "Monthly Income" },
-  { number: 6, name: "Name" },
-  { number: 7, name: "Email" },
-  { number: 8, name: "Phone" },
+  { number: 6, name: "Eligibility Check" },
+  { number: 7, name: "Contact First Name" },
+  { number: 8, name: "Contact Last Name" },
+  { number: 9, name: "Contact Email" },
+  { number: 10, name: "Contact Phone" },
 ];
 
 export const LEAD_STEPS_VETERANS = [
@@ -200,9 +202,11 @@ export const LEAD_STEPS_VETERANS = [
   { number: 4, name: "Budget Affordability" },
   { number: 5, name: "Age" },
   { number: 6, name: "Monthly Income" },
-  { number: 7, name: "Name" },
-  { number: 8, name: "Email" },
-  { number: 9, name: "Phone" },
+  { number: 7, name: "Eligibility Check" },
+  { number: 8, name: "Contact First Name" },
+  { number: 9, name: "Contact Last Name" },
+  { number: 10, name: "Contact Email" },
+  { number: 11, name: "Contact Phone" },
 ];
 
 export const LEAD_STEPS_FIRST_RESPONDERS = [
@@ -213,9 +217,11 @@ export const LEAD_STEPS_FIRST_RESPONDERS = [
   { number: 4, name: "Budget Affordability" },
   { number: 5, name: "Age" },
   { number: 6, name: "Monthly Income" },
-  { number: 7, name: "Name" },
-  { number: 8, name: "Email" },
-  { number: 9, name: "Phone" },
+  { number: 7, name: "Eligibility Check" },
+  { number: 8, name: "Contact First Name" },
+  { number: 9, name: "Contact Last Name" },
+  { number: 10, name: "Contact Email" },
+  { number: 11, name: "Contact Phone" },
 ];
 
 export const LEAD_STEPS = LEAD_STEPS_SENIORS;

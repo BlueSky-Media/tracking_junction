@@ -1,0 +1,50 @@
+Update: Lead-Gen Landing Page Step Flow Changes
+
+The lead-gen landing pages (Seniors, Veterans, First Responders) have been updated with a new conversion-optimized step flow. Please update your API documentation and any step-tracking references accordingly.
+
+What Changed:
+
+The combined Name step has been split into separate First Name and Last Name micro-steps, and a new Eligibility Interstitial step has been added between the quiz and PII collection.
+
+New Step Flow — Seniors (blueskylife.net & blueskylife.io):
+
+Steps 1-5: Quiz (Beneficiary → State → Budget → Age → Income) — unchanged
+Step 6: Eligibility Interstitial (animated loader: "Evaluating your answers..." → "Determining eligibility..." → "Success!" → "Great News!" message with Continue CTA)
+Step 7: First Name (progress 85%)
+Step 8: Last Name (progress 88%) — heading: "Nice to meet you, {firstName}!"
+Step 9: Email (progress 92%)
+Step 10: Phone (progress 96%)
+Step 11: Processing animation
+Step 12: Thank You / Appointment
+New Step Flow — Veterans & First Responders:
+
+Steps 1-6: Quiz (Military Branch/Agency → State → Beneficiary → Budget → Age → Income) — unchanged
+Step 7: Eligibility Interstitial
+Step 8: First Name (progress 85%)
+Step 9: Last Name (progress 88%)
+Step 10: Email (progress 92%)
+Step 11: Phone (progress 96%)
+Step 12: Processing animation
+Step 13: Thank You / Appointment
+Tracking Changes:
+
+trackQuizStep now fires these new step names: Eligibility Check, Contact First Name, Contact Last Name, Contact Email, Contact Phone
+trackStepEvent actions updated: FirstName/submitted, LastName/submitted (previously just Name/submitted)
+trackStepComplete now fires separate events for firstname_submitted (with contactInfo: { fn }) and lastname_submitted (with contactInfo: { fn, ln }) instead of a single name_submitted
+contactFormStartTime now triggers at step 7 (Seniors) / step 8 (Veterans & First Responders) — the first PII input step
+trackFormComplete fires at step 10 (Seniors) / step 11 (Veterans & First Responders) — the phone submission step
+Total steps updated: Seniors = 12, Veterans & First Responders = 13
+New UI Elements on All PII Steps (First Name, Last Name, Email, Phone):
+
+5 gold stars with audience-specific social proof text: "Over 5,000 [seniors/veterans/first responders] like you found coverage"
+Lock icon with "Your information is secure & encrypted"
+Three trust badges: Do Not Call Registry, No Spam Guaranteed, 256-bit SSL Encrypted
+No Changes To:
+
+Call-in pages (CallSeniors, CallVeterans, CallFirstResponders)
+Quiz steps 1-5 (Seniors) / 1-6 (Veterans & First Responders)
+Disqualification logic or qualifying states
+Webhook payload structure
+Ringba API integration
+Facebook CAPI / GTM event structure (just step numbers changed)
+Production builds have been generated in builds/net/ and builds/io/ and are ready for FTP upload.
