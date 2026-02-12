@@ -113,6 +113,7 @@ interface DrilldownStepData {
   completions: number;
   conversionFromPrev: number;
   conversionFromInitial: number;
+  sessionsWithPrev: number;
 }
 
 interface DrilldownRow {
@@ -795,6 +796,22 @@ class DatabaseStorage implements IStorage {
         FROM grouped_steps
         WHERE event_type = 'form_complete'
         GROUP BY group_value
+      ),
+      step_sessions AS (
+        SELECT DISTINCT group_value, session_id, step_number
+        FROM grouped_steps
+      ),
+      prev_step_counts AS (
+        SELECT
+          curr.group_value,
+          curr.step_number as curr_step,
+          COUNT(DISTINCT curr.session_id) as sessions_with_prev
+        FROM step_sessions curr
+        INNER JOIN step_sessions prev
+          ON curr.session_id = prev.session_id
+          AND curr.group_value = prev.group_value
+          AND prev.step_number = curr.step_number - 1
+        GROUP BY curr.group_value, curr.step_number
       )
       SELECT
         gv.group_value,
@@ -804,17 +821,20 @@ class DatabaseStorage implements IStorage {
         COALESCE(fc.completions, 0) as form_completions,
         sc.step_number,
         sc.step_name,
-        sc.completions
+        sc.completions,
+        psc.sessions_with_prev
       FROM group_views gv
       LEFT JOIN page_lands pl ON gv.group_value = pl.group_value
       LEFT JOIN form_completions fc ON gv.group_value = fc.group_value
       LEFT JOIN step_completions sc ON gv.group_value = sc.group_value
+      LEFT JOIN prev_step_counts psc ON gv.group_value = psc.group_value AND sc.step_number = psc.curr_step
       ORDER BY gv.unique_views DESC, gv.group_value, sc.step_number
     `);
 
     const results = (rows as any).rows || [];
 
-    const groupMap = new Map<string, { uniqueViews: number; grossViews: number; pageLands: number; formCompletions: number; stepsMap: Map<string, { stepNumber: number; stepName: string; completions: number }> }>();
+    type StepEntry = { stepNumber: number; stepName: string; completions: number; sessionsWithPrev: number };
+    const groupMap = new Map<string, { uniqueViews: number; grossViews: number; pageLands: number; formCompletions: number; stepsMap: Map<string, StepEntry> }>();
 
     for (const r of results) {
       const gv = r.group_value as string;
@@ -839,6 +859,7 @@ class DatabaseStorage implements IStorage {
             stepNumber: sn,
             stepName: sName,
             completions: Number(r.completions),
+            sessionsWithPrev: Number(r.sessions_with_prev || 0),
           });
         }
       }
@@ -858,11 +879,21 @@ class DatabaseStorage implements IStorage {
 
     function buildSteps(
       defaultBase: number,
-      stepsMap: Map<string, { stepNumber: number; stepName: string; completions: number }>,
+      stepsMap: Map<string, StepEntry>,
       perStepLandBase?: Map<string, number>,
+      useAllKeys?: boolean,
     ): DrilldownStepData[] {
+      const keys = useAllKeys
+        ? sortedStepKeys
+        : Array.from(stepsMap.keys()).sort((a, b) => {
+            const [aNum, ...aName] = a.split(":");
+            const [bNum, ...bName] = b.split(":");
+            const numDiff = Number(aNum) - Number(bNum);
+            if (numDiff !== 0) return numDiff;
+            return aName.join(":").localeCompare(bName.join(":"));
+          });
       let prevCount = defaultBase;
-      return sortedStepKeys.map((sk) => {
+      return keys.map((sk) => {
         const stepData = stepsMap.get(sk);
         const completions = stepData?.completions || 0;
         const convFromPrev = prevCount > 0 ? (completions / prevCount) * 100 : 0;
@@ -877,6 +908,7 @@ class DatabaseStorage implements IStorage {
           completions,
           conversionFromPrev: Math.round(convFromPrev * 10) / 10,
           conversionFromInitial: Math.round(convFromInitial * 10) / 10,
+          sessionsWithPrev: stepData?.sessionsWithPrev || 0,
         };
       });
     }
@@ -904,14 +936,15 @@ class DatabaseStorage implements IStorage {
     const totalGrossViews = drilldownRows.reduce((s, r) => s + r.grossViews, 0);
     const totalPageLands = drilldownRows.reduce((s, r) => s + r.pageLands, 0);
     const totalFormCompletions = drilldownRows.reduce((s, r) => s + r.formCompletions, 0);
-    const totalsStepsMap = new Map<string, { stepNumber: number; stepName: string; completions: number }>();
+    const totalsStepsMap = new Map<string, StepEntry>();
     for (const row of drilldownRows) {
       for (const step of row.steps) {
         const existing = totalsStepsMap.get(step.stepKey);
         if (existing) {
           existing.completions += step.completions;
+          existing.sessionsWithPrev += step.sessionsWithPrev;
         } else {
-          totalsStepsMap.set(step.stepKey, { stepNumber: step.stepNumber, stepName: step.stepName, completions: step.completions });
+          totalsStepsMap.set(step.stepKey, { stepNumber: step.stepNumber, stepName: step.stepName, completions: step.completions, sessionsWithPrev: step.sessionsWithPrev });
         }
       }
     }
@@ -936,7 +969,7 @@ class DatabaseStorage implements IStorage {
       grossViews: totalGrossViews,
       pageLands: totalPageLands,
       formCompletions: totalFormCompletions,
-      steps: buildSteps(totalPageLandBase, totalsStepsMap, perStepLandBase),
+      steps: buildSteps(totalPageLandBase, totalsStepsMap, perStepLandBase, true),
     };
 
     return { rows: drilldownRows, totals, groupBy };

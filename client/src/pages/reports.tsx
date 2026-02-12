@@ -35,6 +35,7 @@ interface DrilldownStepData {
   completions: number;
   conversionFromPrev: number;
   conversionFromInitial: number;
+  sessionsWithPrev: number;
 }
 
 interface DrilldownRow {
@@ -987,17 +988,21 @@ function FunnelReport({
         const audLands = audienceRow.pageLands || audienceRow.uniqueViews;
         const audFormComplete = audienceRow.formCompletions;
         const audFormCvr = audLands > 0 ? (audFormComplete / audLands) * 100 : 0;
-        const allSteps = [...audienceRow.steps].sort((a, b) => a.stepNumber - b.stepNumber || a.stepName.localeCompare(b.stepName));
-        const maxByStepNum = new Map<number, number>();
+        const allSteps = [...audienceRow.steps]
+          .filter(s => s.completions > 0)
+          .sort((a, b) => a.stepNumber - b.stepNumber || a.stepName.localeCompare(b.stepName));
+        const totalByStepNum = new Map<number, number>();
         for (const s of allSteps) {
-          maxByStepNum.set(s.stepNumber, Math.max(maxByStepNum.get(s.stepNumber) ?? 0, s.completions));
+          totalByStepNum.set(s.stepNumber, (totalByStepNum.get(s.stepNumber) ?? 0) + s.completions);
         }
         const audSteps = allSteps.map((step) => {
             const prevStepNum = step.stepNumber - 1;
-            const prevCount = prevStepNum < 1 ? audLands : (maxByStepNum.get(prevStepNum) ?? audLands);
+            const prevCount = prevStepNum < 1 ? audLands : (totalByStepNum.get(prevStepNum) ?? audLands);
             const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
             const cvr = audLands > 0 ? (step.completions / audLands) * 100 : 0;
-            const scvr = prevCount > 0 ? (step.completions / prevCount) * 100 : 0;
+            const scvr = step.stepNumber === 1
+              ? (audLands > 0 ? (step.sessionsWithPrev / audLands) * 100 : 0)
+              : (prevCount > 0 ? (step.sessionsWithPrev / prevCount) * 100 : 0);
             return { ...step, dropOff, cvr, scvr, prevCount };
           });
 
