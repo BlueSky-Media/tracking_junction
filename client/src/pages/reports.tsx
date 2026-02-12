@@ -766,6 +766,7 @@ function DrilldownRowComponent({
   showLandCvr,
   showFormComplete,
   showFormCvr,
+  timeRange,
 }: {
   row: DrilldownRow;
   canDrill: boolean;
