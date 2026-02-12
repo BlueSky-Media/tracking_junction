@@ -241,7 +241,7 @@ function buildConditions(filters: AnalyticsFilters) {
 }
 
 function stepCompleteCondition() {
-  return sql`(${trackingEvents.eventType} = 'step_complete' OR ${trackingEvents.eventType} IS NULL)`;
+  return sql`(${trackingEvents.eventType} IN ('page_land', 'step_complete', 'form_complete') OR ${trackingEvents.eventType} IS NULL)`;
 }
 
 class DatabaseStorage implements IStorage {
