@@ -148,9 +148,33 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 
 ## Meta/Facebook Marketing API
 - Uses FACEBOOK_ACCESS_TOKEN, FACEBOOK_APP_ID, FACEBOOK_APP_SECRET secrets
-- Token is valid for 60 days and needs manual refresh (generate new long-lived token via Graph API Explorer or Facebook Login flow)
+- System user with admin access; minimum scopes needed: ads_read, business_management
+- Token is valid for 60 days (expiring system user access token)
 - All API calls use ad account endpoint with filtering (not campaign/adset node endpoints) for consistency
 - Drill-down: Account > Campaigns > Ad Sets > Ads with breadcrumb navigation
+
+### Token Refresh / Rotation Procedure
+- Expiring tokens must be refreshed within 60 days or a new token must be generated
+- **Refresh** (extends 60 days from refresh date, old token still works until its original expiry):
+  ```
+  GET https://graph.facebook.com/v21.0/oauth/access_token?
+    grant_type=fb_exchange_token&
+    client_id={FACEBOOK_APP_ID}&
+    client_secret={FACEBOOK_APP_SECRET}&
+    set_token_expires_in_60_days=true&
+    fb_exchange_token={current-FACEBOOK_ACCESS_TOKEN}
+  ```
+- **Revoke old token** (immediate invalidation after deploying new token):
+  ```
+  GET https://graph.facebook.com/v21.0/oauth/revoke?
+    client_id={FACEBOOK_APP_ID}&
+    client_secret={FACEBOOK_APP_SECRET}&
+    revoke_token={old-access-token}&
+    access_token={new-access-token}
+  ```
+- **Rotation steps**: 1) Refresh token via API, 2) Update FACEBOOK_ACCESS_TOKEN secret with new token, 3) Revoke old token
+- **Generate new token** (if expired beyond 60 days): POST to `https://graph.facebook.com/v21.0/{SYSTEM-USER-ID}/access_tokens` with business_app, scope, appsecret_proof, set_token_expires_in_60_days=true
+- appsecret_proof = HMAC-SHA256(access_token, app_secret)
 
 ## Public Pages
 - `/page/privacy` - Privacy policy page (no auth required, publicly accessible)
