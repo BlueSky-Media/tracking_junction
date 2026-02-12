@@ -988,8 +988,13 @@ function FunnelReport({
         const audFormComplete = audienceRow.formCompletions;
         const audFormCvr = audLands > 0 ? (audFormComplete / audLands) * 100 : 0;
         const allSteps = [...audienceRow.steps].sort((a, b) => a.stepNumber - b.stepNumber || a.stepName.localeCompare(b.stepName));
-        const audSteps = allSteps.map((step, idx) => {
-            const prevCount = idx === 0 ? audLands : allSteps[idx - 1].completions;
+        const maxByStepNum = new Map<number, number>();
+        for (const s of allSteps) {
+          maxByStepNum.set(s.stepNumber, Math.max(maxByStepNum.get(s.stepNumber) ?? 0, s.completions));
+        }
+        const audSteps = allSteps.map((step) => {
+            const prevStepNum = step.stepNumber - 1;
+            const prevCount = prevStepNum < 1 ? audLands : (maxByStepNum.get(prevStepNum) ?? audLands);
             const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
             const cvr = audLands > 0 ? (step.completions / audLands) * 100 : 0;
             const scvr = prevCount > 0 ? (step.completions / prevCount) * 100 : 0;
