@@ -383,7 +383,7 @@ export default function FacebookAdsPage() {
       <div className="flex items-center gap-2 flex-wrap">
         <SiFacebook className="w-5 h-5 text-[#1877F2]" />
         <h1 className="text-base font-bold">Facebook Ads</h1>
-        <Badge variant="outline" className="text-[9px]">Meta Marketing API v21.0</Badge>
+        <Badge variant="outline" className="text-[9px]">Meta Marketing API v24.0</Badge>
       </div>
 
       <Card>

@@ -13,7 +13,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `shared/schema.ts` - Data models (trackingEvents table, validation schemas, step definitions)
 - `shared/models/auth.ts` - Auth models (users, sessions tables)
 - `server/routes.ts` - API routes (event ingestion + analytics + Facebook endpoints)
-- `server/facebook.ts` - Meta Marketing API v21.0 client (ad accounts, campaign/adset/ad insights)
+- `server/facebook.ts` - Meta Marketing API v24.0 client (ad accounts, campaign/adset/ad insights)
 - `server/storage.ts` - Database operations (event insert, stats, funnel, breakdown, drilldown queries)
 - `server/db.ts` - Database connection
 - `client/src/pages/dashboard.tsx` - Main dashboard page
@@ -159,7 +159,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - Expiring tokens must be refreshed within 60 days or a new token must be generated
 - **Refresh** (extends 60 days from refresh date, old token still works until its original expiry):
   ```
-  GET https://graph.facebook.com/v21.0/oauth/access_token?
+  GET https://graph.facebook.com/v24.0/oauth/access_token?
     grant_type=fb_exchange_token&
     client_id={FACEBOOK_APP_ID}&
     client_secret={FACEBOOK_APP_SECRET}&
@@ -168,14 +168,14 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
   ```
 - **Revoke old token** (immediate invalidation after deploying new token):
   ```
-  GET https://graph.facebook.com/v21.0/oauth/revoke?
+  GET https://graph.facebook.com/v24.0/oauth/revoke?
     client_id={FACEBOOK_APP_ID}&
     client_secret={FACEBOOK_APP_SECRET}&
     revoke_token={old-access-token}&
     access_token={new-access-token}
   ```
 - **Rotation steps**: 1) Refresh token via API, 2) Update FACEBOOK_ACCESS_TOKEN secret with new token, 3) Revoke old token
-- **Generate new token** (if expired beyond 60 days): POST to `https://graph.facebook.com/v21.0/{SYSTEM-USER-ID}/access_tokens` with business_app, scope, appsecret_proof, set_token_expires_in_60_days=true
+- **Generate new token** (if expired beyond 60 days): POST to `https://graph.facebook.com/v24.0/{SYSTEM-USER-ID}/access_tokens` with business_app, scope, appsecret_proof, set_token_expires_in_60_days=true
 - appsecret_proof = HMAC-SHA256(access_token, app_secret)
 
 ## Public Pages
