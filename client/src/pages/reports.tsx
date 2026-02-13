@@ -1119,10 +1119,8 @@ function FunnelReport({
             const prevStepNum = step.stepNumber - 1;
             const prevCount = prevStepNum < 1 ? audLands : (totalByStepNum.get(prevStepNum) ?? audLands);
             const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
-            const cvr = audLands > 0 ? (step.completions / audLands) * 100 : 0;
-            const scvr = step.stepNumber === 1
-              ? (audLands > 0 ? (step.sessionsWithPrev / audLands) * 100 : 0)
-              : (prevCount > 0 ? (step.sessionsWithPrev / prevCount) * 100 : 0);
+            const cvr = prevCount > 0 ? (step.completions / prevCount) * 100 : 0;
+            const scvr = audLands > 0 ? (step.completions / audLands) * 100 : 0;
             return { ...step, dropOff, cvr, scvr, prevCount };
           });
 
@@ -1142,8 +1140,8 @@ function FunnelReport({
                 <TableRow className="h-5">
                   <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Step</TableHead>
                   <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Count</TableHead>
-                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">CVR</TableHead>
-                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">SCVR</TableHead>
+                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap" title="Conversion from previous step">CVR</TableHead>
+                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap" title="Conversion from landing">Land CVR</TableHead>
                   <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Drop-off</TableHead>
                   <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Drop-off Visual</TableHead>
                 </TableRow>
