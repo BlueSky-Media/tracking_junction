@@ -800,18 +800,18 @@ export async function registerRoutes(
 
   app.get("/api/meta-conversions/missing", isAuthenticated, async (req, res) => {
     try {
-      const { startDate, endDate, adId, page } = req.query as {
+      const { startDate, endDate, adId, audience } = req.query as {
         startDate?: string;
         endDate?: string;
         adId?: string;
-        page?: string;
+        audience?: string;
       };
 
       const formCompletes = await storage.getFormCompleteEventsWithFbData({
         startDate,
         endDate,
         adId,
-        page,
+        page: audience,
       });
 
       const uploadedIds = await storage.getUploadedEventIds();

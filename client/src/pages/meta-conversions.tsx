@@ -337,14 +337,26 @@ export default function MetaConversionsPage() {
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-muted-foreground uppercase">Ad ID</label>
-              <input
-                type="text"
-                value={adIdFilter}
-                onChange={(e) => { setAdIdFilter(e.target.value); setPage(1); }}
-                placeholder="Filter by ad ID"
-                className="h-9 rounded-md border px-2 text-[11px] bg-background w-[160px]"
-                data-testid="input-ad-id-filter"
-              />
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={adIdFilter}
+                  onChange={(e) => { setAdIdFilter(e.target.value); setPage(1); }}
+                  placeholder="Filter by ad ID"
+                  className="h-9 rounded-md border px-2 text-[11px] bg-background w-[160px]"
+                  data-testid="input-ad-id-filter"
+                />
+                {adIdFilter && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => { setAdIdFilter(""); setPage(1); }}
+                    data-testid="button-clear-ad-filter"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -458,7 +470,16 @@ export default function MetaConversionsPage() {
                     </TableHeader>
                     <TableBody>
                       {comparisonQuery.data?.comparison?.map((row) => (
-                        <TableRow key={row.adId} data-testid={`row-comparison-${row.adId}`}>
+                        <TableRow
+                          key={row.adId}
+                          data-testid={`row-comparison-${row.adId}`}
+                          className={`cursor-pointer hover-elevate ${row.difference > 0 ? "border-l-0" : ""}`}
+                          onClick={() => {
+                            setAdIdFilter(row.adId);
+                            setPage(1);
+                            document.getElementById("events-section")?.scrollIntoView({ behavior: "smooth" });
+                          }}
+                        >
                           <TableCell className="text-[10px] py-1 px-2 max-w-[150px] truncate">{row.campaignName || row.campaignId}</TableCell>
                           <TableCell className="text-[10px] py-1 px-2 max-w-[150px] truncate">{row.adsetName || row.adsetId}</TableCell>
                           <TableCell className="text-[10px] py-1 px-2 max-w-[150px] truncate">{row.adName || row.adId}</TableCell>
@@ -471,6 +492,7 @@ export default function MetaConversionsPage() {
                       ))}
                     </TableBody>
                   </Table>
+                  <p className="text-[9px] text-muted-foreground mt-2">Click a row to filter events below by that ad</p>
                 </div>
               )}
             </CardContent>
@@ -478,7 +500,7 @@ export default function MetaConversionsPage() {
         </Card>
       </Collapsible>
 
-      <Card>
+      <Card id="events-section">
         <CardHeader className="p-3 pb-0">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <CardTitle className="text-xs font-semibold">Form Complete Events with FB Data</CardTitle>
