@@ -154,7 +154,7 @@ export default function MetaConversionsPage() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [testMode, setTestMode] = useState(false);
-  const [testEventCode, setTestEventCode] = useState("");
+  const [testEventCode, setTestEventCode] = useState(() => localStorage.getItem("capi_test_event_code") || "");
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedAdAccount, setSelectedAdAccount] = useState("");
@@ -388,16 +388,19 @@ export default function MetaConversionsPage() {
             <input
               type="text"
               value={testEventCode}
-              onChange={(e) => setTestEventCode(e.target.value)}
-              placeholder="Paste test_event_code from Events Manager"
-              className="h-8 rounded-md border px-2 text-[10px] bg-background w-[260px]"
+              onChange={(e) => {
+                setTestEventCode(e.target.value);
+                localStorage.setItem("capi_test_event_code", e.target.value);
+              }}
+              placeholder="Paste test_event_code from Events Manager (required)"
+              className={`h-8 rounded-md border px-2 text-[10px] bg-background w-[280px] ${!testEventCode.trim() ? "border-destructive" : ""}`}
               data-testid="input-test-event-code"
             />
           )}
           <Button
             size="sm"
             variant="outline"
-            disabled={selected.size === 0 || uploadMutation.isPending || !isConfigured}
+            disabled={selected.size === 0 || uploadMutation.isPending || !isConfigured || (testMode && !testEventCode.trim())}
             onClick={handleUploadSelected}
             data-testid="button-upload-selected"
           >
@@ -406,7 +409,7 @@ export default function MetaConversionsPage() {
           </Button>
           <Button
             size="sm"
-            disabled={allMissingIds.length === 0 || uploadMutation.isPending || !isConfigured}
+            disabled={allMissingIds.length === 0 || uploadMutation.isPending || !isConfigured || (testMode && !testEventCode.trim())}
             onClick={handleUploadAllMissing}
             data-testid="button-upload-all-missing"
           >
