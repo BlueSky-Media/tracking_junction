@@ -920,7 +920,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "FACEBOOK_PIXEL_ID and FACEBOOK_ACCESS_TOKEN must be configured" });
       }
 
-      const { eventIds, testMode } = req.body as { eventIds: number[]; testMode?: boolean };
+      const { eventIds, testMode, testEventCode: userTestCode } = req.body as { eventIds: number[]; testMode?: boolean; testEventCode?: string };
 
       if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
         return res.status(400).json({ message: "eventIds array is required" });
@@ -971,7 +971,7 @@ export async function registerRoutes(
         return res.json({ results, sent: 0, received: 0 });
       }
 
-      const testEventCode = testMode ? "TEST_CAPI_" + Date.now() : undefined;
+      const testEventCode = testMode ? (userTestCode || "TEST_CAPI_" + Date.now()) : undefined;
 
       const batchSize = 50;
       let totalReceived = 0;

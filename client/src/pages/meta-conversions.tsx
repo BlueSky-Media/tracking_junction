@@ -154,6 +154,7 @@ export default function MetaConversionsPage() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [testMode, setTestMode] = useState(false);
+  const [testEventCode, setTestEventCode] = useState("");
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedAdAccount, setSelectedAdAccount] = useState("");
@@ -201,7 +202,7 @@ export default function MetaConversionsPage() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async (payload: { eventIds: number[]; testMode?: boolean }) => {
+    mutationFn: async (payload: { eventIds: number[]; testMode?: boolean; testEventCode?: string }) => {
       const res = await apiRequest("POST", "/api/meta-conversions/upload", payload);
       return res.json() as Promise<UploadResult>;
     },
@@ -249,12 +250,12 @@ export default function MetaConversionsPage() {
   const handleUploadSelected = () => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    uploadMutation.mutate({ eventIds: ids, testMode });
+    uploadMutation.mutate({ eventIds: ids, testMode, testEventCode: testMode && testEventCode ? testEventCode : undefined });
   };
 
   const handleUploadAllMissing = () => {
     if (allMissingIds.length === 0) return;
-    uploadMutation.mutate({ eventIds: allMissingIds, testMode });
+    uploadMutation.mutate({ eventIds: allMissingIds, testMode, testEventCode: testMode && testEventCode ? testEventCode : undefined });
   };
 
   const status = statusQuery.data;
@@ -383,6 +384,16 @@ export default function MetaConversionsPage() {
             />
             <span className="text-[10px] text-muted-foreground">Test Mode</span>
           </div>
+          {testMode && (
+            <input
+              type="text"
+              value={testEventCode}
+              onChange={(e) => setTestEventCode(e.target.value)}
+              placeholder="Paste test_event_code from Events Manager"
+              className="h-8 rounded-md border px-2 text-[10px] bg-background w-[260px]"
+              data-testid="input-test-event-code"
+            />
+          )}
           <Button
             size="sm"
             variant="outline"
