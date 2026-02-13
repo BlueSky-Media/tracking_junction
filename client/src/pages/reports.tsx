@@ -273,13 +273,20 @@ function localDateTimeToUTC(date: Date, time: string, tz: string): { utcDate: st
     if (utcTotalMin2 >= 1440) { utcTotalMin2 -= 1440; dayShift2 = 1; }
     const finalUtc = new Date(dateStr + "T00:00:00Z");
     finalUtc.setUTCDate(finalUtc.getUTCDate() + dayShift2);
+    finalUtc.setUTCHours(Math.floor(utcTotalMin2 / 60), utcTotalMin2 % 60, 0, 0);
+    const utcY = finalUtc.getUTCFullYear();
+    const utcM = String(finalUtc.getUTCMonth() + 1).padStart(2, "0");
+    const utcD = String(finalUtc.getUTCDate()).padStart(2, "0");
     return {
-      utcDate: format(finalUtc, "yyyy-MM-dd"),
+      utcDate: `${utcY}-${utcM}-${utcD}`,
       utcTime: `${Math.floor(utcTotalMin2 / 60).toString().padStart(2, "0")}:${(utcTotalMin2 % 60).toString().padStart(2, "0")}`,
     };
   }
+  const utcY = candidateUtc.getUTCFullYear();
+  const utcM = String(candidateUtc.getUTCMonth() + 1).padStart(2, "0");
+  const utcD = String(candidateUtc.getUTCDate()).padStart(2, "0");
   return {
-    utcDate: format(candidateUtc, "yyyy-MM-dd"),
+    utcDate: `${utcY}-${utcM}-${utcD}`,
     utcTime: `${candidateUtc.getUTCHours().toString().padStart(2, "0")}:${candidateUtc.getUTCMinutes().toString().padStart(2, "0")}`,
   };
 }
