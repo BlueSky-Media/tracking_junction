@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -154,8 +153,6 @@ export default function MetaConversionsPage() {
   const [adIdFilter, setAdIdFilter] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [testMode, setTestMode] = useState(false);
-  const [testEventCode, setTestEventCode] = useState(() => localStorage.getItem("capi_test_event_code") || "");
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedAdAccount, setSelectedAdAccount] = useState("");
@@ -203,16 +200,14 @@ export default function MetaConversionsPage() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async (payload: { eventIds: number[]; testMode?: boolean; testEventCode?: string }) => {
+    mutationFn: async (payload: { eventIds: number[] }) => {
       const res = await apiRequest("POST", "/api/meta-conversions/upload", payload);
       return res.json() as Promise<UploadResult>;
     },
     onSuccess: (data) => {
       toast({
         title: `Upload complete: ${data.received}/${data.sent} events processed`,
-        description: data.testMode
-          ? `Test mode - code: ${data.testEventCode} | Pixel: ${data.pixelId}`
-          : `Sent to pixel: ${data.pixelId}`,
+        description: `Sent to pixel: ${data.pixelId}`,
       });
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ["/api/meta-conversions/missing"] });
@@ -253,12 +248,12 @@ export default function MetaConversionsPage() {
   const handleUploadSelected = () => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    uploadMutation.mutate({ eventIds: ids, testMode, testEventCode: testMode && testEventCode ? testEventCode : undefined });
+    uploadMutation.mutate({ eventIds: ids });
   };
 
   const handleUploadAllMissing = () => {
     if (allMissingIds.length === 0) return;
-    uploadMutation.mutate({ eventIds: allMissingIds, testMode, testEventCode: testMode && testEventCode ? testEventCode : undefined });
+    uploadMutation.mutate({ eventIds: allMissingIds });
   };
 
   const status = statusQuery.data;
@@ -379,31 +374,10 @@ export default function MetaConversionsPage() {
           </Badge>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <Switch
-              checked={testMode}
-              onCheckedChange={setTestMode}
-              data-testid="switch-test-mode"
-            />
-            <span className="text-[10px] text-muted-foreground" title="Events are still posted live but also appear in Facebook's Test Events tab for verification">Test Mode (visible in FB Test tab)</span>
-          </div>
-          {testMode && (
-            <input
-              type="text"
-              value={testEventCode}
-              onChange={(e) => {
-                setTestEventCode(e.target.value);
-                localStorage.setItem("capi_test_event_code", e.target.value);
-              }}
-              placeholder="Paste test_event_code from Events Manager (required)"
-              className={`h-8 rounded-md border px-2 text-[10px] bg-background w-[280px] ${!testEventCode.trim() ? "border-destructive" : ""}`}
-              data-testid="input-test-event-code"
-            />
-          )}
           <Button
             size="sm"
             variant="outline"
-            disabled={selected.size === 0 || uploadMutation.isPending || !isConfigured || (testMode && !testEventCode.trim())}
+            disabled={selected.size === 0 || uploadMutation.isPending || !isConfigured}
             onClick={handleUploadSelected}
             data-testid="button-upload-selected"
           >
@@ -412,7 +386,7 @@ export default function MetaConversionsPage() {
           </Button>
           <Button
             size="sm"
-            disabled={allMissingIds.length === 0 || uploadMutation.isPending || !isConfigured || (testMode && !testEventCode.trim())}
+            disabled={allMissingIds.length === 0 || uploadMutation.isPending || !isConfigured}
             onClick={handleUploadAllMissing}
             data-testid="button-upload-all-missing"
           >
