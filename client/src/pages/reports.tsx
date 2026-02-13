@@ -784,8 +784,8 @@ function DrilldownTable({
             {visibleSteps.map((step) => (
               <Fragment key={`sh-grp-${step.stepKey}`}>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap border-l border-border/30">#</TableHead>
-                <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">CVR</TableHead>
-                <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">SCVR</TableHead>
+                <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap" title="Conversion from landing">Land CVR</TableHead>
+                <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap" title="Session-based conversion from previous step">CVR</TableHead>
                 <TableHead className="text-[8px] text-right px-0.5 py-0 text-muted-foreground whitespace-nowrap">Drop-off</TableHead>
               </Fragment>
             ))}
@@ -1119,7 +1119,9 @@ function FunnelReport({
             const prevStepNum = step.stepNumber - 1;
             const prevCount = prevStepNum < 1 ? audLands : (totalByStepNum.get(prevStepNum) ?? audLands);
             const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
-            const cvr = prevCount > 0 ? (step.completions / prevCount) * 100 : 0;
+            const cvr = step.stepNumber === 1
+              ? (audLands > 0 ? (step.sessionsWithPrev / audLands) * 100 : 0)
+              : (prevCount > 0 ? (step.sessionsWithPrev / prevCount) * 100 : 0);
             const scvr = audLands > 0 ? (step.completions / audLands) * 100 : 0;
             return { ...step, dropOff, cvr, scvr, prevCount };
           });

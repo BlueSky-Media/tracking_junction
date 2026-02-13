@@ -896,7 +896,8 @@ class DatabaseStorage implements IStorage {
       return keys.map((sk) => {
         const stepData = stepsMap.get(sk);
         const completions = stepData?.completions || 0;
-        const convFromPrev = prevCount > 0 ? (completions / prevCount) * 100 : 0;
+        const sessWithPrev = stepData?.sessionsWithPrev || 0;
+        const convFromPrev = prevCount > 0 ? (sessWithPrev / prevCount) * 100 : 0;
         const landBase = perStepLandBase?.get(sk) ?? defaultBase;
         const convFromInitial = landBase > 0 ? (completions / landBase) * 100 : 0;
         if (completions > 0) prevCount = completions;
