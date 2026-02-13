@@ -786,7 +786,7 @@ class DatabaseStorage implements IStorage {
           step_name,
           COUNT(DISTINCT session_id) as completions
         FROM grouped_steps
-        WHERE event_type = 'step_complete' OR event_type IS NULL
+        WHERE event_type IN ('step_complete', 'form_complete') OR event_type IS NULL
         GROUP BY group_value, step_number, step_name
       ),
       form_completions AS (
