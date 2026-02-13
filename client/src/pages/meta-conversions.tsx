@@ -385,7 +385,7 @@ export default function MetaConversionsPage() {
               onCheckedChange={setTestMode}
               data-testid="switch-test-mode"
             />
-            <span className="text-[10px] text-muted-foreground">Test Mode</span>
+            <span className="text-[10px] text-muted-foreground" title="Events are still posted live but also appear in Facebook's Test Events tab for verification">Test Mode (visible in FB Test tab)</span>
           </div>
           {testMode && (
             <input
