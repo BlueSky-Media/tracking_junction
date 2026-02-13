@@ -54,6 +54,12 @@ interface CapiEvent {
   geoState: string | null;
   deviceType: string | null;
   placement: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmContent: string | null;
+  utmTerm: string | null;
+  utmId: string | null;
 }
 
 interface MissingResult {
@@ -507,8 +513,10 @@ export default function MetaConversionsPage() {
                       <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Audience</TableHead>
                       <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Name</TableHead>
                       <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Email</TableHead>
-                      <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Ad Name</TableHead>
-                      <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Ad ID</TableHead>
+                      <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Campaign</TableHead>
+                      <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Ad Set</TableHead>
+                      <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Ad</TableHead>
+                      <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Placement</TableHead>
                       <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap text-center">Signals</TableHead>
                       <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap text-center">Status</TableHead>
                     </TableRow>
@@ -542,10 +550,18 @@ export default function MetaConversionsPage() {
                         <TableCell className="text-[10px] py-1 px-2 truncate max-w-[140px]" title={ev.maskedEmail || ""}>
                           {ev.maskedEmail || "-"}
                         </TableCell>
-                        <TableCell className="text-[10px] py-1 px-2 truncate max-w-[140px]" title={ev.adName || ""}>
-                          {ev.adName || "-"}
+                        <TableCell className="text-[10px] py-1 px-2 truncate max-w-[120px]" title={ev.campaignName || ev.campaignId || ""}>
+                          {ev.campaignName || ev.campaignId || "-"}
                         </TableCell>
-                        <TableCell className="text-[10px] py-1 px-2 font-mono">{ev.adId || "-"}</TableCell>
+                        <TableCell className="text-[10px] py-1 px-2 truncate max-w-[120px]" title={ev.adsetName || ev.adsetId || ""}>
+                          {ev.adsetName || ev.adsetId || "-"}
+                        </TableCell>
+                        <TableCell className="text-[10px] py-1 px-2 truncate max-w-[120px]" title={ev.adName || ev.adId || ""}>
+                          {ev.adName || ev.adId || "-"}
+                        </TableCell>
+                        <TableCell className="text-[10px] py-1 px-2 truncate max-w-[100px]" title={ev.placement || ""}>
+                          {ev.placement || "-"}
+                        </TableCell>
                         <TableCell className="py-1 px-2">
                           <div className="flex items-center gap-0.5 justify-center">
                             <SignalIcon active={ev.fbclid} icon={MousePointerClick} label="fbclid" />

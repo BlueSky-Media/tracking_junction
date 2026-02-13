@@ -828,23 +828,29 @@ export async function registerRoutes(
         nameInitials: [e.firstName?.[0], e.lastName?.[0]].filter(Boolean).join("") || null,
         maskedEmail: e.email ? e.email.replace(/^(.{2})(.*)(@.*)$/, "$1***$3") : null,
         maskedPhone: e.phone ? e.phone.replace(/^(\d{3})(\d+)(\d{2})$/, "$1***$3") : null,
-        adId: e.adId,
-        adName: e.adName,
-        adsetId: e.adsetId,
-        adsetName: e.adsetName,
-        campaignId: e.campaignId,
-        campaignName: e.campaignName,
-        fbclid: !!e.fbclid,
-        fbp: !!e.fbp,
-        fbc: !!e.fbc,
-        externalId: !!e.externalId,
+        adId: e.sessionAdId || e.adId,
+        adName: e.sessionAdName || e.adName,
+        adsetId: e.sessionAdsetId || e.adsetId,
+        adsetName: e.sessionAdsetName || e.adsetName,
+        campaignId: e.sessionCampaignId || e.campaignId,
+        campaignName: e.sessionCampaignName || e.campaignName,
+        fbclid: !!(e.sessionFbclid || e.fbclid),
+        fbp: !!(e.sessionFbp || e.fbp),
+        fbc: !!(e.sessionFbc || e.fbc),
+        externalId: !!(e.sessionExternalId || e.externalId),
         ipAddress: !!e.ipAddress,
         hasEmail: !!e.email,
         hasPhone: !!e.phone,
         uploaded: uploadedIds.has(e.id),
         geoState: e.geoState,
         deviceType: e.deviceType,
-        placement: e.placement,
+        placement: e.sessionPlacement || e.placement,
+        utmSource: e.sessionUtmSource || e.utmSource,
+        utmMedium: e.sessionUtmMedium || e.utmMedium,
+        utmCampaign: e.sessionUtmCampaign || e.utmCampaign,
+        utmContent: e.sessionUtmContent || e.utmContent,
+        utmTerm: e.sessionUtmTerm || e.utmTerm,
+        utmId: e.sessionUtmId || e.utmId,
       }));
 
       res.json({ events, total: events.length, uploaded: events.filter(e => e.uploaded).length });
@@ -941,7 +947,24 @@ export async function registerRoutes(
           results.push({ eventId: id, status: "skipped", message: "Already uploaded" });
           continue;
         }
-        eventsToSend.push({ trackingEvent: event, convEvent: buildConversionEvent(event) });
+        eventsToSend.push({ trackingEvent: event, convEvent: buildConversionEvent({
+          eventId: event.eventId,
+          sessionId: event.sessionId,
+          eventTimestamp: event.eventTimestamp,
+          pageUrl: event.pageUrl,
+          email: event.email,
+          phone: event.phone,
+          firstName: event.firstName,
+          lastName: event.lastName,
+          geoState: event.geoState,
+          country: event.country,
+          externalId: event.sessionExternalId || event.externalId,
+          ipAddress: event.ipAddress,
+          userAgent: event.userAgent,
+          fbp: event.sessionFbp || event.fbp,
+          fbc: event.sessionFbc || event.fbc,
+          fbclid: event.sessionFbclid || event.fbclid,
+        }) });
       }
 
       if (eventsToSend.length === 0) {

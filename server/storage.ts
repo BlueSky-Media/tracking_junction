@@ -12,7 +12,7 @@ import {
   type MetaConversionUpload,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or, inArray, type SQL } from "drizzle-orm";
 
 export interface AnalyticsFilters {
   page?: string | string[];
@@ -1303,35 +1303,147 @@ class DatabaseStorage implements IStorage {
     endDate?: string;
     adId?: string;
     page?: string;
-  }): Promise<TrackingEvent[]> {
-    const conditions = [
-      eq(trackingEvents.eventType, "form_complete"),
-      or(
-        isNotNull(trackingEvents.fbclid),
-        isNotNull(trackingEvents.fbp),
-        isNotNull(trackingEvents.externalId),
-      ),
-    ];
+  }): Promise<(TrackingEvent & { sessionFbclid?: string | null; sessionFbp?: string | null; sessionFbc?: string | null; sessionExternalId?: string | null; sessionAdId?: string | null; sessionAdName?: string | null; sessionAdsetId?: string | null; sessionAdsetName?: string | null; sessionCampaignId?: string | null; sessionCampaignName?: string | null; sessionPlacement?: string | null; sessionUtmSource?: string | null; sessionUtmCampaign?: string | null; sessionUtmMedium?: string | null; sessionUtmContent?: string | null; sessionUtmTerm?: string | null; sessionUtmId?: string | null })[]> {
+    const conditions: SQL[] = [];
 
     if (filters.startDate) {
-      conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
+      conditions.push(sql`fc.event_timestamp >= ${new Date(filters.startDate)}`);
     }
     if (filters.endDate) {
       const end = new Date(filters.endDate);
       end.setDate(end.getDate() + 1);
-      conditions.push(lte(trackingEvents.eventTimestamp, end));
+      conditions.push(sql`fc.event_timestamp <= ${end}`);
     }
     if (filters.adId) {
-      conditions.push(eq(trackingEvents.adId, filters.adId));
+      conditions.push(sql`(fc.ad_id = ${filters.adId} OR pl.ad_id = ${filters.adId} OR fc.utm_content = ${filters.adId} OR pl.utm_content = ${filters.adId})`);
     }
     if (filters.page) {
-      conditions.push(eq(trackingEvents.page, filters.page));
+      conditions.push(sql`fc.page = ${filters.page}`);
     }
 
-    return db.select()
-      .from(trackingEvents)
-      .where(and(...conditions))
-      .orderBy(desc(trackingEvents.eventTimestamp));
+    const extraConditions = conditions.length > 0
+      ? sql` AND ${sql.join(conditions, sql` AND `)}`
+      : sql``;
+
+    const query = sql`
+      SELECT fc.*,
+        COALESCE(fc.fbclid, pl.fbclid) as session_fbclid,
+        COALESCE(fc.fbp, pl.fbp) as session_fbp,
+        COALESCE(fc.fbc, pl.fbc) as session_fbc,
+        COALESCE(fc.external_id, pl.external_id) as session_external_id,
+        COALESCE(fc.ad_id, pl.ad_id) as session_ad_id,
+        COALESCE(fc.ad_name, pl.ad_name) as session_ad_name,
+        COALESCE(fc.adset_id, pl.adset_id) as session_adset_id,
+        COALESCE(fc.adset_name, pl.adset_name) as session_adset_name,
+        COALESCE(fc.campaign_id, pl.campaign_id) as session_campaign_id,
+        COALESCE(fc.campaign_name, pl.campaign_name) as session_campaign_name,
+        COALESCE(fc.placement, pl.placement) as session_placement,
+        COALESCE(fc.utm_source, pl.utm_source) as session_utm_source,
+        COALESCE(fc.utm_campaign, pl.utm_campaign) as session_utm_campaign,
+        COALESCE(fc.utm_medium, pl.utm_medium) as session_utm_medium,
+        COALESCE(fc.utm_content, pl.utm_content) as session_utm_content,
+        COALESCE(fc.utm_term, pl.utm_term) as session_utm_term,
+        COALESCE(fc.utm_id, pl.utm_id) as session_utm_id
+      FROM tracking_events fc
+      LEFT JOIN LATERAL (
+        SELECT * FROM tracking_events pl2
+        WHERE pl2.session_id = fc.session_id
+          AND pl2.event_type = 'page_land'
+        ORDER BY pl2.event_timestamp ASC
+        LIMIT 1
+      ) pl ON true
+      WHERE fc.event_type = 'form_complete'
+        AND (
+          fc.fbclid IS NOT NULL OR fc.fbp IS NOT NULL OR fc.external_id IS NOT NULL
+          OR fc.ad_id IS NOT NULL OR fc.utm_content IS NOT NULL
+          OR fc.utm_campaign IS NOT NULL OR fc.utm_term IS NOT NULL OR fc.utm_id IS NOT NULL
+          OR pl.fbclid IS NOT NULL OR pl.fbp IS NOT NULL OR pl.external_id IS NOT NULL
+          OR pl.ad_id IS NOT NULL OR pl.utm_content IS NOT NULL
+          OR pl.utm_campaign IS NOT NULL OR pl.utm_term IS NOT NULL OR pl.utm_id IS NOT NULL
+        )
+        ${extraConditions}
+      ORDER BY fc.event_timestamp DESC
+    `;
+
+    const result = await db.execute(query);
+
+    return (result.rows as any[]).map((row: any) => ({
+      ...this.mapRowToTrackingEvent(row),
+      sessionFbclid: row.session_fbclid,
+      sessionFbp: row.session_fbp,
+      sessionFbc: row.session_fbc,
+      sessionExternalId: row.session_external_id,
+      sessionAdId: row.session_ad_id,
+      sessionAdName: row.session_ad_name,
+      sessionAdsetId: row.session_adset_id,
+      sessionAdsetName: row.session_adset_name,
+      sessionCampaignId: row.session_campaign_id,
+      sessionCampaignName: row.session_campaign_name,
+      sessionPlacement: row.session_placement,
+      sessionUtmSource: row.session_utm_source,
+      sessionUtmCampaign: row.session_utm_campaign,
+      sessionUtmMedium: row.session_utm_medium,
+      sessionUtmContent: row.session_utm_content,
+      sessionUtmTerm: row.session_utm_term,
+      sessionUtmId: row.session_utm_id,
+    }));
+  }
+
+  private mapRowToTrackingEvent(row: any): TrackingEvent {
+    return {
+      id: row.id,
+      page: row.page,
+      pageType: row.page_type,
+      domain: row.domain,
+      stepNumber: row.step_number,
+      stepName: row.step_name,
+      selectedValue: row.selected_value,
+      sessionId: row.session_id,
+      userAgent: row.user_agent,
+      eventType: row.event_type,
+      utmSource: row.utm_source,
+      utmCampaign: row.utm_campaign,
+      utmMedium: row.utm_medium,
+      utmContent: row.utm_content,
+      deviceType: row.device_type,
+      referrer: row.referrer,
+      eventTimestamp: new Date(row.event_timestamp),
+      timeOnStep: row.time_on_step,
+      os: row.os,
+      browser: row.browser,
+      placement: row.placement,
+      geoState: row.geo_state,
+      ipAddress: row.ip_address,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      email: row.email,
+      phone: row.phone,
+      eventId: row.event_id,
+      externalId: row.external_id,
+      utmTerm: row.utm_term,
+      utmId: row.utm_id,
+      mediaType: row.media_type,
+      campaignName: row.campaign_name,
+      campaignId: row.campaign_id,
+      adName: row.ad_name,
+      adId: row.ad_id,
+      adsetName: row.adset_name,
+      adsetId: row.adset_id,
+      fbclid: row.fbclid,
+      fbc: row.fbc,
+      fbp: row.fbp,
+      quizAnswers: row.quiz_answers,
+      pageUrl: row.page_url,
+      screenResolution: row.screen_resolution,
+      viewport: row.viewport,
+      language: row.language,
+      selectedState: row.selected_state,
+      country: row.country,
+      browserVersion: row.browser_version,
+      osVersion: row.os_version,
+      ipType: row.ip_type,
+      receivedAt: row.received_at ? new Date(row.received_at) : new Date(),
+    };
   }
 
   async getUploadedEventIds(): Promise<Set<number>> {
@@ -1360,46 +1472,53 @@ class DatabaseStorage implements IStorage {
     startDate?: string;
     endDate?: string;
   }): Promise<{ adId: string; adName: string | null; campaignId: string | null; campaignName: string | null; adsetId: string | null; adsetName: string | null; count: number }[]> {
-    const conditions = [
-      eq(trackingEvents.eventType, "form_complete"),
-      isNotNull(trackingEvents.adId),
-    ];
+    const conditions: SQL[] = [];
+
     if (filters.startDate) {
-      conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
+      conditions.push(sql`fc.event_timestamp >= ${new Date(filters.startDate)}`);
     }
     if (filters.endDate) {
       const end = new Date(filters.endDate);
       end.setDate(end.getDate() + 1);
-      conditions.push(lte(trackingEvents.eventTimestamp, end));
+      conditions.push(sql`fc.event_timestamp <= ${end}`);
     }
 
-    const rows = await db.select({
-      adId: trackingEvents.adId,
-      adName: trackingEvents.adName,
-      campaignId: trackingEvents.campaignId,
-      campaignName: trackingEvents.campaignName,
-      adsetId: trackingEvents.adsetId,
-      adsetName: trackingEvents.adsetName,
-      count: count(),
-    })
-      .from(trackingEvents)
-      .where(and(...conditions))
-      .groupBy(
-        trackingEvents.adId,
-        trackingEvents.adName,
-        trackingEvents.campaignId,
-        trackingEvents.campaignName,
-        trackingEvents.adsetId,
-        trackingEvents.adsetName,
-      );
+    const extraConditions = conditions.length > 0
+      ? sql` AND ${sql.join(conditions, sql` AND `)}`
+      : sql``;
 
-    return rows.filter(r => r.adId).map(r => ({
-      adId: r.adId!,
-      adName: r.adName,
-      campaignId: r.campaignId,
-      campaignName: r.campaignName,
-      adsetId: r.adsetId,
-      adsetName: r.adsetName,
+    const query = sql`
+      SELECT
+        COALESCE(fc.ad_id, pl.ad_id, fc.utm_content, pl.utm_content) as effective_ad_id,
+        COALESCE(fc.ad_name, pl.ad_name) as effective_ad_name,
+        COALESCE(fc.campaign_id, pl.campaign_id, fc.utm_campaign, pl.utm_campaign, fc.utm_id, pl.utm_id) as effective_campaign_id,
+        COALESCE(fc.campaign_name, pl.campaign_name) as effective_campaign_name,
+        COALESCE(fc.adset_id, pl.adset_id, fc.utm_term, pl.utm_term) as effective_adset_id,
+        COALESCE(fc.adset_name, pl.adset_name) as effective_adset_name,
+        COUNT(*) as count
+      FROM tracking_events fc
+      LEFT JOIN LATERAL (
+        SELECT * FROM tracking_events pl2
+        WHERE pl2.session_id = fc.session_id
+          AND pl2.event_type = 'page_land'
+        ORDER BY pl2.event_timestamp ASC
+        LIMIT 1
+      ) pl ON true
+      WHERE fc.event_type = 'form_complete'
+        AND COALESCE(fc.ad_id, pl.ad_id, fc.utm_content, pl.utm_content) IS NOT NULL
+        ${extraConditions}
+      GROUP BY effective_ad_id, effective_ad_name, effective_campaign_id, effective_campaign_name, effective_adset_id, effective_adset_name
+    `;
+
+    const result = await db.execute(query);
+
+    return (result.rows as any[]).filter(r => r.effective_ad_id).map(r => ({
+      adId: r.effective_ad_id,
+      adName: r.effective_ad_name,
+      campaignId: r.effective_campaign_id,
+      campaignName: r.effective_campaign_name,
+      adsetId: r.effective_adset_id,
+      adsetName: r.effective_adset_name,
       count: Number(r.count),
     }));
   }
