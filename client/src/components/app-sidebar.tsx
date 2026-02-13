@@ -1,8 +1,10 @@
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { LayoutDashboard, BarChart3, FileText, LogOut, Server, Ban, Megaphone } from "lucide-react";
+import { useTimezone, TIMEZONE_OPTIONS } from "@/hooks/use-timezone";
+import { LayoutDashboard, BarChart3, FileText, LogOut, Server, Ban, Megaphone, Globe } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sidebar,
   SidebarContent,
@@ -30,6 +32,7 @@ const navItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const { timezone, setTimezone, getTimezoneShort } = useTimezone();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
 
@@ -84,7 +87,27 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
+      <SidebarFooter className="p-3 space-y-2">
+        {!collapsed && (
+          <div className="flex items-center gap-1.5">
+            <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <Select value={timezone} onValueChange={setTimezone}>
+              <SelectTrigger className="h-7 text-[11px] flex-1" data-testid="select-timezone">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIMEZONE_OPTIONS.map((tz) => (
+                  <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {collapsed && (
+          <div className="flex justify-center" title={getTimezoneShort()}>
+            <Globe className="w-4 h-4 text-muted-foreground" />
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Avatar className="w-8 h-8 shrink-0">
             <AvatarImage

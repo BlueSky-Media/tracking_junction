@@ -24,6 +24,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `client/src/pages/landing.tsx` - Landing/login page
 - `client/src/pages/facebook-ads.tsx` - Facebook Ads page (Meta Marketing API integration)
 - `client/src/pages/privacy.tsx` - Public privacy policy page (no auth required, at /page/privacy)
+- `client/src/hooks/use-timezone.tsx` - Timezone context provider (localStorage-persisted, converts local time to UTC for API queries)
 - `client/src/components/` - Dashboard components (filters, funnel chart, funnel table, step breakdown, stats cards, campaign table, device breakdown, time heatmap, contact funnel, referrer breakdown, csv export)
 
 ## API Endpoints

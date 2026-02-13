@@ -18,6 +18,7 @@ import {
   MinusCircle, Save, Columns, Info, GripVertical,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTimezone } from "@/hooks/use-timezone";
 import { format, formatDistanceToNow } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
@@ -27,6 +28,31 @@ const REFRESH_INTERVALS: { label: string; value: number }[] = [
   { label: "1m", value: 60000 },
   { label: "5m", value: 300000 },
 ];
+
+function LiveClock() {
+  const { timezone, getTimezoneShort } = useTimezone();
+  const [now, setNow] = useState("");
+  useEffect(() => {
+    const update = () => {
+      setNow(new Date().toLocaleString("en-US", {
+        timeZone: timezone,
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [timezone]);
+  return (
+    <span className="text-[10px] text-muted-foreground flex items-center gap-1 tabular-nums" data-testid="text-live-clock">
+      <Clock className="w-3 h-3" />
+      {now} {getTimezoneShort()}
+    </span>
+  );
+}
 
 interface DrilldownStepData {
   stepNumber: number;
@@ -209,12 +235,64 @@ function isFilterActive(values: string[]): boolean {
   return values.length > 0;
 }
 
-function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, extra?: Record<string, string>, timeRange?: { startTime?: string; endTime?: string }): string {
+function localDateTimeToUTC(date: Date, time: string | undefined, tz: string): { utcDate: string; utcTime?: string } {
+  const dateStr = format(date, "yyyy-MM-dd");
+  if (!time) return { utcDate: dateStr };
+  const [h, m] = time.split(":").map(Number);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric", month: "numeric", day: "numeric",
+    hour: "numeric", minute: "numeric", hour12: false,
+  });
+  const g = (parts: Intl.DateTimeFormatPart[], t: string) => parseInt(parts.find(p => p.type === t)!.value);
+  const guessUtcH = h;
+  const guessUtc = new Date(dateStr + `T${guessUtcH.toString().padStart(2, "0")}:${(m || 0).toString().padStart(2, "0")}:00Z`);
+  const parts1 = fmt.formatToParts(guessUtc);
+  const localH1 = g(parts1, "hour") === 24 ? 0 : g(parts1, "hour");
+  const localM1 = g(parts1, "minute");
+  const offset1 = (localH1 * 60 + localM1) - (guessUtc.getUTCHours() * 60 + guessUtc.getUTCMinutes());
+  const localTotalMin = h * 60 + (m || 0);
+  let utcTotalMin = localTotalMin - offset1;
+  let dayShift = 0;
+  if (utcTotalMin < 0) { utcTotalMin += 1440; dayShift = -1; }
+  if (utcTotalMin >= 1440) { utcTotalMin -= 1440; dayShift = 1; }
+  const candidateUtc = new Date(dateStr + "T00:00:00Z");
+  candidateUtc.setUTCDate(candidateUtc.getUTCDate() + dayShift);
+  candidateUtc.setUTCHours(Math.floor(utcTotalMin / 60), utcTotalMin % 60, 0, 0);
+  const parts2 = fmt.formatToParts(candidateUtc);
+  const localH2 = g(parts2, "hour") === 24 ? 0 : g(parts2, "hour");
+  const localM2 = g(parts2, "minute");
+  if (localH2 !== h || localM2 !== (m || 0)) {
+    const offset2 = (localH2 * 60 + localM2) - (candidateUtc.getUTCHours() * 60 + candidateUtc.getUTCMinutes());
+    let utcTotalMin2 = localTotalMin - offset2;
+    let dayShift2 = 0;
+    if (utcTotalMin2 < 0) { utcTotalMin2 += 1440; dayShift2 = -1; }
+    if (utcTotalMin2 >= 1440) { utcTotalMin2 -= 1440; dayShift2 = 1; }
+    const finalUtc = new Date(dateStr + "T00:00:00Z");
+    finalUtc.setUTCDate(finalUtc.getUTCDate() + dayShift2);
+    return {
+      utcDate: format(finalUtc, "yyyy-MM-dd"),
+      utcTime: `${Math.floor(utcTotalMin2 / 60).toString().padStart(2, "0")}:${(utcTotalMin2 % 60).toString().padStart(2, "0")}`,
+    };
+  }
+  return {
+    utcDate: format(candidateUtc, "yyyy-MM-dd"),
+    utcTime: `${candidateUtc.getUTCHours().toString().padStart(2, "0")}:${candidateUtc.getUTCMinutes().toString().padStart(2, "0")}`,
+  };
+}
+
+function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, extra?: Record<string, string>, timeRange?: { startTime?: string; endTime?: string }, tz?: string): string {
   const params = new URLSearchParams();
-  if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
-  if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
-  if (timeRange?.startTime) params.set("startTime", timeRange.startTime);
-  if (timeRange?.endTime) params.set("endTime", timeRange.endTime);
+  if (dateRange?.from) {
+    const converted = tz ? localDateTimeToUTC(dateRange.from, timeRange?.startTime, tz) : { utcDate: format(dateRange.from, "yyyy-MM-dd"), utcTime: timeRange?.startTime };
+    params.set("startDate", converted.utcDate);
+    if (converted.utcTime) params.set("startTime", converted.utcTime);
+  }
+  if (dateRange?.to) {
+    const converted = tz ? localDateTimeToUTC(dateRange.to, timeRange?.endTime, tz) : { utcDate: format(dateRange.to, "yyyy-MM-dd"), utcTime: timeRange?.endTime };
+    params.set("endDate", converted.utcDate);
+    if (converted.utcTime) params.set("endTime", converted.utcTime);
+  }
   setFilterParam(params, "domain", filters.domain);
   setFilterParam(params, "deviceType", filters.deviceType);
   setFilterParam(params, "audience", filters.page);
@@ -233,14 +311,20 @@ function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, ex
   return params.toString();
 }
 
-function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logPage: number, search: string, logLimit: number = 25, timeRange?: { startTime?: string; endTime?: string }): string {
+function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logPage: number, search: string, logLimit: number = 25, timeRange?: { startTime?: string; endTime?: string }, tz?: string): string {
   const params = new URLSearchParams();
   params.set("page", logPage.toString());
   params.set("limit", logLimit.toString());
-  if (dateRange?.from) params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
-  if (dateRange?.to) params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
-  if (timeRange?.startTime) params.set("startTime", timeRange.startTime);
-  if (timeRange?.endTime) params.set("endTime", timeRange.endTime);
+  if (dateRange?.from) {
+    const converted = tz ? localDateTimeToUTC(dateRange.from, timeRange?.startTime, tz) : { utcDate: format(dateRange.from, "yyyy-MM-dd"), utcTime: timeRange?.startTime };
+    params.set("startDate", converted.utcDate);
+    if (converted.utcTime) params.set("startTime", converted.utcTime);
+  }
+  if (dateRange?.to) {
+    const converted = tz ? localDateTimeToUTC(dateRange.to, timeRange?.endTime, tz) : { utcDate: format(dateRange.to, "yyyy-MM-dd"), utcTime: timeRange?.endTime };
+    params.set("endDate", converted.utcDate);
+    if (converted.utcTime) params.set("endTime", converted.utcTime);
+  }
   setFilterParam(params, "domain", filters.domain);
   setFilterParam(params, "deviceType", filters.deviceType);
   setFilterParam(params, "audience", filters.page);
@@ -554,7 +638,8 @@ function DrilldownTable({
     });
   }, []);
 
-  const queryStr = buildQueryParams(dateRange, globalFilters, { groupBy, ...parentFilters }, timeRange);
+  const { timezone } = useTimezone();
+  const queryStr = buildQueryParams(dateRange, globalFilters, { groupBy, ...parentFilters }, timeRange, timezone);
 
   const { data, isLoading } = useQuery<DrilldownResult>({
     queryKey: ["/api/analytics/drilldown", queryStr],
@@ -911,7 +996,8 @@ function FunnelReport({
   timeRange?: { startTime?: string; endTime?: string };
 }) {
 
-  const summaryQuery = buildQueryParams(dateRange, filters, { groupBy: "domain" }, timeRange);
+  const { timezone } = useTimezone();
+  const summaryQuery = buildQueryParams(dateRange, filters, { groupBy: "domain" }, timeRange, timezone);
   const { data: summaryData, isLoading: summaryLoading } = useQuery<DrilldownResult>({
     queryKey: ["/api/analytics/drilldown", "summary", summaryQuery],
     queryFn: async () => {
@@ -921,7 +1007,7 @@ function FunnelReport({
     },
   });
 
-  const audienceQuery = buildQueryParams(dateRange, filters, { groupBy: "page" }, timeRange);
+  const audienceQuery = buildQueryParams(dateRange, filters, { groupBy: "page" }, timeRange, timezone);
   const { data: audienceData, isLoading: audienceLoading } = useQuery<DrilldownResult>({
     queryKey: ["/api/analytics/drilldown", "audience-funnel", audienceQuery],
     queryFn: async () => {
@@ -1481,7 +1567,8 @@ function EventLogsSection({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const logsQueryStr = buildLogsQuery(dateRange, filters, logPage, debouncedSearch, logLimit, timeRange);
+  const { timezone } = useTimezone();
+  const logsQueryStr = buildLogsQuery(dateRange, filters, logPage, debouncedSearch, logLimit, timeRange, timezone);
   const sessionsQuery = useQuery<SessionLogResult>({
     queryKey: ["/api/analytics/sessions", logsQueryStr],
     queryFn: async () => {
@@ -2565,6 +2652,7 @@ export default function ReportsPage() {
             </Select>
           )}
         </div>
+        <LiveClock />
       </div>
 
       <FunnelReport dateRange={dateRange} filterOptions={filterOptions} filters={reportFilters} onFiltersChange={setReportFilters} drillDimension={drillDimension} onDrillDimensionChange={setDrillDimension} timeRange={timeRange} />
