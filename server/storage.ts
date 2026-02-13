@@ -231,20 +231,20 @@ function buildConditions(filters: AnalyticsFilters) {
   addFilterCondition(conditions, trackingEvents.pageType, filters.pageType);
   addFilterCondition(conditions, trackingEvents.domain, filters.domain);
   if (filters.startDate) {
-    const start = new Date(filters.startDate);
+    const start = new Date(filters.startDate + "T00:00:00Z");
     if (filters.startTime) {
       const [h, m] = filters.startTime.split(":").map(Number);
-      start.setHours(h || 0, m || 0, 0, 0);
+      start.setUTCHours(h || 0, m || 0, 0, 0);
     }
     conditions.push(gte(trackingEvents.eventTimestamp, start));
   }
   if (filters.endDate) {
-    const end = new Date(filters.endDate);
+    const end = new Date(filters.endDate + "T00:00:00Z");
     if (filters.endTime) {
       const [h, m] = filters.endTime.split(":").map(Number);
-      end.setHours(h || 23, m || 59, 59, 999);
+      end.setUTCHours(h || 23, m || 59, 59, 999);
     } else {
-      end.setHours(23, 59, 59, 999);
+      end.setUTCHours(23, 59, 59, 999);
     }
     conditions.push(lte(trackingEvents.eventTimestamp, end));
   }
@@ -981,20 +981,20 @@ class DatabaseStorage implements IStorage {
     addFilterCondition(conditions, trackingEvents.pageType, filters.pageType);
     addFilterCondition(conditions, trackingEvents.domain, filters.domain);
     if (filters.startDate) {
-      const start = new Date(filters.startDate);
+      const start = new Date(filters.startDate + "T00:00:00Z");
       if (filters.startTime) {
         const [h, m] = filters.startTime.split(":").map(Number);
-        start.setHours(h || 0, m || 0, 0, 0);
+        start.setUTCHours(h || 0, m || 0, 0, 0);
       }
       conditions.push(gte(trackingEvents.eventTimestamp, start));
     }
     if (filters.endDate) {
-      const end = new Date(filters.endDate);
+      const end = new Date(filters.endDate + "T00:00:00Z");
       if (filters.endTime) {
         const [h, m] = filters.endTime.split(":").map(Number);
-        end.setHours(h || 23, m || 59, 59, 999);
+        end.setUTCHours(h || 23, m || 59, 59, 999);
       } else {
-        end.setHours(23, 59, 59, 999);
+        end.setUTCHours(23, 59, 59, 999);
       }
       conditions.push(lte(trackingEvents.eventTimestamp, end));
     }

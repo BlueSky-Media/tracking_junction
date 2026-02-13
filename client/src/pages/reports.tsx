@@ -235,9 +235,8 @@ function isFilterActive(values: string[]): boolean {
   return values.length > 0;
 }
 
-function localDateTimeToUTC(date: Date, time: string | undefined, tz: string): { utcDate: string; utcTime?: string } {
+function localDateTimeToUTC(date: Date, time: string, tz: string): { utcDate: string; utcTime: string } {
   const dateStr = format(date, "yyyy-MM-dd");
-  if (!time) return { utcDate: dateStr };
   const [h, m] = time.split(":").map(Number);
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: tz,
@@ -250,7 +249,9 @@ function localDateTimeToUTC(date: Date, time: string | undefined, tz: string): {
   const parts1 = fmt.formatToParts(guessUtc);
   const localH1 = g(parts1, "hour") === 24 ? 0 : g(parts1, "hour");
   const localM1 = g(parts1, "minute");
-  const offset1 = (localH1 * 60 + localM1) - (guessUtc.getUTCHours() * 60 + guessUtc.getUTCMinutes());
+  let offset1 = (localH1 * 60 + localM1) - (guessUtc.getUTCHours() * 60 + guessUtc.getUTCMinutes());
+  if (offset1 > 720) offset1 -= 1440;
+  if (offset1 < -720) offset1 += 1440;
   const localTotalMin = h * 60 + (m || 0);
   let utcTotalMin = localTotalMin - offset1;
   let dayShift = 0;
@@ -263,7 +264,9 @@ function localDateTimeToUTC(date: Date, time: string | undefined, tz: string): {
   const localH2 = g(parts2, "hour") === 24 ? 0 : g(parts2, "hour");
   const localM2 = g(parts2, "minute");
   if (localH2 !== h || localM2 !== (m || 0)) {
-    const offset2 = (localH2 * 60 + localM2) - (candidateUtc.getUTCHours() * 60 + candidateUtc.getUTCMinutes());
+    let offset2 = (localH2 * 60 + localM2) - (candidateUtc.getUTCHours() * 60 + candidateUtc.getUTCMinutes());
+    if (offset2 > 720) offset2 -= 1440;
+    if (offset2 < -720) offset2 += 1440;
     let utcTotalMin2 = localTotalMin - offset2;
     let dayShift2 = 0;
     if (utcTotalMin2 < 0) { utcTotalMin2 += 1440; dayShift2 = -1; }
@@ -284,14 +287,26 @@ function localDateTimeToUTC(date: Date, time: string | undefined, tz: string): {
 function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, extra?: Record<string, string>, timeRange?: { startTime?: string; endTime?: string }, tz?: string): string {
   const params = new URLSearchParams();
   if (dateRange?.from) {
-    const converted = tz ? localDateTimeToUTC(dateRange.from, timeRange?.startTime, tz) : { utcDate: format(dateRange.from, "yyyy-MM-dd"), utcTime: timeRange?.startTime };
-    params.set("startDate", converted.utcDate);
-    if (converted.utcTime) params.set("startTime", converted.utcTime);
+    const startTime = timeRange?.startTime || "00:00";
+    if (tz) {
+      const converted = localDateTimeToUTC(dateRange.from, startTime, tz);
+      params.set("startDate", converted.utcDate);
+      params.set("startTime", converted.utcTime);
+    } else {
+      params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
+      if (timeRange?.startTime) params.set("startTime", timeRange.startTime);
+    }
   }
   if (dateRange?.to) {
-    const converted = tz ? localDateTimeToUTC(dateRange.to, timeRange?.endTime, tz) : { utcDate: format(dateRange.to, "yyyy-MM-dd"), utcTime: timeRange?.endTime };
-    params.set("endDate", converted.utcDate);
-    if (converted.utcTime) params.set("endTime", converted.utcTime);
+    const endTime = timeRange?.endTime || "23:59";
+    if (tz) {
+      const converted = localDateTimeToUTC(dateRange.to, endTime, tz);
+      params.set("endDate", converted.utcDate);
+      params.set("endTime", converted.utcTime);
+    } else {
+      params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
+      if (timeRange?.endTime) params.set("endTime", timeRange.endTime);
+    }
   }
   setFilterParam(params, "domain", filters.domain);
   setFilterParam(params, "deviceType", filters.deviceType);
@@ -316,14 +331,26 @@ function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logP
   params.set("page", logPage.toString());
   params.set("limit", logLimit.toString());
   if (dateRange?.from) {
-    const converted = tz ? localDateTimeToUTC(dateRange.from, timeRange?.startTime, tz) : { utcDate: format(dateRange.from, "yyyy-MM-dd"), utcTime: timeRange?.startTime };
-    params.set("startDate", converted.utcDate);
-    if (converted.utcTime) params.set("startTime", converted.utcTime);
+    const startTime = timeRange?.startTime || "00:00";
+    if (tz) {
+      const converted = localDateTimeToUTC(dateRange.from, startTime, tz);
+      params.set("startDate", converted.utcDate);
+      params.set("startTime", converted.utcTime);
+    } else {
+      params.set("startDate", format(dateRange.from, "yyyy-MM-dd"));
+      if (timeRange?.startTime) params.set("startTime", timeRange.startTime);
+    }
   }
   if (dateRange?.to) {
-    const converted = tz ? localDateTimeToUTC(dateRange.to, timeRange?.endTime, tz) : { utcDate: format(dateRange.to, "yyyy-MM-dd"), utcTime: timeRange?.endTime };
-    params.set("endDate", converted.utcDate);
-    if (converted.utcTime) params.set("endTime", converted.utcTime);
+    const endTime = timeRange?.endTime || "23:59";
+    if (tz) {
+      const converted = localDateTimeToUTC(dateRange.to, endTime, tz);
+      params.set("endDate", converted.utcDate);
+      params.set("endTime", converted.utcTime);
+    } else {
+      params.set("endDate", format(dateRange.to, "yyyy-MM-dd"));
+      if (timeRange?.endTime) params.set("endTime", timeRange.endTime);
+    }
   }
   setFilterParam(params, "domain", filters.domain);
   setFilterParam(params, "deviceType", filters.deviceType);
