@@ -90,6 +90,7 @@ interface UploadResult {
   received: number;
   testMode: boolean;
   testEventCode?: string;
+  pixelId?: string;
 }
 
 interface HistoryEntry {
@@ -209,7 +210,9 @@ export default function MetaConversionsPage() {
     onSuccess: (data) => {
       toast({
         title: `Upload complete: ${data.received}/${data.sent} events processed`,
-        description: data.testMode ? `Test mode - event code: ${data.testEventCode}` : undefined,
+        description: data.testMode
+          ? `Test mode - code: ${data.testEventCode} | Pixel: ${data.pixelId}`
+          : `Sent to pixel: ${data.pixelId}`,
       });
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ["/api/meta-conversions/missing"] });

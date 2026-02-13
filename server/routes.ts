@@ -979,12 +979,14 @@ export async function registerRoutes(
       for (let i = 0; i < eventsToSend.length; i += batchSize) {
         const batch = eventsToSend.slice(i, i + batchSize);
         try {
+          console.log(`[CAPI] Sending ${batch.length} events to pixel ${pixelId} ${testEventCode ? `(test: ${testEventCode})` : "(LIVE)"}`);
           const response = await sendConversionEvents(
             pixelId,
             accessToken,
             batch.map(b => b.convEvent),
             testEventCode,
           );
+          console.log(`[CAPI] Response: events_received=${response.events_received}, fbtrace_id=${response.fbtrace_id}, messages=${JSON.stringify(response.messages || [])}`);
           totalReceived += response.events_received;
 
           for (const item of batch) {
@@ -1026,6 +1028,7 @@ export async function registerRoutes(
         received: totalReceived,
         testMode: !!testMode,
         testEventCode,
+        pixelId,
       });
     } catch (error) {
       console.error("Error uploading conversions:", error);
