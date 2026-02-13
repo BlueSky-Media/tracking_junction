@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { trackingEventApiSchema } from "@shared/schema";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import * as facebook from "./facebook";
+import { buildConversionEvent, sendConversionEvents, MetaConversionError } from "./meta-conversions";
 
 const PII_FIELDS = ["first_name", "last_name", "email", "phone", "firstName", "lastName"];
 
@@ -784,6 +785,238 @@ export async function registerRoutes(
       }
       console.error("Error revoking token:", error);
       res.status(500).json({ message: "Failed to revoke token" });
+    }
+  });
+
+  app.get("/api/meta-conversions/status", isAuthenticated, async (_req, res) => {
+    const pixelId = process.env.FACEBOOK_PIXEL_ID;
+    const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+    res.json({
+      configured: !!(pixelId && accessToken),
+      hasPixelId: !!pixelId,
+      hasAccessToken: !!accessToken,
+    });
+  });
+
+  app.get("/api/meta-conversions/missing", isAuthenticated, async (req, res) => {
+    try {
+      const { startDate, endDate, adId, page } = req.query as {
+        startDate?: string;
+        endDate?: string;
+        adId?: string;
+        page?: string;
+      };
+
+      const formCompletes = await storage.getFormCompleteEventsWithFbData({
+        startDate,
+        endDate,
+        adId,
+        page,
+      });
+
+      const uploadedIds = await storage.getUploadedEventIds();
+
+      const events = formCompletes.map((e) => ({
+        id: e.id,
+        sessionId: e.sessionId,
+        eventId: e.eventId,
+        eventTimestamp: e.eventTimestamp,
+        page: e.page,
+        domain: e.domain,
+        hasFirstName: !!e.firstName,
+        hasLastName: !!e.lastName,
+        nameInitials: [e.firstName?.[0], e.lastName?.[0]].filter(Boolean).join("") || null,
+        maskedEmail: e.email ? e.email.replace(/^(.{2})(.*)(@.*)$/, "$1***$3") : null,
+        maskedPhone: e.phone ? e.phone.replace(/^(\d{3})(\d+)(\d{2})$/, "$1***$3") : null,
+        adId: e.adId,
+        adName: e.adName,
+        adsetId: e.adsetId,
+        adsetName: e.adsetName,
+        campaignId: e.campaignId,
+        campaignName: e.campaignName,
+        fbclid: !!e.fbclid,
+        fbp: !!e.fbp,
+        fbc: !!e.fbc,
+        externalId: !!e.externalId,
+        ipAddress: !!e.ipAddress,
+        hasEmail: !!e.email,
+        hasPhone: !!e.phone,
+        uploaded: uploadedIds.has(e.id),
+        geoState: e.geoState,
+        deviceType: e.deviceType,
+        placement: e.placement,
+      }));
+
+      res.json({ events, total: events.length, uploaded: events.filter(e => e.uploaded).length });
+    } catch (error) {
+      console.error("Error fetching missing conversions:", error);
+      res.status(500).json({ message: "Failed to fetch conversion data" });
+    }
+  });
+
+  app.get("/api/meta-conversions/comparison", isAuthenticated, async (req, res) => {
+    try {
+      const { startDate, endDate, adAccountId } = req.query as {
+        startDate?: string;
+        endDate?: string;
+        adAccountId?: string;
+      };
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "startDate and endDate are required" });
+      }
+
+      const ourCounts = await storage.getFormCompleteCountsByAd({ startDate, endDate });
+
+      let metaInsights: facebook.NormalizedInsight[] = [];
+      if (adAccountId && facebook.isConfigured()) {
+        try {
+          metaInsights = await facebook.getAdInsightsAll(adAccountId, startDate, endDate);
+        } catch (e) {
+          console.error("Error fetching Meta ad insights for comparison:", e);
+        }
+      }
+
+      const metaLeadsByAd = new Map<string, number>();
+      for (const insight of metaInsights) {
+        if (insight.adId) {
+          metaLeadsByAd.set(insight.adId, (metaLeadsByAd.get(insight.adId) || 0) + insight.leads);
+        }
+      }
+
+      const comparison = ourCounts.map((our) => ({
+        adId: our.adId,
+        adName: our.adName,
+        campaignId: our.campaignId,
+        campaignName: our.campaignName,
+        adsetId: our.adsetId,
+        adsetName: our.adsetName,
+        ourLeads: our.count,
+        metaLeads: metaLeadsByAd.get(our.adId) ?? null,
+        difference: metaLeadsByAd.has(our.adId) ? our.count - metaLeadsByAd.get(our.adId)! : null,
+      }));
+
+      comparison.sort((a, b) => (b.difference ?? 0) - (a.difference ?? 0));
+
+      res.json({ comparison });
+    } catch (error) {
+      console.error("Error fetching conversion comparison:", error);
+      res.status(500).json({ message: "Failed to fetch comparison data" });
+    }
+  });
+
+  app.post("/api/meta-conversions/upload", isAuthenticated, async (req, res) => {
+    try {
+      const pixelId = process.env.FACEBOOK_PIXEL_ID;
+      const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+
+      if (!pixelId || !accessToken) {
+        return res.status(400).json({ message: "FACEBOOK_PIXEL_ID and FACEBOOK_ACCESS_TOKEN must be configured" });
+      }
+
+      const { eventIds, testMode } = req.body as { eventIds: number[]; testMode?: boolean };
+
+      if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
+        return res.status(400).json({ message: "eventIds array is required" });
+      }
+
+      if (eventIds.length > 100) {
+        return res.status(400).json({ message: "Maximum 100 events per upload" });
+      }
+
+      const formCompletes = await storage.getFormCompleteEventsWithFbData({});
+      const eventMap = new Map(formCompletes.map(e => [e.id, e]));
+      const uploadedIds = await storage.getUploadedEventIds();
+
+      const results: { eventId: number; status: string; message: string }[] = [];
+      const eventsToSend = [];
+
+      for (const id of eventIds) {
+        const event = eventMap.get(id);
+        if (!event) {
+          results.push({ eventId: id, status: "error", message: "Event not found" });
+          continue;
+        }
+        if (uploadedIds.has(id) && !testMode) {
+          results.push({ eventId: id, status: "skipped", message: "Already uploaded" });
+          continue;
+        }
+        eventsToSend.push({ trackingEvent: event, convEvent: buildConversionEvent(event) });
+      }
+
+      if (eventsToSend.length === 0) {
+        return res.json({ results, sent: 0, received: 0 });
+      }
+
+      const testEventCode = testMode ? "TEST_CAPI_" + Date.now() : undefined;
+
+      const batchSize = 50;
+      let totalReceived = 0;
+
+      for (let i = 0; i < eventsToSend.length; i += batchSize) {
+        const batch = eventsToSend.slice(i, i + batchSize);
+        try {
+          const response = await sendConversionEvents(
+            pixelId,
+            accessToken,
+            batch.map(b => b.convEvent),
+            testEventCode,
+          );
+          totalReceived += response.events_received;
+
+          for (const item of batch) {
+            await storage.recordMetaUpload({
+              trackingEventId: item.trackingEvent.id,
+              sessionId: item.trackingEvent.sessionId,
+              eventId: item.trackingEvent.eventId || null,
+              metaEventId: item.convEvent.eventId,
+              pixelId: testMode ? "TEST" : pixelId,
+              status: "sent",
+              eventsReceived: response.events_received,
+              fbtraceId: response.fbtrace_id || null,
+              errorMessage: null,
+            });
+            results.push({ eventId: item.trackingEvent.id, status: "sent", message: `Sent successfully (fbtrace: ${response.fbtrace_id})` });
+          }
+        } catch (error) {
+          const errMsg = error instanceof MetaConversionError ? error.message : String(error);
+          for (const item of batch) {
+            await storage.recordMetaUpload({
+              trackingEventId: item.trackingEvent.id,
+              sessionId: item.trackingEvent.sessionId,
+              eventId: item.trackingEvent.eventId || null,
+              metaEventId: item.convEvent.eventId,
+              pixelId,
+              status: "error",
+              eventsReceived: null,
+              fbtraceId: null,
+              errorMessage: errMsg,
+            });
+            results.push({ eventId: item.trackingEvent.id, status: "error", message: errMsg });
+          }
+        }
+      }
+
+      res.json({
+        results,
+        sent: eventsToSend.length,
+        received: totalReceived,
+        testMode: !!testMode,
+        testEventCode,
+      });
+    } catch (error) {
+      console.error("Error uploading conversions:", error);
+      res.status(500).json({ message: "Failed to upload conversions" });
+    }
+  });
+
+  app.get("/api/meta-conversions/history", isAuthenticated, async (_req, res) => {
+    try {
+      const history = await storage.getMetaUploadHistory(100);
+      res.json({ history });
+    } catch (error) {
+      console.error("Error fetching upload history:", error);
+      res.status(500).json({ message: "Failed to fetch upload history" });
     }
   });
 

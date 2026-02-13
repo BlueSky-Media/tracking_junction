@@ -13,6 +13,7 @@ import ReportsPage from "@/pages/reports";
 import ServerLogsPage from "@/pages/server-logs";
 import BlockListPage from "@/pages/block-list";
 import FacebookAdsPage from "@/pages/facebook-ads";
+import MetaConversionsPage from "@/pages/meta-conversions";
 import PrivacyPage from "@/pages/privacy";
 import NotFound from "@/pages/not-found";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -46,6 +47,7 @@ function AuthenticatedLayout() {
               <Route path="/logs" component={ServerLogsPage} />
               <Route path="/block-list" component={BlockListPage} />
               <Route path="/facebook-ads" component={FacebookAdsPage} />
+              <Route path="/meta-conversions" component={MetaConversionsPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

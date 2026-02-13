@@ -2,11 +2,14 @@ import {
   trackingEvents,
   requestLogs,
   blockedNumbers,
+  metaConversionUploads,
   type InsertTrackingEvent,
   type TrackingEvent,
   type InsertRequestLog,
   type RequestLog,
   type BlockedNumber,
+  type InsertMetaConversionUpload,
+  type MetaConversionUpload,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or, inArray } from "drizzle-orm";
@@ -1293,6 +1296,112 @@ class DatabaseStorage implements IStorage {
     if (phones.length === 0) return 0;
     const result = await db.delete(blockedNumbers).where(inArray(blockedNumbers.phone, phones)).returning();
     return result.length;
+  }
+
+  async getFormCompleteEventsWithFbData(filters: {
+    startDate?: string;
+    endDate?: string;
+    adId?: string;
+    page?: string;
+  }): Promise<TrackingEvent[]> {
+    const conditions = [
+      eq(trackingEvents.eventType, "form_complete"),
+      or(
+        isNotNull(trackingEvents.fbclid),
+        isNotNull(trackingEvents.fbp),
+        isNotNull(trackingEvents.externalId),
+      ),
+    ];
+
+    if (filters.startDate) {
+      conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
+    }
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setDate(end.getDate() + 1);
+      conditions.push(lte(trackingEvents.eventTimestamp, end));
+    }
+    if (filters.adId) {
+      conditions.push(eq(trackingEvents.adId, filters.adId));
+    }
+    if (filters.page) {
+      conditions.push(eq(trackingEvents.page, filters.page));
+    }
+
+    return db.select()
+      .from(trackingEvents)
+      .where(and(...conditions))
+      .orderBy(desc(trackingEvents.eventTimestamp));
+  }
+
+  async getUploadedEventIds(): Promise<Set<number>> {
+    const rows = await db.select({ trackingEventId: metaConversionUploads.trackingEventId })
+      .from(metaConversionUploads)
+      .where(and(
+        eq(metaConversionUploads.status, "sent"),
+        ne(metaConversionUploads.pixelId, "TEST"),
+      ));
+    return new Set(rows.map(r => r.trackingEventId));
+  }
+
+  async recordMetaUpload(upload: InsertMetaConversionUpload): Promise<MetaConversionUpload> {
+    const [result] = await db.insert(metaConversionUploads).values(upload as any).returning();
+    return result;
+  }
+
+  async getMetaUploadHistory(limit = 50): Promise<MetaConversionUpload[]> {
+    return db.select()
+      .from(metaConversionUploads)
+      .orderBy(desc(metaConversionUploads.uploadedAt))
+      .limit(limit);
+  }
+
+  async getFormCompleteCountsByAd(filters: {
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{ adId: string; adName: string | null; campaignId: string | null; campaignName: string | null; adsetId: string | null; adsetName: string | null; count: number }[]> {
+    const conditions = [
+      eq(trackingEvents.eventType, "form_complete"),
+      isNotNull(trackingEvents.adId),
+    ];
+    if (filters.startDate) {
+      conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
+    }
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setDate(end.getDate() + 1);
+      conditions.push(lte(trackingEvents.eventTimestamp, end));
+    }
+
+    const rows = await db.select({
+      adId: trackingEvents.adId,
+      adName: trackingEvents.adName,
+      campaignId: trackingEvents.campaignId,
+      campaignName: trackingEvents.campaignName,
+      adsetId: trackingEvents.adsetId,
+      adsetName: trackingEvents.adsetName,
+      count: count(),
+    })
+      .from(trackingEvents)
+      .where(and(...conditions))
+      .groupBy(
+        trackingEvents.adId,
+        trackingEvents.adName,
+        trackingEvents.campaignId,
+        trackingEvents.campaignName,
+        trackingEvents.adsetId,
+        trackingEvents.adsetName,
+      );
+
+    return rows.filter(r => r.adId).map(r => ({
+      adId: r.adId!,
+      adName: r.adName,
+      campaignId: r.campaignId,
+      campaignName: r.campaignName,
+      adsetId: r.adsetId,
+      adsetName: r.adsetName,
+      count: Number(r.count),
+    }));
   }
 }
 

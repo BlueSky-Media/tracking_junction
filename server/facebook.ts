@@ -237,6 +237,20 @@ export async function getAdInsights(
   return rows.map(normalizeInsight);
 }
 
+export async function getAdInsightsAll(
+  adAccountId: string,
+  startDate: string,
+  endDate: string
+): Promise<NormalizedInsight[]> {
+  const rows = await paginatedFetch<InsightRow>(`/${adAccountId}/insights`, {
+    fields: `ad_id,ad_name,campaign_id,campaign_name,adset_id,adset_name,${INSIGHT_FIELDS}`,
+    time_range: JSON.stringify({ since: startDate, until: endDate }),
+    level: "ad",
+    limit: 500,
+  });
+  return rows.map(normalizeInsight);
+}
+
 export async function getDailyInsights(
   adAccountId: string,
   startDate: string,

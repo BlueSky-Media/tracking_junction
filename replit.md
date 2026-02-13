@@ -23,6 +23,8 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `client/src/pages/block-list.tsx` - Block List management page
 - `client/src/pages/landing.tsx` - Landing/login page
 - `client/src/pages/facebook-ads.tsx` - Facebook Ads page (Meta Marketing API integration)
+- `client/src/pages/meta-conversions.tsx` - Meta Conversions API page (detect missing conversions, upload to CAPI)
+- `server/meta-conversions.ts` - Meta Conversions API (CAPI) client (PII hashing, event formatting, batch upload)
 - `client/src/pages/privacy.tsx` - Public privacy policy page (no auth required, at /page/privacy)
 - `client/src/hooks/use-timezone.tsx` - Timezone context provider (localStorage-persisted, converts local time to UTC for API queries)
 - `client/src/components/` - Dashboard components (filters, funnel chart, funnel table, step breakdown, stats cards, campaign table, device breakdown, time heatmap, contact funnel, referrer breakdown, csv export)
@@ -62,6 +64,11 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `GET /api/facebook/daily-insights?adAccountId&startDate&endDate` - Daily time-series insights (protected)
 - `POST /api/facebook/refresh-token` - Refresh Facebook access token (protected, returns new token + expiry)
 - `POST /api/facebook/revoke-token` - Revoke old Facebook access token (protected, body: {token: string})
+- `GET /api/meta-conversions/status` - Check if CAPI is configured (pixel ID + access token) (protected)
+- `GET /api/meta-conversions/missing?startDate&endDate&adId&page` - List form_complete events with FB tracking data, mark uploaded status (protected)
+- `GET /api/meta-conversions/comparison?startDate&endDate&adAccountId` - Compare our lead counts per ad vs Meta Ads Insights (protected)
+- `POST /api/meta-conversions/upload` - Upload conversions to Meta CAPI (protected, body: {eventIds: number[], testMode?: boolean})
+- `GET /api/meta-conversions/history` - Upload history log (protected)
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 
 ## Event Schema Fields

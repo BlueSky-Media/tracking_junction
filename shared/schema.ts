@@ -180,6 +180,32 @@ export const insertBlockedNumberSchema = createInsertSchema(blockedNumbers).omit
 export type InsertBlockedNumber = z.infer<typeof insertBlockedNumberSchema>;
 export type BlockedNumber = typeof blockedNumbers.$inferSelect;
 
+export const metaConversionUploads = pgTable("meta_conversion_uploads", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  trackingEventId: integer("tracking_event_id").notNull(),
+  sessionId: varchar("session_id", { length: 64 }).notNull(),
+  eventId: varchar("event_id", { length: 100 }),
+  metaEventId: varchar("meta_event_id", { length: 200 }),
+  pixelId: varchar("pixel_id", { length: 50 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("sent"),
+  eventsReceived: integer("events_received"),
+  fbtraceId: varchar("fbtrace_id", { length: 200 }),
+  errorMessage: text("error_message"),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_meta_uploads_event").on(table.trackingEventId),
+  index("idx_meta_uploads_session").on(table.sessionId),
+  index("idx_meta_uploads_status").on(table.status),
+]);
+
+export const insertMetaConversionUploadSchema = createInsertSchema(metaConversionUploads).omit({
+  id: true as const,
+  uploadedAt: true as const,
+});
+
+export type InsertMetaConversionUpload = z.infer<typeof insertMetaConversionUploadSchema>;
+export type MetaConversionUpload = typeof metaConversionUploads.$inferSelect;
+
 export const LEAD_STEPS_SENIORS = [
   { number: 0, name: "Landing" },
   { number: 1, name: "Beneficiary" },
