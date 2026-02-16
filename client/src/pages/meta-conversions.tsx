@@ -125,6 +125,8 @@ interface SignalRuleConditions {
   domain?: string[];
   deviceType?: string[];
   pageType?: string[];
+  stepName?: string[];
+  stepNumber?: number[];
   minTimeOnStep?: number;
   maxTimeOnStep?: number;
   hasEmail?: boolean;
@@ -203,6 +205,8 @@ export default function MetaConversionsPage() {
   const [ruleCondPageType, setRuleCondPageType] = useState<string[]>([]);
   const [ruleCondMinTime, setRuleCondMinTime] = useState("");
   const [ruleCondMaxTime, setRuleCondMaxTime] = useState("");
+  const [ruleCondStepName, setRuleCondStepName] = useState("");
+  const [ruleCondStepNumber, setRuleCondStepNumber] = useState("");
   const [ruleCondHasEmail, setRuleCondHasEmail] = useState(false);
   const [ruleCondHasPhone, setRuleCondHasPhone] = useState(false);
 
@@ -300,6 +304,8 @@ export default function MetaConversionsPage() {
     setRuleCondPageType([]);
     setRuleCondMinTime("");
     setRuleCondMaxTime("");
+    setRuleCondStepName("");
+    setRuleCondStepNumber("");
     setRuleCondHasEmail(false);
     setRuleCondHasPhone(false);
   };
@@ -317,6 +323,8 @@ export default function MetaConversionsPage() {
     setRuleCondPageType(rule.conditions.pageType || []);
     setRuleCondMinTime(rule.conditions.minTimeOnStep != null ? String(rule.conditions.minTimeOnStep) : "");
     setRuleCondMaxTime(rule.conditions.maxTimeOnStep != null ? String(rule.conditions.maxTimeOnStep) : "");
+    setRuleCondStepName(rule.conditions.stepName ? rule.conditions.stepName.join(", ") : "");
+    setRuleCondStepNumber(rule.conditions.stepNumber ? rule.conditions.stepNumber.join(", ") : "");
     setRuleCondHasEmail(rule.conditions.hasEmail || false);
     setRuleCondHasPhone(rule.conditions.hasPhone || false);
   };
@@ -329,6 +337,8 @@ export default function MetaConversionsPage() {
     if (ruleCondPageType.length > 0) conditions.pageType = ruleCondPageType;
     if (ruleCondMinTime) conditions.minTimeOnStep = Number(ruleCondMinTime);
     if (ruleCondMaxTime) conditions.maxTimeOnStep = Number(ruleCondMaxTime);
+    if (ruleCondStepName.trim()) conditions.stepName = ruleCondStepName.split(",").map(s => s.trim()).filter(Boolean);
+    if (ruleCondStepNumber.trim()) conditions.stepNumber = ruleCondStepNumber.split(",").map(s => Number(s.trim())).filter(n => !isNaN(n));
     if (ruleCondHasEmail) conditions.hasEmail = true;
     if (ruleCondHasPhone) conditions.hasPhone = true;
     return {
@@ -407,6 +417,21 @@ export default function MetaConversionsPage() {
     } else {
       setter([...arr, value]);
     }
+  };
+
+  const summarizeConditions = (c: SignalRuleConditions): string => {
+    const parts: string[] = [];
+    if (c.audience?.length) parts.push(`Audience: ${c.audience.join(", ")}`);
+    if (c.domain?.length) parts.push(`Domain: ${c.domain.join(", ")}`);
+    if (c.deviceType?.length) parts.push(`Device: ${c.deviceType.join(", ")}`);
+    if (c.pageType?.length) parts.push(`Type: ${c.pageType.join(", ")}`);
+    if (c.stepName?.length) parts.push(`Step: ${c.stepName.join(", ")}`);
+    if (c.stepNumber?.length) parts.push(`Step #${c.stepNumber.join(", ")}`);
+    if (c.minTimeOnStep != null) parts.push(`Min time: ${c.minTimeOnStep}s`);
+    if (c.maxTimeOnStep != null) parts.push(`Max time: ${c.maxTimeOnStep}s`);
+    if (c.hasEmail) parts.push("Has email");
+    if (c.hasPhone) parts.push("Has phone");
+    return parts.length > 0 ? parts.join(" | ") : "No filters (matches all)";
   };
 
   interface AudienceStat { tier: string; count: number; totalValue: number }
@@ -1287,6 +1312,30 @@ export default function MetaConversionsPage() {
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground">Step Name</label>
+                        <input
+                          type="text"
+                          value={ruleCondStepName}
+                          onChange={(e) => setRuleCondStepName(e.target.value)}
+                          placeholder="e.g. Eligibility Check"
+                          className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                          data-testid="input-cond-step-name"
+                        />
+                        <span className="text-[9px] text-muted-foreground">Comma-separated</span>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground">Step Number</label>
+                        <input
+                          type="text"
+                          value={ruleCondStepNumber}
+                          onChange={(e) => setRuleCondStepNumber(e.target.value)}
+                          placeholder="e.g. 6, 7"
+                          className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                          data-testid="input-cond-step-number"
+                        />
+                        <span className="text-[9px] text-muted-foreground">Comma-separated</span>
+                      </div>
+                      <div className="space-y-1">
                         <label className="text-[10px] font-medium text-muted-foreground">Min Time on Step (s)</label>
                         <input
                           type="number"
@@ -1306,6 +1355,8 @@ export default function MetaConversionsPage() {
                           data-testid="input-cond-max-time"
                         />
                       </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="flex items-end gap-3">
                         <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
                           <input
@@ -1381,6 +1432,7 @@ export default function MetaConversionsPage() {
                             <span className="text-[11px] font-medium" data-testid={`text-rule-name-${rule.id}`}>{rule.name}</span>
                             <Badge variant="outline" className="text-[9px]" data-testid={`badge-rule-trigger-${rule.id}`}>{rule.triggerEvent}</Badge>
                             <Badge variant="secondary" className="text-[9px]" data-testid={`badge-rule-meta-event-${rule.id}`}>{rule.metaEventName}</Badge>
+                            <span className="text-[9px] text-muted-foreground" data-testid={`text-rule-conditions-${rule.id}`}>{summarizeConditions(rule.conditions)}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <div
@@ -1557,6 +1609,30 @@ export default function MetaConversionsPage() {
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground">Step Name</label>
+                                  <input
+                                    type="text"
+                                    value={ruleCondStepName}
+                                    onChange={(e) => setRuleCondStepName(e.target.value)}
+                                    placeholder="e.g. Eligibility Check"
+                                    className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                    data-testid="input-edit-cond-step-name"
+                                  />
+                                  <span className="text-[9px] text-muted-foreground">Comma-separated</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground">Step Number</label>
+                                  <input
+                                    type="text"
+                                    value={ruleCondStepNumber}
+                                    onChange={(e) => setRuleCondStepNumber(e.target.value)}
+                                    placeholder="e.g. 6, 7"
+                                    className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                    data-testid="input-edit-cond-step-number"
+                                  />
+                                  <span className="text-[9px] text-muted-foreground">Comma-separated</span>
+                                </div>
+                                <div className="space-y-1">
                                   <label className="text-[10px] font-medium text-muted-foreground">Min Time on Step (s)</label>
                                   <input
                                     type="number"
@@ -1576,6 +1652,8 @@ export default function MetaConversionsPage() {
                                     data-testid="input-edit-cond-max-time"
                                   />
                                 </div>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div className="flex items-end gap-3">
                                   <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
                                     <input
