@@ -21,6 +21,9 @@ import { SiFacebook } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
+import {
+  LEAD_STEPS_SENIORS, LEAD_STEPS_VETERANS, LEAD_STEPS_FIRST_RESPONDERS, CALL_STEPS,
+} from "@shared/schema";
 
 interface CapiStatus {
   configured: boolean;
@@ -209,7 +212,7 @@ export default function MetaConversionsPage() {
   const [ruleCondPageType, setRuleCondPageType] = useState<string[]>([]);
   const [ruleCondMinTime, setRuleCondMinTime] = useState("");
   const [ruleCondMaxTime, setRuleCondMaxTime] = useState("");
-  const [ruleCondStepName, setRuleCondStepName] = useState("");
+  const [ruleCondStepName, setRuleCondStepName] = useState<string[]>([]);
   const [ruleCondStepNumber, setRuleCondStepNumber] = useState("");
   const [ruleCondMinBudget, setRuleCondMinBudget] = useState("");
   const [ruleCondMaxBudget, setRuleCondMaxBudget] = useState("");
@@ -319,7 +322,7 @@ export default function MetaConversionsPage() {
     setRuleCondPageType([]);
     setRuleCondMinTime("");
     setRuleCondMaxTime("");
-    setRuleCondStepName("");
+    setRuleCondStepName([]);
     setRuleCondStepNumber("");
     setRuleCondMinBudget("");
     setRuleCondMaxBudget("");
@@ -340,7 +343,7 @@ export default function MetaConversionsPage() {
     setRuleCondPageType(rule.conditions.pageType || []);
     setRuleCondMinTime(rule.conditions.minTimeOnStep != null ? String(rule.conditions.minTimeOnStep) : "");
     setRuleCondMaxTime(rule.conditions.maxTimeOnStep != null ? String(rule.conditions.maxTimeOnStep) : "");
-    setRuleCondStepName(rule.conditions.stepName ? rule.conditions.stepName.join(", ") : "");
+    setRuleCondStepName(rule.conditions.stepName || []);
     setRuleCondStepNumber(rule.conditions.stepNumber ? rule.conditions.stepNumber.join(", ") : "");
     setRuleCondMinBudget(rule.conditions.minBudget != null ? String(rule.conditions.minBudget) : "");
     setRuleCondMaxBudget(rule.conditions.maxBudget != null ? String(rule.conditions.maxBudget) : "");
@@ -356,7 +359,7 @@ export default function MetaConversionsPage() {
     if (ruleCondPageType.length > 0) conditions.pageType = ruleCondPageType;
     if (ruleCondMinTime) conditions.minTimeOnStep = Number(ruleCondMinTime);
     if (ruleCondMaxTime) conditions.maxTimeOnStep = Number(ruleCondMaxTime);
-    if (ruleCondStepName.trim()) conditions.stepName = ruleCondStepName.split(",").map(s => s.trim()).filter(Boolean);
+    if (ruleCondStepName.length > 0) conditions.stepName = ruleCondStepName;
     if (ruleCondStepNumber.trim()) conditions.stepNumber = ruleCondStepNumber.split(",").map(s => Number(s.trim())).filter(n => !isNaN(n));
     if (ruleCondMinBudget) conditions.minBudget = Number(ruleCondMinBudget);
     if (ruleCondMaxBudget) conditions.maxBudget = Number(ruleCondMaxBudget);
@@ -457,6 +460,15 @@ export default function MetaConversionsPage() {
       setter([...arr, value]);
     }
   };
+
+  const ALL_STEP_NAMES = useMemo(() => {
+    const allSteps = [
+      ...LEAD_STEPS_SENIORS, ...LEAD_STEPS_VETERANS,
+      ...LEAD_STEPS_FIRST_RESPONDERS, ...CALL_STEPS,
+    ];
+    const unique = Array.from(new Set(allSteps.map(s => s.name)));
+    return unique.sort((a, b) => a.localeCompare(b));
+  }, []);
 
   const CONDITION_TIPS: Record<string, string> = {
     "Audience": "Which landing page audience: seniors, veterans, or first-responders. Leave unchecked to match all audiences.",
@@ -1383,17 +1395,25 @@ export default function MetaConversionsPage() {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="space-y-1">
+                      <div className="space-y-1 col-span-2">
                         <CondLabel text="Step Name" />
-                        <input
-                          type="text"
-                          value={ruleCondStepName}
-                          onChange={(e) => setRuleCondStepName(e.target.value)}
-                          placeholder="e.g. Eligibility Check"
-                          className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
-                          data-testid="input-cond-step-name"
-                        />
-                        <span className="text-[9px] text-muted-foreground">Comma-separated</span>
+                        <div className="max-h-[120px] overflow-y-auto border rounded-md p-1.5 bg-background space-y-0.5" data-testid="select-cond-step-name">
+                          {ALL_STEP_NAMES.map((name) => (
+                            <label key={name} className="flex items-center gap-1.5 text-[10px] cursor-pointer px-1 py-0.5 rounded hover-elevate">
+                              <input
+                                type="checkbox"
+                                checked={ruleCondStepName.includes(name)}
+                                onChange={() => toggleConditionArray(ruleCondStepName, name, setRuleCondStepName)}
+                                className="h-3 w-3 rounded-sm"
+                                data-testid={`checkbox-cond-step-${name.replace(/\s+/g, "-").toLowerCase()}`}
+                              />
+                              <span>{name}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {ruleCondStepName.length > 0 && (
+                          <span className="text-[9px] text-muted-foreground">{ruleCondStepName.length} selected</span>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <CondLabel text="Step Number" />
@@ -1724,17 +1744,25 @@ export default function MetaConversionsPage() {
                                 </div>
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="space-y-1">
+                                <div className="space-y-1 col-span-2">
                                   <CondLabel text="Step Name" />
-                                  <input
-                                    type="text"
-                                    value={ruleCondStepName}
-                                    onChange={(e) => setRuleCondStepName(e.target.value)}
-                                    placeholder="e.g. Eligibility Check"
-                                    className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
-                                    data-testid="input-edit-cond-step-name"
-                                  />
-                                  <span className="text-[9px] text-muted-foreground">Comma-separated</span>
+                                  <div className="max-h-[120px] overflow-y-auto border rounded-md p-1.5 bg-background space-y-0.5" data-testid="select-edit-cond-step-name">
+                                    {ALL_STEP_NAMES.map((name) => (
+                                      <label key={name} className="flex items-center gap-1.5 text-[10px] cursor-pointer px-1 py-0.5 rounded hover-elevate">
+                                        <input
+                                          type="checkbox"
+                                          checked={ruleCondStepName.includes(name)}
+                                          onChange={() => toggleConditionArray(ruleCondStepName, name, setRuleCondStepName)}
+                                          className="h-3 w-3 rounded-sm"
+                                          data-testid={`checkbox-edit-cond-step-${name.replace(/\s+/g, "-").toLowerCase()}`}
+                                        />
+                                        <span>{name}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                  {ruleCondStepName.length > 0 && (
+                                    <span className="text-[9px] text-muted-foreground">{ruleCondStepName.length} selected</span>
+                                  )}
                                 </div>
                                 <div className="space-y-1">
                                   <CondLabel text="Step Number" />
