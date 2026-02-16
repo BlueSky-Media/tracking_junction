@@ -1012,6 +1012,209 @@ function DrilldownRowComponent({
   );
 }
 
+const RESPONSE_BAR_COLORS = [
+  "bg-chart-1",
+  "bg-chart-2",
+  "bg-chart-3",
+  "bg-chart-4",
+  "bg-chart-5",
+];
+
+interface StepResponseOption {
+  value: string;
+  count: number;
+  percentage: number;
+}
+
+interface StepResponseData {
+  stepNumber: number;
+  stepName: string;
+  totalResponses: number;
+  options: StepResponseOption[];
+}
+
+function AudienceFunnelPanel({
+  audienceRow,
+  dateRange,
+  filters,
+  timeRange,
+}: {
+  audienceRow: DrilldownRow;
+  dateRange: DateRange | undefined;
+  filters: Filters;
+  timeRange?: { startTime?: string; endTime?: string };
+}) {
+  const { timezone } = useTimezone();
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+
+  const breakdownQuery = buildQueryParams(dateRange, filters, { audience: audienceRow.groupValue }, timeRange, timezone);
+  const { data: breakdownData } = useQuery<StepResponseData[]>({
+    queryKey: ["/api/analytics/breakdown", "audience-panel", audienceRow.groupValue, breakdownQuery],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/breakdown?${breakdownQuery}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch breakdown");
+      return res.json();
+    },
+  });
+
+  const breakdownMap = new Map<number, StepResponseData>();
+  if (breakdownData) {
+    for (const item of breakdownData) {
+      breakdownMap.set(item.stepNumber, item);
+    }
+  }
+
+  const toggleStep = (stepKey: string) => {
+    setExpandedSteps(prev => {
+      const next = new Set(prev);
+      if (next.has(stepKey)) next.delete(stepKey);
+      else next.add(stepKey);
+      return next;
+    });
+  };
+
+  const audLands = audienceRow.pageLands || audienceRow.uniqueViews;
+  const audFormComplete = audienceRow.formCompletions;
+  const audFormCvr = audLands > 0 ? (audFormComplete / audLands) * 100 : 0;
+  const allSteps = [...audienceRow.steps]
+    .filter(s => s.completions > 0)
+    .sort((a, b) => a.stepNumber - b.stepNumber || a.stepName.localeCompare(b.stepName));
+  const totalByStepNum = new Map<number, number>();
+  for (const s of allSteps) {
+    totalByStepNum.set(s.stepNumber, (totalByStepNum.get(s.stepNumber) ?? 0) + s.completions);
+  }
+  const audSteps = allSteps.map((step) => {
+    const prevStepNum = step.stepNumber - 1;
+    const prevCount = prevStepNum < 1 ? audLands : (totalByStepNum.get(prevStepNum) ?? audLands);
+    const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
+    const cvr = step.stepNumber === 1
+      ? (audLands > 0 ? (step.sessionsWithPrev / audLands) * 100 : 0)
+      : (prevCount > 0 ? (step.sessionsWithPrev / prevCount) * 100 : 0);
+    const scvr = audLands > 0 ? (step.completions / audLands) * 100 : 0;
+    return { ...step, dropOff, cvr, scvr, prevCount };
+  });
+
+  return (
+    <div className="overflow-x-auto border rounded-md mb-2" data-testid={`funnel-audience-${audienceRow.groupValue}`}>
+      <Table>
+        <TableHeader>
+          <TableRow className="h-5 bg-muted/30">
+            <TableHead colSpan={6} className="text-[10px] px-1.5 py-0 font-semibold capitalize">
+              {audienceRow.groupValue}
+              <span className="text-muted-foreground font-normal ml-2">
+                Lands: {audLands.toLocaleString()}
+                {audFormComplete > 0 && <> | Form Complete: {audFormComplete} | Form CVR: {audFormCvr.toFixed(1)}%</>}
+              </span>
+            </TableHead>
+          </TableRow>
+          <TableRow className="h-5">
+            <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Step</TableHead>
+            <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Count</TableHead>
+            <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap" title="Conversion from previous step">CVR</TableHead>
+            <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap" title="Conversion from landing">Land CVR</TableHead>
+            <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Drop-off</TableHead>
+            <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Drop-off Visual</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow className="h-5 bg-muted/20">
+            <TableCell className="font-mono text-[9px] px-1.5 py-0">0. Landing</TableCell>
+            <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">{audLands.toLocaleString()}</TableCell>
+            <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">100.0%</TableCell>
+            <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
+            <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
+            <TableCell className="px-1.5 py-0">
+              <div className="w-full bg-muted rounded-sm h-2.5">
+                <div className="h-2.5 rounded-sm bg-primary" style={{ width: "100%" }} />
+              </div>
+            </TableCell>
+          </TableRow>
+          {audSteps.map((step) => {
+            const barWidth = audLands > 0 ? Math.max(1, (step.completions / audLands) * 100) : 0;
+            const isHighDropOff = step.dropOff > 50;
+            const isMedDropOff = step.dropOff > 30;
+            const stepKey = `${audienceRow.groupValue}-${step.stepNumber}-${step.stepName}`;
+            const isExpanded = expandedSteps.has(stepKey);
+            const breakdown = breakdownMap.get(step.stepNumber);
+            const hasBreakdown = breakdown && breakdown.options.length > 0;
+            return (
+              <Fragment key={step.stepKey}>
+                <TableRow
+                  className={`h-5 ${hasBreakdown ? "cursor-pointer hover-elevate" : ""}`}
+                  data-testid={`row-funnel-step-${audienceRow.groupValue}-${step.stepNumber}`}
+                  onClick={() => hasBreakdown && toggleStep(stepKey)}
+                >
+                  <TableCell className="font-mono text-[9px] px-1.5 py-0 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1">
+                      {hasBreakdown && (
+                        isExpanded
+                          ? <ChevronDown className="w-2.5 h-2.5 text-muted-foreground" />
+                          : <ChevronRight className="w-2.5 h-2.5 text-muted-foreground" />
+                      )}
+                      {step.stepNumber}. {step.stepName}
+                      {hasBreakdown && (
+                        <Badge variant="secondary" className="text-[7px] px-1 py-0 leading-tight ml-0.5">
+                          {breakdown.options.length}
+                        </Badge>
+                      )}
+                    </span>
+                  </TableCell>
+                  <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">
+                    {step.completions.toLocaleString()}
+                  </TableCell>
+                  <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.cvr < 30 ? "text-red-500" : step.cvr < 60 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
+                    {step.cvr.toFixed(1)}%
+                  </TableCell>
+                  <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.scvr < 50 ? "text-red-500" : step.scvr < 70 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
+                    {step.scvr.toFixed(1)}%
+                  </TableCell>
+                  <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${isHighDropOff ? "text-red-500 font-bold" : isMedDropOff ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}`}>
+                    {step.dropOff.toFixed(1)}%
+                  </TableCell>
+                  <TableCell className="px-1.5 py-0">
+                    <div className="w-full bg-muted rounded-sm h-2.5">
+                      <div
+                        className={`h-2.5 rounded-sm ${isHighDropOff ? "bg-red-500" : isMedDropOff ? "bg-yellow-500" : "bg-primary"}`}
+                        style={{ width: `${barWidth}%` }}
+                      />
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {isExpanded && hasBreakdown && (
+                  <TableRow className="bg-muted/10" data-testid={`row-funnel-step-responses-${audienceRow.groupValue}-${step.stepNumber}`}>
+                    <TableCell colSpan={6} className="px-3 py-1.5">
+                      <div className="space-y-1">
+                        <div className="text-[8px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                          Responses ({breakdown.totalResponses.toLocaleString()} total)
+                        </div>
+                        {breakdown.options.map((option, idx) => (
+                          <div key={option.value} className="flex items-center gap-2" data-testid={`response-option-${audienceRow.groupValue}-${step.stepNumber}-${idx}`}>
+                            <span className="text-[9px] min-w-[100px] truncate">{option.value}</span>
+                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${RESPONSE_BAR_COLORS[idx % RESPONSE_BAR_COLORS.length]}`}
+                                style={{ width: `${option.percentage}%` }}
+                              />
+                            </div>
+                            <span className="text-[9px] font-mono text-muted-foreground min-w-[28px] text-right">{option.count}</span>
+                            <Badge variant="outline" className="text-[7px] px-1 py-0 font-mono min-w-[36px] justify-center">
+                              {option.percentage.toFixed(1)}%
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 function FunnelReport({
   dateRange,
   filterOptions,
@@ -1104,100 +1307,15 @@ function FunnelReport({
         </Table>
       </div>
 
-      {audienceRows.map((audienceRow) => {
-        const audLands = audienceRow.pageLands || audienceRow.uniqueViews;
-        const audFormComplete = audienceRow.formCompletions;
-        const audFormCvr = audLands > 0 ? (audFormComplete / audLands) * 100 : 0;
-        const allSteps = [...audienceRow.steps]
-          .filter(s => s.completions > 0)
-          .sort((a, b) => a.stepNumber - b.stepNumber || a.stepName.localeCompare(b.stepName));
-        const totalByStepNum = new Map<number, number>();
-        for (const s of allSteps) {
-          totalByStepNum.set(s.stepNumber, (totalByStepNum.get(s.stepNumber) ?? 0) + s.completions);
-        }
-        const audSteps = allSteps.map((step) => {
-            const prevStepNum = step.stepNumber - 1;
-            const prevCount = prevStepNum < 1 ? audLands : (totalByStepNum.get(prevStepNum) ?? audLands);
-            const dropOff = prevCount > 0 ? ((prevCount - step.completions) / prevCount) * 100 : 0;
-            const cvr = step.stepNumber === 1
-              ? (audLands > 0 ? (step.sessionsWithPrev / audLands) * 100 : 0)
-              : (prevCount > 0 ? (step.sessionsWithPrev / prevCount) * 100 : 0);
-            const scvr = audLands > 0 ? (step.completions / audLands) * 100 : 0;
-            return { ...step, dropOff, cvr, scvr, prevCount };
-          });
-
-        return (
-          <div key={audienceRow.groupValue} className="overflow-x-auto border rounded-md mb-2" data-testid={`funnel-audience-${audienceRow.groupValue}`}>
-            <Table>
-              <TableHeader>
-                <TableRow className="h-5 bg-muted/30">
-                  <TableHead colSpan={6} className="text-[10px] px-1.5 py-0 font-semibold capitalize">
-                    {audienceRow.groupValue}
-                    <span className="text-muted-foreground font-normal ml-2">
-                      Lands: {audLands.toLocaleString()}
-                      {audFormComplete > 0 && <> | Form Complete: {audFormComplete} | Form CVR: {audFormCvr.toFixed(1)}%</>}
-                    </span>
-                  </TableHead>
-                </TableRow>
-                <TableRow className="h-5">
-                  <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Step</TableHead>
-                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Count</TableHead>
-                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap" title="Conversion from previous step">CVR</TableHead>
-                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap" title="Conversion from landing">Land CVR</TableHead>
-                  <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Drop-off</TableHead>
-                  <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Drop-off Visual</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow className="h-5 bg-muted/20">
-                  <TableCell className="font-mono text-[9px] px-1.5 py-0">0. Landing</TableCell>
-                  <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">{audLands.toLocaleString()}</TableCell>
-                  <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">100.0%</TableCell>
-                  <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
-                  <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
-                  <TableCell className="px-1.5 py-0">
-                    <div className="w-full bg-muted rounded-sm h-2.5">
-                      <div className="h-2.5 rounded-sm bg-primary" style={{ width: "100%" }} />
-                    </div>
-                  </TableCell>
-                </TableRow>
-                {audSteps.map((step) => {
-                  const barWidth = audLands > 0 ? Math.max(1, (step.completions / audLands) * 100) : 0;
-                  const isHighDropOff = step.dropOff > 50;
-                  const isMedDropOff = step.dropOff > 30;
-                  return (
-                    <TableRow key={step.stepKey} className="h-5" data-testid={`row-funnel-step-${audienceRow.groupValue}-${step.stepNumber}`}>
-                      <TableCell className="font-mono text-[9px] px-1.5 py-0 whitespace-nowrap">
-                        {step.stepNumber}. {step.stepName}
-                      </TableCell>
-                      <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">
-                        {step.completions.toLocaleString()}
-                      </TableCell>
-                      <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.cvr < 30 ? "text-red-500" : step.cvr < 60 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
-                        {step.cvr.toFixed(1)}%
-                      </TableCell>
-                      <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.scvr < 50 ? "text-red-500" : step.scvr < 70 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
-                        {step.scvr.toFixed(1)}%
-                      </TableCell>
-                      <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${isHighDropOff ? "text-red-500 font-bold" : isMedDropOff ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}`}>
-                        {step.dropOff.toFixed(1)}%
-                      </TableCell>
-                      <TableCell className="px-1.5 py-0">
-                        <div className="w-full bg-muted rounded-sm h-2.5">
-                          <div
-                            className={`h-2.5 rounded-sm ${isHighDropOff ? "bg-red-500" : isMedDropOff ? "bg-yellow-500" : "bg-primary"}`}
-                            style={{ width: `${barWidth}%` }}
-                          />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        );
-      })}
+      {audienceRows.map((audienceRow) => (
+        <AudienceFunnelPanel
+          key={audienceRow.groupValue}
+          audienceRow={audienceRow}
+          dateRange={dateRange}
+          filters={filters}
+          timeRange={timeRange}
+        />
+      ))}
 
       <div className="border-t pt-2 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">

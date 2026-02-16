@@ -201,7 +201,7 @@ export default function DashboardPage() {
 
       <FunnelChart data={(funnelQuery.data as any)?.steps} isLoading={funnelQuery.isLoading} />
 
-      <FunnelTable data={(funnelQuery.data as any)?.steps} isLoading={funnelQuery.isLoading} />
+      <FunnelTable data={(funnelQuery.data as any)?.steps} isLoading={funnelQuery.isLoading} breakdownData={breakdownQuery.data as any} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ContactFunnel data={contactFunnelQuery.data as any} isLoading={contactFunnelQuery.isLoading} />
