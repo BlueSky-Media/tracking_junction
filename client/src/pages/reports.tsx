@@ -1773,13 +1773,14 @@ function EventLogsSection({
   };
 
   const invalidateAnalytics = async () => {
-    await queryClient.invalidateQueries({
-      predicate: (query) => {
+    const analyticsPredicate = {
+      predicate: (query: any) => {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/analytics");
       },
-      refetchType: "all",
-    });
+    };
+    queryClient.removeQueries(analyticsPredicate);
+    await queryClient.invalidateQueries({ ...analyticsPredicate, refetchType: "all" });
   };
 
   const toggleColVisibility = useCallback((key: string) => {
