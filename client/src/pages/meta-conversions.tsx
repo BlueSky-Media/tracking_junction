@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   Mail, Phone, Globe, Fingerprint, MousePointerClick, Clock, History,
   ArrowUpDown, Loader2, Info, Shield, ChevronLeft, ChevronsLeft, ChevronsRight,
   Users, UserCheck, UserX, DollarSign, TrendingUp, Plus, Pencil, Trash2,
+  Lock, Unlock,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { SiFacebook } from "react-icons/si";
@@ -129,6 +130,8 @@ interface SignalRuleConditions {
   stepNumber?: number[];
   minTimeOnStep?: number;
   maxTimeOnStep?: number;
+  minBudget?: number;
+  maxBudget?: number;
   hasEmail?: boolean;
   hasPhone?: boolean;
 }
@@ -207,8 +210,11 @@ export default function MetaConversionsPage() {
   const [ruleCondMaxTime, setRuleCondMaxTime] = useState("");
   const [ruleCondStepName, setRuleCondStepName] = useState("");
   const [ruleCondStepNumber, setRuleCondStepNumber] = useState("");
+  const [ruleCondMinBudget, setRuleCondMinBudget] = useState("");
+  const [ruleCondMaxBudget, setRuleCondMaxBudget] = useState("");
   const [ruleCondHasEmail, setRuleCondHasEmail] = useState(false);
   const [ruleCondHasPhone, setRuleCondHasPhone] = useState(false);
+  const [lockedRules, setLockedRules] = useState<Set<number>>(new Set());
 
   const statusQuery = useQuery<CapiStatus>({
     queryKey: ["/api/meta-conversions/status"],
@@ -291,6 +297,14 @@ export default function MetaConversionsPage() {
     queryKey: ["/api/meta-conversions/signal-rules"],
   });
 
+  const lockedInitialized = useRef(false);
+  useEffect(() => {
+    if (!lockedInitialized.current && signalRulesQuery.data?.rules?.length) {
+      setLockedRules(new Set(signalRulesQuery.data.rules.map(r => r.id)));
+      lockedInitialized.current = true;
+    }
+  }, [signalRulesQuery.data]);
+
   const resetRuleForm = () => {
     setRuleName("");
     setRuleTriggerEvent("page_land");
@@ -306,6 +320,8 @@ export default function MetaConversionsPage() {
     setRuleCondMaxTime("");
     setRuleCondStepName("");
     setRuleCondStepNumber("");
+    setRuleCondMinBudget("");
+    setRuleCondMaxBudget("");
     setRuleCondHasEmail(false);
     setRuleCondHasPhone(false);
   };
@@ -325,6 +341,8 @@ export default function MetaConversionsPage() {
     setRuleCondMaxTime(rule.conditions.maxTimeOnStep != null ? String(rule.conditions.maxTimeOnStep) : "");
     setRuleCondStepName(rule.conditions.stepName ? rule.conditions.stepName.join(", ") : "");
     setRuleCondStepNumber(rule.conditions.stepNumber ? rule.conditions.stepNumber.join(", ") : "");
+    setRuleCondMinBudget(rule.conditions.minBudget != null ? String(rule.conditions.minBudget) : "");
+    setRuleCondMaxBudget(rule.conditions.maxBudget != null ? String(rule.conditions.maxBudget) : "");
     setRuleCondHasEmail(rule.conditions.hasEmail || false);
     setRuleCondHasPhone(rule.conditions.hasPhone || false);
   };
@@ -339,6 +357,8 @@ export default function MetaConversionsPage() {
     if (ruleCondMaxTime) conditions.maxTimeOnStep = Number(ruleCondMaxTime);
     if (ruleCondStepName.trim()) conditions.stepName = ruleCondStepName.split(",").map(s => s.trim()).filter(Boolean);
     if (ruleCondStepNumber.trim()) conditions.stepNumber = ruleCondStepNumber.split(",").map(s => Number(s.trim())).filter(n => !isNaN(n));
+    if (ruleCondMinBudget) conditions.minBudget = Number(ruleCondMinBudget);
+    if (ruleCondMaxBudget) conditions.maxBudget = Number(ruleCondMaxBudget);
     if (ruleCondHasEmail) conditions.hasEmail = true;
     if (ruleCondHasPhone) conditions.hasPhone = true;
     return {
@@ -411,6 +431,24 @@ export default function MetaConversionsPage() {
     });
   };
 
+  const isRuleLocked = (ruleId: number) => lockedRules.has(ruleId);
+
+  const toggleRuleLock = (ruleId: number) => {
+    setLockedRules(prev => {
+      const next = new Set(prev);
+      if (next.has(ruleId)) {
+        next.delete(ruleId);
+      } else {
+        next.add(ruleId);
+        if (editingRuleId === ruleId) {
+          setEditingRuleId(null);
+          resetRuleForm();
+        }
+      }
+      return next;
+    });
+  };
+
   const toggleConditionArray = (arr: string[], value: string, setter: (v: string[]) => void) => {
     if (arr.includes(value)) {
       setter(arr.filter(v => v !== value));
@@ -429,6 +467,8 @@ export default function MetaConversionsPage() {
     if (c.stepNumber?.length) parts.push(`Step #${c.stepNumber.join(", ")}`);
     if (c.minTimeOnStep != null) parts.push(`Min time: ${c.minTimeOnStep}s`);
     if (c.maxTimeOnStep != null) parts.push(`Max time: ${c.maxTimeOnStep}s`);
+    if (c.minBudget != null) parts.push(`Min budget: $${c.minBudget}/mo`);
+    if (c.maxBudget != null) parts.push(`Max budget: $${c.maxBudget}/mo`);
     if (c.hasEmail) parts.push("Has email");
     if (c.hasPhone) parts.push("Has phone");
     return parts.length > 0 ? parts.join(" | ") : "No filters (matches all)";
@@ -1357,6 +1397,28 @@ export default function MetaConversionsPage() {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground">Min Budget ($/mo)</label>
+                        <input
+                          type="number"
+                          value={ruleCondMinBudget}
+                          onChange={(e) => setRuleCondMinBudget(e.target.value)}
+                          placeholder="e.g. 100"
+                          className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                          data-testid="input-cond-min-budget"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground">Max Budget ($/mo)</label>
+                        <input
+                          type="number"
+                          value={ruleCondMaxBudget}
+                          onChange={(e) => setRuleCondMaxBudget(e.target.value)}
+                          placeholder="e.g. 500"
+                          className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                          data-testid="input-cond-max-budget"
+                        />
+                      </div>
                       <div className="flex items-end gap-3">
                         <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
                           <input
@@ -1413,6 +1475,7 @@ export default function MetaConversionsPage() {
                   {signalRulesQuery.data.rules.map((rule) => (
                     <div key={rule.id} data-testid={`rule-row-${rule.id}`}>
                       <Collapsible open={editingRuleId === rule.id} onOpenChange={(open) => {
+                        if (isRuleLocked(rule.id)) return;
                         if (open) {
                           setEditingRuleId(rule.id);
                           setNewRuleOpen(false);
@@ -1425,7 +1488,7 @@ export default function MetaConversionsPage() {
                         <div className="flex items-center justify-between gap-2 p-2 rounded-md border flex-wrap">
                           <div className="flex items-center gap-2 flex-wrap">
                             <CollapsibleTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-expand-rule-${rule.id}`}>
+                              <Button size="icon" variant="ghost" disabled={isRuleLocked(rule.id)} data-testid={`button-expand-rule-${rule.id}`}>
                                 {editingRuleId === rule.id ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                               </Button>
                             </CollapsibleTrigger>
@@ -1435,14 +1498,23 @@ export default function MetaConversionsPage() {
                             <span className="text-[9px] text-muted-foreground" data-testid={`text-rule-conditions-${rule.id}`}>{summarizeConditions(rule.conditions)}</span>
                           </div>
                           <div className="flex items-center gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => toggleRuleLock(rule.id)}
+                              data-testid={`button-lock-rule-${rule.id}`}
+                            >
+                              {isRuleLocked(rule.id) ? <Lock className="w-3 h-3 text-amber-500" /> : <Unlock className="w-3 h-3 text-muted-foreground" />}
+                            </Button>
                             <div
-                              className="flex items-center gap-1.5 cursor-pointer"
-                              onClick={() => toggleRuleActive(rule)}
+                              className={`flex items-center gap-1.5 ${isRuleLocked(rule.id) ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}
+                              onClick={() => { if (!isRuleLocked(rule.id)) toggleRuleActive(rule); }}
                               data-testid={`toggle-rule-active-${rule.id}`}
                             >
                               <Switch
                                 checked={rule.active === 1}
-                                onCheckedChange={() => toggleRuleActive(rule)}
+                                disabled={isRuleLocked(rule.id)}
+                                onCheckedChange={() => { if (!isRuleLocked(rule.id)) toggleRuleActive(rule); }}
                                 className="scale-75"
                               />
                               <span className={`text-[9px] font-medium ${rule.active === 1 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
@@ -1450,15 +1522,15 @@ export default function MetaConversionsPage() {
                               </span>
                             </div>
                             <CollapsibleTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-edit-rule-${rule.id}`}>
+                              <Button size="icon" variant="ghost" disabled={isRuleLocked(rule.id)} data-testid={`button-edit-rule-${rule.id}`}>
                                 <Pencil className="w-3 h-3" />
                               </Button>
                             </CollapsibleTrigger>
                             <Button
                               size="icon"
                               variant="ghost"
-                              onClick={() => deleteRuleMutation.mutate(rule.id)}
-                              disabled={deleteRuleMutation.isPending}
+                              onClick={() => { if (!isRuleLocked(rule.id)) deleteRuleMutation.mutate(rule.id); }}
+                              disabled={isRuleLocked(rule.id) || deleteRuleMutation.isPending}
                               data-testid={`button-delete-rule-${rule.id}`}
                             >
                               <Trash2 className="w-3 h-3 text-destructive" />
@@ -1654,6 +1726,28 @@ export default function MetaConversionsPage() {
                                 </div>
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground">Min Budget ($/mo)</label>
+                                  <input
+                                    type="number"
+                                    value={ruleCondMinBudget}
+                                    onChange={(e) => setRuleCondMinBudget(e.target.value)}
+                                    placeholder="e.g. 100"
+                                    className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                    data-testid="input-edit-cond-min-budget"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground">Max Budget ($/mo)</label>
+                                  <input
+                                    type="number"
+                                    value={ruleCondMaxBudget}
+                                    onChange={(e) => setRuleCondMaxBudget(e.target.value)}
+                                    placeholder="e.g. 500"
+                                    className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                    data-testid="input-edit-cond-max-budget"
+                                  />
+                                </div>
                                 <div className="flex items-end gap-3">
                                   <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
                                     <input
