@@ -1190,16 +1190,16 @@ function AudienceFunnelPanel({
                           {breakdown.options.map((option, idx) => (
                             <div key={option.value} className="flex items-center gap-2" data-testid={`response-option-${audienceRow.groupValue}-${step.stepNumber}-${idx}`}>
                               <span className="text-[9px] min-w-[100px] truncate">{option.value}</span>
+                              <span className="text-[9px] font-mono text-muted-foreground min-w-[28px] text-right">{option.count}</span>
+                              <Badge variant="outline" className="text-[7px] px-1 py-0 font-mono min-w-[36px] justify-center">
+                                {option.percentage.toFixed(1)}%
+                              </Badge>
                               <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                                 <div
                                   className={`h-full rounded-full ${RESPONSE_BAR_COLORS[idx % RESPONSE_BAR_COLORS.length]}`}
                                   style={{ width: `${option.percentage}%` }}
                                 />
                               </div>
-                              <span className="text-[9px] font-mono text-muted-foreground min-w-[28px] text-right">{option.count}</span>
-                              <Badge variant="outline" className="text-[7px] px-1 py-0 font-mono min-w-[36px] justify-center">
-                                {option.percentage.toFixed(1)}%
-                              </Badge>
                             </div>
                           ))}
                         </div>

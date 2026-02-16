@@ -201,16 +201,16 @@ export function FunnelTable({ data, isLoading, breakdownData }: FunnelTableProps
                             {breakdown.options.map((option, optIdx) => (
                               <div key={option.value} className="flex items-center gap-3" data-testid={`response-option-${step.stepNumber}-${optIdx}`}>
                                 <span className="text-sm min-w-[120px] truncate">{option.value}</span>
+                                <span className="text-sm font-mono text-muted-foreground min-w-[32px] text-right">{option.count}</span>
+                                <Badge variant="outline" className="font-mono text-xs min-w-[48px] justify-center">
+                                  {option.percentage.toFixed(1)}%
+                                </Badge>
                                 <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                                   <div
                                     className={`h-full rounded-full ${BAR_COLORS[optIdx % BAR_COLORS.length]}`}
                                     style={{ width: `${option.percentage}%` }}
                                   />
                                 </div>
-                                <span className="text-sm font-mono text-muted-foreground min-w-[32px] text-right">{option.count}</span>
-                                <Badge variant="outline" className="font-mono text-xs min-w-[48px] justify-center">
-                                  {option.percentage.toFixed(1)}%
-                                </Badge>
                               </div>
                             ))}
                           </div>
