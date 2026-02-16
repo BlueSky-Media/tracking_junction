@@ -236,6 +236,24 @@ export const insertAudienceSignalRuleSchema = z.object({
 export type InsertAudienceSignalRule = z.infer<typeof insertAudienceSignalRuleSchema>;
 export type AudienceSignalRule = typeof audienceSignalRules.$inferSelect;
 
+export const signalFireLog = pgTable("signal_fire_log", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  ruleId: integer("rule_id").notNull(),
+  ruleName: varchar("rule_name", { length: 200 }).notNull(),
+  eventId: integer("event_id"),
+  sessionId: varchar("session_id", { length: 64 }).notNull(),
+  metaEventName: varchar("meta_event_name", { length: 100 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull(),
+  errorMessage: text("error_message"),
+  eventValue: integer("event_value"),
+  firedAt: timestamp("fired_at").notNull().defaultNow(),
+}, (table) => [
+  index("signal_fire_log_fired_at_idx").on(table.firedAt),
+  index("signal_fire_log_rule_id_idx").on(table.ruleId),
+]);
+
+export type SignalFireLog = typeof signalFireLog.$inferSelect;
+
 export const LEAD_STEPS_SENIORS = [
   { number: 0, name: "Landing" },
   { number: 1, name: "Beneficiary" },

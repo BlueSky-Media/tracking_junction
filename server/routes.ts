@@ -227,13 +227,25 @@ export async function registerRoutes(
               ? { ...signalData, email: null, phone: null, firstName: null, lastName: null }
               : signalData;
 
-            await fireAudienceSignal(
+            const result = await fireAudienceSignal(
               rule.metaEventName,
               eventSignalData,
               value,
               rule.contentName || data.page,
             );
-            console.log(`[Signal Rules] Rule "${rule.name}" matched for session ${data.session_id}, fired ${rule.metaEventName}`);
+
+            await storage.insertSignalFireLog({
+              ruleId: rule.id,
+              ruleName: rule.name,
+              eventId: event.id,
+              sessionId: data.session_id,
+              metaEventName: rule.metaEventName,
+              status: result.success ? "success" : "failed",
+              errorMessage: result.error || null,
+              eventValue: value,
+            });
+
+            console.log(`[Signal Rules] Rule "${rule.name}" matched for session ${data.session_id}, fired ${rule.metaEventName}, status: ${result.success ? "success" : "failed"}`);
           }
         } catch (err) {
           console.error("[Signal Rules] Fire-and-forget error:", err);
@@ -1206,6 +1218,20 @@ export async function registerRoutes(
     } catch (error) {
       console.error("[Webhook] Policy sold error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/meta-conversions/signal-log", isAuthenticated, async (req, res) => {
+    try {
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 50;
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const result = await storage.getSignalFireLogs({ startDate, endDate, page, limit });
+      res.json({ logs: result.logs, total: result.total, page, totalPages: Math.ceil(result.total / limit) });
+    } catch (error) {
+      console.error("Error fetching signal fire logs:", error);
+      res.status(500).json({ error: "Failed to fetch signal fire logs" });
     }
   });
 

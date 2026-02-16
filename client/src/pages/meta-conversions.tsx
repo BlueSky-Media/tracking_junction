@@ -518,6 +518,15 @@ export default function MetaConversionsPage() {
     return parts.length > 0 ? parts.join(" | ") : "No filters (matches all)";
   };
 
+  interface SignalFireLogEntry {
+    id: number; ruleId: number; ruleName: string; eventId: number | null;
+    sessionId: string; metaEventName: string; status: string;
+    errorMessage: string | null; eventValue: number | null; firedAt: string;
+  }
+  interface SignalFireLogResult {
+    logs: SignalFireLogEntry[]; total: number; page: number; totalPages: number;
+  }
+
   interface AudienceStat { tier: string; count: number; totalValue: number }
   interface AudienceStatsResult { stats: AudienceStat[] }
   interface AudienceEvent {
@@ -540,6 +549,23 @@ export default function MetaConversionsPage() {
       if (endDate) params.set("endDate", endDate);
       if (audience && audience !== "__all__") params.set("audience", audience);
       const res = await fetch(`/api/meta-conversions/audience-stats?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+  });
+
+  const [signalLogPage, setSignalLogPage] = useState(1);
+
+  const signalLogQuery = useQuery<SignalFireLogResult>({
+    queryKey: ["/api/meta-conversions/signal-log", startDate, endDate, signalLogPage],
+    enabled: activeTab === "audiences",
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      params.set("page", signalLogPage.toString());
+      params.set("limit", "20");
+      const res = await fetch(`/api/meta-conversions/signal-log?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
@@ -1886,6 +1912,121 @@ export default function MetaConversionsPage() {
                   No signal rules configured. Click "+ New Rule" to create one.
                 </p>
               ) : null}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-signal-fire-log">
+            <CardHeader className="p-3 pb-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="text-xs font-semibold flex items-center gap-2">
+                  <History className="w-3 h-3" />
+                  Signal Fire Log
+                  {signalLogQuery.data && (
+                    <Badge variant="secondary" className="text-[9px]">
+                      {signalLogQuery.data.total} fires
+                    </Badge>
+                  )}
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => signalLogQuery.refetch()}
+                  disabled={signalLogQuery.isFetching}
+                  data-testid="button-refresh-signal-log"
+                >
+                  {signalLogQuery.isFetching ? <Loader2 className="w-3 h-3 animate-spin" /> : <History className="w-3 h-3" />}
+                  <span className="text-[10px] ml-1">Refresh</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              {signalLogQuery.isLoading ? (
+                <Skeleton className="h-32 w-full" />
+              ) : signalLogQuery.data?.logs && signalLogQuery.data.logs.length > 0 ? (
+                <>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-[10px] w-[110px]">Timestamp</TableHead>
+                          <TableHead className="text-[10px] w-[140px]">Rule</TableHead>
+                          <TableHead className="text-[10px] w-[120px]">Meta Event</TableHead>
+                          <TableHead className="text-[10px] w-[60px]">Status</TableHead>
+                          <TableHead className="text-[10px] w-[60px]">Value</TableHead>
+                          <TableHead className="text-[10px] w-[100px]">Session</TableHead>
+                          <TableHead className="text-[10px]">Error</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {signalLogQuery.data.logs.map((log) => (
+                          <TableRow key={log.id} data-testid={`signal-log-row-${log.id}`}>
+                            <TableCell className="text-[10px]">
+                              {format(new Date(log.firedAt), "MMM d, HH:mm:ss")}
+                            </TableCell>
+                            <TableCell className="text-[10px] font-medium">{log.ruleName}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-[9px]">{log.metaEventName}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {log.status === "success" ? (
+                                <Badge variant="default" className="text-[9px]" data-testid={`signal-log-status-${log.id}`}>
+                                  <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
+                                  OK
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-[9px]" data-testid={`signal-log-status-${log.id}`}>
+                                  <XCircle className="w-2.5 h-2.5 mr-0.5" />
+                                  Fail
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-[10px]">
+                              {log.eventValue != null ? `$${log.eventValue.toLocaleString()}` : "-"}
+                            </TableCell>
+                            <TableCell className="text-[10px] font-mono text-muted-foreground">
+                              {log.sessionId.slice(0, 8)}...
+                            </TableCell>
+                            <TableCell className="text-[10px] text-destructive max-w-[200px] truncate">
+                              {log.errorMessage || "-"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {signalLogQuery.data.totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-[9px] text-muted-foreground">
+                        Page {signalLogQuery.data.page} of {signalLogQuery.data.totalPages}
+                      </span>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={signalLogPage <= 1}
+                          onClick={() => setSignalLogPage(p => p - 1)}
+                          data-testid="button-signal-log-prev"
+                        >
+                          <ChevronLeft className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={signalLogPage >= (signalLogQuery.data?.totalPages || 1)}
+                          onClick={() => setSignalLogPage(p => p + 1)}
+                          data-testid="button-signal-log-next"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-[10px] text-muted-foreground text-center py-4" data-testid="text-no-signal-logs">
+                  No signal fires recorded yet. When events are received that match your rules, they will appear here with their Meta CAPI response status.
+                </p>
+              )}
             </CardContent>
           </Card>
 

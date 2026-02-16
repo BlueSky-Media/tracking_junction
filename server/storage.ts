@@ -4,6 +4,7 @@ import {
   blockedNumbers,
   metaConversionUploads,
   audienceSignalRules,
+  signalFireLog,
   type InsertTrackingEvent,
   type TrackingEvent,
   type InsertRequestLog,
@@ -13,6 +14,7 @@ import {
   type MetaConversionUpload,
   type InsertAudienceSignalRule,
   type AudienceSignalRule,
+  type SignalFireLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or, inArray, type SQL } from "drizzle-orm";
@@ -1691,6 +1693,45 @@ class DatabaseStorage implements IStorage {
       .where(eq(audienceSignalRules.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  async insertSignalFireLog(entry: {
+    ruleId: number;
+    ruleName: string;
+    eventId: number | null;
+    sessionId: string;
+    metaEventName: string;
+    status: string;
+    errorMessage?: string | null;
+    eventValue?: number | null;
+  }): Promise<void> {
+    await db.insert(signalFireLog).values({
+      ruleId: entry.ruleId,
+      ruleName: entry.ruleName,
+      eventId: entry.eventId ?? null,
+      sessionId: entry.sessionId,
+      metaEventName: entry.metaEventName,
+      status: entry.status,
+      errorMessage: entry.errorMessage ?? null,
+      eventValue: entry.eventValue ?? null,
+    });
+  }
+
+  async getSignalFireLogs(opts: { startDate?: string; endDate?: string; page?: number; limit?: number }): Promise<{ logs: SignalFireLog[]; total: number }> {
+    const limit = opts.limit || 50;
+    const page = opts.page || 1;
+    const conditions: SQL[] = [];
+    if (opts.startDate) conditions.push(gte(signalFireLog.firedAt, new Date(opts.startDate)));
+    if (opts.endDate) {
+      const endOfDay = new Date(opts.endDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      conditions.push(lte(signalFireLog.firedAt, endOfDay));
+    }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const [totalResult] = await db.select({ count: count() }).from(signalFireLog).where(whereClause);
+    const logs = await db.select().from(signalFireLog).where(whereClause).orderBy(desc(signalFireLog.firedAt)).limit(limit).offset((page - 1) * limit);
+    return { logs, total: Number(totalResult.count) };
   }
 }
 
