@@ -16,6 +16,7 @@ import {
   Lock, Unlock,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SiFacebook } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -456,6 +457,37 @@ export default function MetaConversionsPage() {
       setter([...arr, value]);
     }
   };
+
+  const CONDITION_TIPS: Record<string, string> = {
+    "Audience": "Which landing page audience: seniors, veterans, or first-responders. Leave unchecked to match all audiences.",
+    "Domain": "Which website the event came from. Leave unchecked to match events from both domains.",
+    "Device Type": "Filter by the visitor's device. Leave unchecked to match all device types.",
+    "Page Type": "\"Lead\" = quiz funnel, \"Call\" = call-in funnel. Leave unchecked to match both funnel types.",
+    "Step Name": "Match specific quiz steps by name (e.g. Eligibility Check). Comma-separated for multiple steps.",
+    "Step Number": "Match quiz steps by their number in the funnel (e.g. step 6). Comma-separated for multiple.",
+    "Min Time on Step (s)": "Minimum seconds the visitor spent on the step before clicking. Useful for filtering out bots that click instantly.",
+    "Max Time on Step (s)": "Maximum seconds the visitor spent on the step. Useful for filtering out abandoned sessions.",
+    "Min Budget ($/mo)": "Minimum monthly budget from the visitor's quiz answer. Compared against the midpoint of their selected range (e.g. \"$100-$200\" = $150).",
+    "Max Budget ($/mo)": "Maximum monthly budget from the visitor's quiz answer. Compared against the midpoint of their selected range (e.g. \"$100-$200\" = $150).",
+    "Has Email": "Only match events where the visitor provided an email address.",
+    "Has Phone": "Only match events where the visitor provided a phone number.",
+  };
+
+  const CondLabel = ({ text }: { text: string }) => (
+    <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+      {text}
+      {CONDITION_TIPS[text] && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Info className="w-3 h-3 text-muted-foreground/60 cursor-help shrink-0" />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[240px] text-xs">
+            {CONDITION_TIPS[text]}
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </span>
+  );
 
   const summarizeConditions = (c: SignalRuleConditions): string => {
     const parts: string[] = [];
@@ -1282,7 +1314,7 @@ export default function MetaConversionsPage() {
                     <div className="text-[10px] font-semibold text-muted-foreground uppercase">Conditions</div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">Audience</label>
+                        <CondLabel text="Audience" />
                         <div className="space-y-1">
                           {["seniors", "veterans", "first-responders"].map((v) => (
                             <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
@@ -1299,7 +1331,7 @@ export default function MetaConversionsPage() {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">Domain</label>
+                        <CondLabel text="Domain" />
                         <div className="space-y-1">
                           {["blueskylife.net", "blueskylife.io"].map((v) => (
                             <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
@@ -1316,7 +1348,7 @@ export default function MetaConversionsPage() {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">Device Type</label>
+                        <CondLabel text="Device Type" />
                         <div className="space-y-1">
                           {["mobile", "desktop", "tablet"].map((v) => (
                             <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
@@ -1333,7 +1365,7 @@ export default function MetaConversionsPage() {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">Page Type</label>
+                        <CondLabel text="Page Type" />
                         <div className="space-y-1">
                           {["lead", "call"].map((v) => (
                             <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
@@ -1352,7 +1384,7 @@ export default function MetaConversionsPage() {
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">Step Name</label>
+                        <CondLabel text="Step Name" />
                         <input
                           type="text"
                           value={ruleCondStepName}
@@ -1364,7 +1396,7 @@ export default function MetaConversionsPage() {
                         <span className="text-[9px] text-muted-foreground">Comma-separated</span>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">Step Number</label>
+                        <CondLabel text="Step Number" />
                         <input
                           type="text"
                           value={ruleCondStepNumber}
@@ -1376,7 +1408,7 @@ export default function MetaConversionsPage() {
                         <span className="text-[9px] text-muted-foreground">Comma-separated</span>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">Min Time on Step (s)</label>
+                        <CondLabel text="Min Time on Step (s)" />
                         <input
                           type="number"
                           value={ruleCondMinTime}
@@ -1386,7 +1418,7 @@ export default function MetaConversionsPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">Max Time on Step (s)</label>
+                        <CondLabel text="Max Time on Step (s)" />
                         <input
                           type="number"
                           value={ruleCondMaxTime}
@@ -1398,7 +1430,7 @@ export default function MetaConversionsPage() {
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">Min Budget ($/mo)</label>
+                        <CondLabel text="Min Budget ($/mo)" />
                         <input
                           type="number"
                           value={ruleCondMinBudget}
@@ -1409,7 +1441,7 @@ export default function MetaConversionsPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-medium text-muted-foreground">Max Budget ($/mo)</label>
+                        <CondLabel text="Max Budget ($/mo)" />
                         <input
                           type="number"
                           value={ruleCondMaxBudget}
@@ -1420,26 +1452,38 @@ export default function MetaConversionsPage() {
                         />
                       </div>
                       <div className="flex items-end gap-3">
-                        <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={ruleCondHasEmail}
-                            onChange={(e) => setRuleCondHasEmail(e.target.checked)}
-                            className="h-3 w-3 rounded-sm"
-                            data-testid="checkbox-cond-has-email"
-                          />
-                          <span>Has Email</span>
-                        </label>
-                        <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={ruleCondHasPhone}
-                            onChange={(e) => setRuleCondHasPhone(e.target.checked)}
-                            className="h-3 w-3 rounded-sm"
-                            data-testid="checkbox-cond-has-phone"
-                          />
-                          <span>Has Phone</span>
-                        </label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={ruleCondHasEmail}
+                                onChange={(e) => setRuleCondHasEmail(e.target.checked)}
+                                className="h-3 w-3 rounded-sm"
+                                data-testid="checkbox-cond-has-email"
+                              />
+                              <span>Has Email</span>
+                              <Info className="w-3 h-3 text-muted-foreground/60 cursor-help shrink-0" />
+                            </label>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[240px] text-xs">{CONDITION_TIPS["Has Email"]}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={ruleCondHasPhone}
+                                onChange={(e) => setRuleCondHasPhone(e.target.checked)}
+                                className="h-3 w-3 rounded-sm"
+                                data-testid="checkbox-cond-has-phone"
+                              />
+                              <span>Has Phone</span>
+                              <Info className="w-3 h-3 text-muted-foreground/60 cursor-help shrink-0" />
+                            </label>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[240px] text-xs">{CONDITION_TIPS["Has Phone"]}</TooltipContent>
+                        </Tooltip>
                       </div>
                     </div>
                   </div>
@@ -1611,7 +1655,7 @@ export default function MetaConversionsPage() {
                               <div className="text-[10px] font-semibold text-muted-foreground uppercase">Conditions</div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground">Audience</label>
+                                  <CondLabel text="Audience" />
                                   <div className="space-y-1">
                                     {["seniors", "veterans", "first-responders"].map((v) => (
                                       <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
@@ -1628,7 +1672,7 @@ export default function MetaConversionsPage() {
                                   </div>
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground">Domain</label>
+                                  <CondLabel text="Domain" />
                                   <div className="space-y-1">
                                     {["blueskylife.net", "blueskylife.io"].map((v) => (
                                       <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
@@ -1645,7 +1689,7 @@ export default function MetaConversionsPage() {
                                   </div>
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground">Device Type</label>
+                                  <CondLabel text="Device Type" />
                                   <div className="space-y-1">
                                     {["mobile", "desktop", "tablet"].map((v) => (
                                       <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
@@ -1662,7 +1706,7 @@ export default function MetaConversionsPage() {
                                   </div>
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground">Page Type</label>
+                                  <CondLabel text="Page Type" />
                                   <div className="space-y-1">
                                     {["lead", "call"].map((v) => (
                                       <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
@@ -1681,7 +1725,7 @@ export default function MetaConversionsPage() {
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground">Step Name</label>
+                                  <CondLabel text="Step Name" />
                                   <input
                                     type="text"
                                     value={ruleCondStepName}
@@ -1693,7 +1737,7 @@ export default function MetaConversionsPage() {
                                   <span className="text-[9px] text-muted-foreground">Comma-separated</span>
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground">Step Number</label>
+                                  <CondLabel text="Step Number" />
                                   <input
                                     type="text"
                                     value={ruleCondStepNumber}
@@ -1705,7 +1749,7 @@ export default function MetaConversionsPage() {
                                   <span className="text-[9px] text-muted-foreground">Comma-separated</span>
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground">Min Time on Step (s)</label>
+                                  <CondLabel text="Min Time on Step (s)" />
                                   <input
                                     type="number"
                                     value={ruleCondMinTime}
@@ -1715,7 +1759,7 @@ export default function MetaConversionsPage() {
                                   />
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground">Max Time on Step (s)</label>
+                                  <CondLabel text="Max Time on Step (s)" />
                                   <input
                                     type="number"
                                     value={ruleCondMaxTime}
@@ -1727,7 +1771,7 @@ export default function MetaConversionsPage() {
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground">Min Budget ($/mo)</label>
+                                  <CondLabel text="Min Budget ($/mo)" />
                                   <input
                                     type="number"
                                     value={ruleCondMinBudget}
@@ -1738,7 +1782,7 @@ export default function MetaConversionsPage() {
                                   />
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground">Max Budget ($/mo)</label>
+                                  <CondLabel text="Max Budget ($/mo)" />
                                   <input
                                     type="number"
                                     value={ruleCondMaxBudget}
@@ -1749,26 +1793,38 @@ export default function MetaConversionsPage() {
                                   />
                                 </div>
                                 <div className="flex items-end gap-3">
-                                  <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={ruleCondHasEmail}
-                                      onChange={(e) => setRuleCondHasEmail(e.target.checked)}
-                                      className="h-3 w-3 rounded-sm"
-                                      data-testid="checkbox-edit-cond-has-email"
-                                    />
-                                    <span>Has Email</span>
-                                  </label>
-                                  <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={ruleCondHasPhone}
-                                      onChange={(e) => setRuleCondHasPhone(e.target.checked)}
-                                      className="h-3 w-3 rounded-sm"
-                                      data-testid="checkbox-edit-cond-has-phone"
-                                    />
-                                    <span>Has Phone</span>
-                                  </label>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={ruleCondHasEmail}
+                                          onChange={(e) => setRuleCondHasEmail(e.target.checked)}
+                                          className="h-3 w-3 rounded-sm"
+                                          data-testid="checkbox-edit-cond-has-email"
+                                        />
+                                        <span>Has Email</span>
+                                        <Info className="w-3 h-3 text-muted-foreground/60 cursor-help shrink-0" />
+                                      </label>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-[240px] text-xs">{CONDITION_TIPS["Has Email"]}</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={ruleCondHasPhone}
+                                          onChange={(e) => setRuleCondHasPhone(e.target.checked)}
+                                          className="h-3 w-3 rounded-sm"
+                                          data-testid="checkbox-edit-cond-has-phone"
+                                        />
+                                        <span>Has Phone</span>
+                                        <Info className="w-3 h-3 text-muted-foreground/60 cursor-help shrink-0" />
+                                      </label>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-[240px] text-xs">{CONDITION_TIPS["Has Phone"]}</TooltipContent>
+                                  </Tooltip>
                                 </div>
                               </div>
                             </div>
