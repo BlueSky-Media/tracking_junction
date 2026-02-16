@@ -1,0 +1,266 @@
+ Tracking Junction: Lead Scoring & Facebook CAPI Integration
+
+ This is a prompt for Replit Agent. Do NOT modify the landing page. All work is inside Tracking Junction's server code.
+
+ What to Build
+
+ Add Facebook Conversions API (CAPI) event firing to Tracking Junction. When leads complete the quiz, when leads are disqualified mid-funnel, and
+ when policies are sold — fire scored events to Meta with monetary values for ad optimization.
+
+ Three CAPI Event Types
+
+ ┌───────────────────┬───────────────────────────────────────────────────────────┬───────────────────────────────────┬───────────────────────────┐
+ │    Event Name     │                          Trigger                          │        User Data Available        │        Value (USD)        │
+ ├───────────────────┼───────────────────────────────────────────────────────────┼───────────────────────────────────┼───────────────────────────┤
+ │ QualifiedLead     │ form_complete event arrives via POST /api/events          │ Full PII (email, phone, name) +   │ Estimated annual premium  │
+ │                   │                                                           │ fbc, fbp, external_id, IP, UA     │ (budget midpoint × 12)    │
+ ├───────────────────┼───────────────────────────────────────────────────────────┼───────────────────────────────────┼───────────────────────────┤
+ │ DisqualifiedLead  │ disqualified event arrives via POST /api/events           │ NO PII — only fbc, fbp,           │ $0                        │
+ │                   │                                                           │ external_id, IP, UA               │                           │
+ ├───────────────────┼───────────────────────────────────────────────────────────┼───────────────────────────────────┼───────────────────────────┤
+ │ HighValueCustomer │ Policy sold webhook (POST /api/webhook/policy-sold) with  │ Email, phone, name (from webhook  │ Actual annual premium     │
+ │                   │ policy_type: "level"                                      │ payload)                          │                           │
+ ├───────────────────┼───────────────────────────────────────────────────────────┼───────────────────────────────────┼───────────────────────────┤
+ │ LowValueCustomer  │ Policy sold webhook (POST /api/webhook/policy-sold) with  │ Email, phone, name (from webhook  │ Actual annual premium     │
+ │                   │ policy_type: "graded" or "guaranteed_issue"               │ payload)                          │                           │
+ └───────────────────┴───────────────────────────────────────────────────────────┴───────────────────────────────────┴───────────────────────────┘
+
+ About DisqualifiedLead: The landing page blocks leads who don't qualify (wrong state, no income, age out of range, budget too low for age). These
+  users never fill out name/email/phone — they get stopped at quiz steps 1-5. But we still have their Facebook tracking cookies (fbc, fbp) and
+ IP/UA, which is enough for CAPI matching. The landing page will be updated separately to send a "disqualified" event_type to POST /api/events
+ when someone gets blocked. Tracking Junction needs to be ready to handle it.
+
+ ---
+ Current Architecture (don't change these patterns)
+
+ - Server: Express 5, TypeScript, Node.js 20
+ - Database: PostgreSQL via Drizzle ORM
+ - Facebook API: Native fetch, Graph API v24.0, helper in server/facebook.ts
+ - Event flow: POST /api/events → Zod validation → storage.insertEvent() → { ok: true }
+ - Existing env vars: FACEBOOK_ACCESS_TOKEN, FACEBOOK_APP_ID, FACEBOOK_APP_SECRET
+ - PII handling: Only stored on form_complete events. See redactPii() in server/routes.ts lines 8-17.
+ - Quiz answers: Stored in quiz_answers JSONB column. Keys: beneficiary, state, budget, age, income.
+
+ Key files to reference for patterns:
+
+ - server/facebook.ts — Facebook Graph API patterns (native fetch, error class, access token handling)
+ - server/routes.ts lines 72-208 — Event handler (CORS, Zod validation, insert, logging)
+ - server/storage.ts — Drizzle ORM database operations, IStorage interface pattern
+ - shared/schema.ts — Database schema + Zod validation schemas
+
+ ---
+ New Environment Variables
+
+ ┌───────────────────┬─────────────────────────────────────────────────┐
+ │     Variable      │                     Purpose                     │
+ ├───────────────────┼─────────────────────────────────────────────────┤
+ │ FACEBOOK_PIXEL_ID │ Facebook Pixel/Dataset ID for CAPI events       │
+ ├───────────────────┼─────────────────────────────────────────────────┤
+ │ WEBHOOK_API_KEY   │ API key to authenticate the policy-sold webhook │
+ └───────────────────┴─────────────────────────────────────────────────┘
+
+ ---
+ Files to Create
+
+ 1. server/lead-scoring.ts
+
+ Pure scoring logic. No side effects, no database calls.
+
+ parseBudgetRange(budget: string): { min: number, max: number | null } | null
+   - Parse budget strings from quiz_answers
+   - Examples: "$50-$80" → { min: 50, max: 80 }, "$150+" → { min: 150, max: null }
+   - Handle variations: with/without "$", "/month", spaces
+
+ calculateAnnualPremiumEstimate(budget: string): number
+   - Budget midpoint × 12:
+     "$50-$80"   → $780
+     "$80-$100"  → $1,080
+     "$100-$150" → $1,500
+     "$150+"     → $2,100
+   - Return 0 if unparseable
+
+ 2. server/facebook-capi.ts
+
+ Facebook Conversions API client. Separate file from existing server/facebook.ts (which is read-only Marketing API — don't touch it).
+
+ Follow the same patterns as server/facebook.ts: native fetch, Graph API v24.0, same error handling style.
+
+ hashSha256(value: string): string
+   - SHA-256 hash after lowercase + trim
+   - Uses Node.js crypto module
+   - Required by Meta for all PII fields
+
+ normalizeAndHashPhone(phone: string): string
+   - Strip non-digits
+   - Prepend "+1" if 10 digits (US numbers)
+   - SHA-256 hash the result
+   - Meta requires E.164 format before hashing
+
+ normalizeAndHashEmail(email: string): string
+   - Lowercase, trim, then SHA-256 hash
+
+ buildUserData(options): object
+   - For form_complete events (has PII):
+     { em, ph, fn, ln (all hashed), client_ip_address, client_user_agent, fbc, fbp, external_id (hashed) }
+   - For disqualified events (NO PII):
+     { client_ip_address, client_user_agent, fbc, fbp, external_id (hashed) }
+     Only include fields that are present (fbc/fbp may be null for organic traffic)
+   - For policy-sold webhook:
+     { em, ph, fn, ln (all hashed) } — whatever is provided in the webhook payload
+
+ sendConversionEvent(params): Promise<void>
+   - POST to https://graph.facebook.com/v24.0/{PIXEL_ID}/events
+   - Body: {
+       data: [{
+         event_name: string,
+         event_time: number (unix timestamp seconds),
+         event_id: string (for deduplication with client-side events),
+         action_source: "website",
+         event_source_url: string,
+         user_data: object (from buildUserData),
+         custom_data: { value: number, currency: "USD" }
+       }],
+       access_token: process.env.FACEBOOK_ACCESS_TOKEN
+     }
+
+ fireQualifiedLeadEvent(event: TrackingEvent, annualValue: number): Promise<void>
+   - Build and send "QualifiedLead" CAPI event
+   - Catch and log errors — NEVER throw
+
+ fireDisqualifiedLeadEvent(event: TrackingEvent): Promise<void>
+   - Build and send "DisqualifiedLead" CAPI event with value $0
+   - Uses limited user_data (no PII, just fbc/fbp/external_id/IP/UA)
+   - Catch and log errors — NEVER throw
+
+ fireCustomerEvent(eventName: "HighValueCustomer" | "LowValueCustomer", webhookData: object, annualPremium: number): Promise<void>
+   - Build and send customer-tier CAPI event
+   - Catch and log errors — NEVER throw
+
+ ---
+ Files to Modify
+
+ 3. shared/schema.ts
+
+ Add column to trackingEvents table:
+ leadTier: varchar("lead_tier", { length: 20 })
+
+ Add index:
+ index("idx_events_lead_tier").on(table.leadTier)
+
+ No Zod schema change — lead_tier is set server-side, not from API input.
+
+ 4. server/storage.ts
+
+ Add to IStorage interface and DatabaseStorage class:
+ updateEventLeadTier(id: number, leadTier: string): Promise<void>
+   // UPDATE tracking_events SET lead_tier = $1 WHERE id = $2
+   // Follow existing Drizzle ORM patterns
+
+ 5. server/routes.ts
+
+ A) Modify POST /api/events handler. After storage.insertEvent() succeeds (~line 163), add non-blocking scoring + CAPI:
+
+ // After event is stored, BEFORE the response is sent:
+
+ if (data.event_type === "form_complete") {
+   // Fire-and-forget — do NOT await
+   (async () => {
+     try {
+       const quizAnswers = (data.quiz_answers || {}) as Record<string, any>;
+       const budget = quizAnswers.budget as string;
+       const annualValue = calculateAnnualPremiumEstimate(budget);
+       await storage.updateEventLeadTier(event.id, "qualified");
+       if (process.env.FACEBOOK_PIXEL_ID) {
+         await fireQualifiedLeadEvent(event, annualValue);
+       }
+     } catch (err) {
+       console.error("Lead scoring/CAPI error:", err);
+     }
+   })();
+ }
+
+ if (data.event_type === "disqualified") {
+   // Fire-and-forget — do NOT await
+   (async () => {
+     try {
+       await storage.updateEventLeadTier(event.id, "disqualified");
+       if (process.env.FACEBOOK_PIXEL_ID) {
+         await fireDisqualifiedLeadEvent(event);
+       }
+     } catch (err) {
+       console.error("Disqualified CAPI error:", err);
+     }
+   })();
+ }
+
+ CRITICAL: Fire-and-forget. Do NOT await these async blocks. The { ok: true } response to the landing page must return immediately. CAPI failures
+ must NEVER affect event storage or the response.
+
+ B) Add new endpoint: POST /api/webhook/policy-sold
+
+ Zod validation schema:
+ {
+   email: z.string().email() (required)
+   phone: z.string().optional()
+   first_name: z.string().optional()
+   last_name: z.string().optional()
+   policy_type: z.enum(["level", "graded", "guaranteed_issue"]) (required)
+   annual_premium: z.number().positive() (required)
+   event_id: z.string().optional()
+ }
+
+ Authentication:
+ - Check X-API-Key header against process.env.WEBHOOK_API_KEY
+ - Return 401 if missing or wrong
+
+ Logic:
+ 1. Validate payload with Zod
+ 2. Map policy_type:
+    - "level" → event name "HighValueCustomer"
+    - "graded" or "guaranteed_issue" → event name "LowValueCustomer"
+ 3. Generate event_id if not provided (e.g., "ps_" + timestamp + "_" + random)
+ 4. Fire CAPI event with actual annual_premium as value
+ 5. Log via storage.insertRequestLog() (redact PII)
+ 6. Return { ok: true }
+
+ ---
+ Interstitial Logic (reference only — NOT built here)
+
+ This is a landing page change, documented here for context:
+
+ - Age 75-80 + budget $50-$80 or $80-$100 → interstitial offers $100-$150 (~$10-15K coverage) or $150+ (~$20-25K coverage). Decline =
+ blocked/disqualified.
+ - Age 80-85 + budget anything under $150 → must bump to $150+. Decline = blocked/disqualified.
+
+ If the user accepts, their quiz_answers.budget will reflect the new budget in the form_complete event. If they decline, the landing page will (in
+  a future update) send a disqualified event.
+
+ ---
+ Implementation Order
+
+ 1. Add lead_tier column + index to shared/schema.ts
+ 2. Run npm run db:push to apply schema change
+ 3. Create server/lead-scoring.ts (budget parsing + annual value calculation)
+ 4. Create server/facebook-capi.ts (CAPI client: hashing, user data building, event sending)
+ 5. Add updateEventLeadTier() to server/storage.ts
+ 6. Update POST /api/events in server/routes.ts (handle form_complete + disqualified)
+ 7. Add POST /api/webhook/policy-sold endpoint to server/routes.ts
+ 8. Add FACEBOOK_PIXEL_ID and WEBHOOK_API_KEY to environment variables
+ 9. Test with Facebook Events Manager → Test Events
+
+ ---
+ Verification
+
+ 1. Schema: After db:push, confirm lead_tier column exists in tracking_events
+ 2. QualifiedLead flow: POST a form_complete event to /api/events with quiz_answers: { budget: "$100-$150" }. Verify:
+   - Event stored with lead_tier = "qualified"
+   - CAPI event appears in Facebook Events Manager
+   - Event name = "QualifiedLead", value = $1,500
+ 3. DisqualifiedLead flow: POST a disqualified event to /api/events with fbc/fbp but no PII. Verify:
+   - Event stored with lead_tier = "disqualified"
+   - CAPI event fires with value = $0 and limited user_data
+ 4. Policy sold flow: POST to /api/webhook/policy-sold with policy_type: "level", annual_premium: 1800. Verify:
+   - CAPI event = "HighValueCustomer", value = $1,800
+ 5. Error isolation: Use invalid FACEBOOK_PIXEL_ID, confirm events still store and responses still return { ok: true }
+ 6. Auth: POST to /api/webhook/policy-sold without X-API-Key header, confirm 401 response
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
