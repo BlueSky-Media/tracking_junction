@@ -25,7 +25,7 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `client/src/pages/facebook-ads.tsx` - Facebook Ads page (Meta Marketing API integration)
 - `client/src/pages/meta-conversions.tsx` - Meta Conversions API page (Events tab: detect missing conversions/upload to CAPI; Custom Audiences tab: real-time audience signal dashboard)
 - `server/meta-conversions.ts` - Meta Conversions API (CAPI) client (PII hashing, event formatting, batch upload, audience signaling)
-- `server/lead-scoring.ts` - Lead scoring engine (budget parsing, annual premium estimation, customer tier classification)
+- `server/lead-scoring.ts` - Lead scoring engine (budget parsing, annual premium estimation, customer tier classification, rule condition evaluation)
 - `client/src/pages/privacy.tsx` - Public privacy policy page (no auth required, at /page/privacy)
 - `client/src/hooks/use-timezone.tsx` - Timezone context provider (localStorage-persisted, converts local time to UTC for API queries)
 - `client/src/components/` - Dashboard components (filters, funnel chart, funnel table, step breakdown, stats cards, campaign table, device breakdown, time heatmap, contact funnel, referrer breakdown, csv export)
@@ -70,6 +70,12 @@ Web analytics dashboard for tracking user interactions on landing pages (bluesky
 - `GET /api/meta-conversions/comparison?startDate&endDate&adAccountId` - Compare our lead counts per ad vs Meta Ads Insights (protected)
 - `POST /api/meta-conversions/upload` - Upload conversions to Meta CAPI (protected, body: {eventIds: number[], testMode?: boolean})
 - `GET /api/meta-conversions/history` - Upload history log (protected)
+- `GET /api/meta-conversions/signal-rules` - List all audience signal rules (protected)
+- `POST /api/meta-conversions/signal-rules` - Create a signal rule (protected, body: {name, triggerEvent, conditions, metaEventName, customValue?, currency?, contentName?, active})
+- `PUT /api/meta-conversions/signal-rules/:id` - Update a signal rule (protected)
+- `DELETE /api/meta-conversions/signal-rules/:id` - Delete a signal rule (protected)
+- `GET /api/meta-conversions/audience-stats` - Audience signal tier stats (protected)
+- `GET /api/meta-conversions/audience-events` - Paginated audience events (protected)
 - Auth routes: `/api/login`, `/api/logout`, `/api/auth/user`
 
 ## Event Schema Fields

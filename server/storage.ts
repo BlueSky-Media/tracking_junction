@@ -3,6 +3,7 @@ import {
   requestLogs,
   blockedNumbers,
   metaConversionUploads,
+  audienceSignalRules,
   type InsertTrackingEvent,
   type TrackingEvent,
   type InsertRequestLog,
@@ -10,6 +11,8 @@ import {
   type BlockedNumber,
   type InsertMetaConversionUpload,
   type MetaConversionUpload,
+  type InsertAudienceSignalRule,
+  type AudienceSignalRule,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or, inArray, type SQL } from "drizzle-orm";
@@ -222,6 +225,11 @@ export interface IStorage {
   getSessionPageLandEvent(sessionId: string): Promise<TrackingEvent | null>;
   getLeadTierStats(filters: { startDate?: string; endDate?: string; page?: string }): Promise<{ tier: string; count: number; totalValue: number }[]>;
   getLeadTierEvents(filters: { startDate?: string; endDate?: string; page?: string; tier?: string }, page: number, limit: number): Promise<{ events: TrackingEvent[]; total: number }>;
+  getSignalRules(): Promise<AudienceSignalRule[]>;
+  getActiveSignalRules(): Promise<AudienceSignalRule[]>;
+  createSignalRule(rule: InsertAudienceSignalRule): Promise<AudienceSignalRule>;
+  updateSignalRule(id: number, updates: Partial<InsertAudienceSignalRule>): Promise<AudienceSignalRule | null>;
+  deleteSignalRule(id: number): Promise<boolean>;
 }
 
 function addFilterCondition(conditions: any[], column: any, value: string | string[] | undefined) {
@@ -1644,6 +1652,45 @@ class DatabaseStorage implements IStorage {
       .offset((page - 1) * limit);
 
     return { events, total: Number(totalResult.count) };
+  }
+
+  async getSignalRules(): Promise<AudienceSignalRule[]> {
+    return db.select().from(audienceSignalRules).orderBy(desc(audienceSignalRules.createdAt));
+  }
+
+  async getActiveSignalRules(): Promise<AudienceSignalRule[]> {
+    return db.select().from(audienceSignalRules)
+      .where(eq(audienceSignalRules.active, 1))
+      .orderBy(desc(audienceSignalRules.createdAt));
+  }
+
+  async createSignalRule(rule: InsertAudienceSignalRule): Promise<AudienceSignalRule> {
+    const [created] = await db.insert(audienceSignalRules).values({
+      name: rule.name,
+      triggerEvent: rule.triggerEvent,
+      conditions: rule.conditions ?? {},
+      metaEventName: rule.metaEventName,
+      customValue: rule.customValue ?? null,
+      currency: rule.currency ?? "USD",
+      contentName: rule.contentName ?? null,
+      active: rule.active ?? 1,
+    }).returning();
+    return created;
+  }
+
+  async updateSignalRule(id: number, updates: Partial<InsertAudienceSignalRule>): Promise<AudienceSignalRule | null> {
+    const [updated] = await db.update(audienceSignalRules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(audienceSignalRules.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteSignalRule(id: number): Promise<boolean> {
+    const result = await db.delete(audienceSignalRules)
+      .where(eq(audienceSignalRules.id, id))
+      .returning();
+    return result.length > 0;
   }
 }
 

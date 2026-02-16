@@ -6,7 +6,7 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import * as facebook from "./facebook";
 import { buildConversionEvent, sendConversionEvents, MetaConversionError, fireAudienceSignal } from "./meta-conversions";
-import { calculateAnnualPremiumEstimate, getCapiEventName, classifyCustomerTier } from "./lead-scoring";
+import { calculateAnnualPremiumEstimate, getCapiEventName, classifyCustomerTier, evaluateRuleConditions, computeRuleValue, type EventContext, type SignalRuleConditions } from "./lead-scoring";
 
 const PII_FIELDS = ["first_name", "last_name", "email", "phone", "firstName", "lastName"];
 
@@ -165,56 +165,80 @@ export async function registerRoutes(
         ipType: data.ip_type || null,
       });
 
-      if (data.event_type === "form_complete" || data.event_type === "disqualified") {
-        (async () => {
-          try {
-            const pageLand = await storage.getSessionPageLandEvent(data.session_id);
+      (async () => {
+        try {
+          const activeRules = await storage.getActiveSignalRules();
+          if (activeRules.length === 0) return;
 
-            const signalData = {
-              eventId: event.eventId,
-              sessionId: event.sessionId,
-              eventTimestamp: event.eventTimestamp,
-              pageUrl: event.pageUrl,
-              email: event.email,
-              phone: event.phone,
-              firstName: event.firstName,
-              lastName: event.lastName,
-              geoState: event.geoState,
-              country: event.country,
-              externalId: event.externalId || pageLand?.externalId || null,
-              ipAddress: event.ipAddress || pageLand?.ipAddress || null,
-              userAgent: event.userAgent || pageLand?.userAgent || null,
-              fbp: event.fbp || pageLand?.fbp || null,
-              fbc: event.fbc || pageLand?.fbc || null,
-              fbclid: event.fbclid || pageLand?.fbclid || null,
-            };
+          const eventContext: EventContext = {
+            eventType: data.event_type || "step_complete",
+            page: data.page,
+            pageType: data.page_type,
+            domain: data.domain,
+            stepNumber: data.step_number,
+            stepName: data.step_name,
+            selectedValue: data.selected_value || null,
+            timeOnStep: data.time_on_step || null,
+            deviceType: data.device_type || null,
+            geoState: data.geo_state || null,
+            email: data.email || null,
+            phone: data.phone || null,
+            quizAnswers: (data.quiz_answers as Record<string, any>) || null,
+          };
 
-            if (data.event_type === "form_complete") {
-              const budget = (data.quiz_answers as any)?.budget || (data.quiz_answers as any)?.["Budget Affordability"] || "";
-              const annualValue = calculateAnnualPremiumEstimate(String(budget));
-              const tier = "qualified";
-              const capiEventName = getCapiEventName(tier);
+          const matchingRules = activeRules.filter(rule =>
+            rule.triggerEvent === eventContext.eventType &&
+            evaluateRuleConditions(rule.conditions as SignalRuleConditions, eventContext)
+          );
 
-              await storage.updateEventLeadTier(event.id, tier);
-              await fireAudienceSignal(capiEventName, signalData, annualValue, data.page);
-            } else {
-              const tier = "disqualified";
-              const capiEventName = getCapiEventName(tier);
+          if (matchingRules.length === 0) return;
 
-              await storage.updateEventLeadTier(event.id, tier);
-              await fireAudienceSignal(capiEventName, {
-                ...signalData,
-                email: null,
-                phone: null,
-                firstName: null,
-                lastName: null,
-              }, 0, data.page);
-            }
-          } catch (err) {
-            console.error("[CAPI Audience] Fire-and-forget error:", err);
+          const pageLand = await storage.getSessionPageLandEvent(data.session_id);
+
+          const signalData = {
+            eventId: event.eventId,
+            sessionId: event.sessionId,
+            eventTimestamp: event.eventTimestamp,
+            pageUrl: event.pageUrl,
+            email: event.email,
+            phone: event.phone,
+            firstName: event.firstName,
+            lastName: event.lastName,
+            geoState: event.geoState,
+            country: event.country,
+            externalId: event.externalId || pageLand?.externalId || null,
+            ipAddress: event.ipAddress || pageLand?.ipAddress || null,
+            userAgent: event.userAgent || pageLand?.userAgent || null,
+            fbp: event.fbp || pageLand?.fbp || null,
+            fbc: event.fbc || pageLand?.fbc || null,
+            fbclid: event.fbclid || pageLand?.fbclid || null,
+          };
+
+          for (const rule of matchingRules) {
+            const value = computeRuleValue(rule.customValue, eventContext);
+            const tierName = rule.metaEventName.toLowerCase().includes("disqualified") ? "disqualified"
+              : rule.metaEventName.toLowerCase().includes("highvalue") ? "high_value_customer"
+              : rule.metaEventName.toLowerCase().includes("lowvalue") ? "low_value_customer"
+              : "qualified";
+
+            await storage.updateEventLeadTier(event.id, tierName);
+
+            const eventSignalData = tierName === "disqualified"
+              ? { ...signalData, email: null, phone: null, firstName: null, lastName: null }
+              : signalData;
+
+            await fireAudienceSignal(
+              rule.metaEventName,
+              eventSignalData,
+              value,
+              rule.contentName || data.page,
+            );
+            console.log(`[Signal Rules] Rule "${rule.name}" matched for session ${data.session_id}, fired ${rule.metaEventName}`);
           }
-        })();
-      }
+        } catch (err) {
+          console.error("[Signal Rules] Fire-and-forget error:", err);
+        }
+      })();
 
       const successResponse = { ok: true };
 
@@ -1182,6 +1206,81 @@ export async function registerRoutes(
     } catch (error) {
       console.error("[Webhook] Policy sold error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/meta-conversions/signal-rules", isAuthenticated, async (req, res) => {
+    try {
+      const rules = await storage.getSignalRules();
+      res.json({ rules });
+    } catch (error) {
+      console.error("Error fetching signal rules:", error);
+      res.status(500).json({ message: "Failed to fetch signal rules" });
+    }
+  });
+
+  app.post("/api/meta-conversions/signal-rules", isAuthenticated, async (req, res) => {
+    try {
+      const schema = z.object({
+        name: z.string().min(1).max(200),
+        triggerEvent: z.string().min(1).max(30),
+        conditions: z.record(z.any()).default({}),
+        metaEventName: z.string().min(1).max(100),
+        customValue: z.number().int().optional().nullable(),
+        currency: z.string().max(10).default("USD"),
+        contentName: z.string().max(200).optional().nullable(),
+        active: z.number().int().min(0).max(1).default(1),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
+      }
+      const rule = await storage.createSignalRule(parsed.data);
+      res.json({ rule });
+    } catch (error) {
+      console.error("Error creating signal rule:", error);
+      res.status(500).json({ message: "Failed to create signal rule" });
+    }
+  });
+
+  app.put("/api/meta-conversions/signal-rules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid rule ID" });
+
+      const schema = z.object({
+        name: z.string().min(1).max(200).optional(),
+        triggerEvent: z.string().min(1).max(30).optional(),
+        conditions: z.record(z.any()).optional(),
+        metaEventName: z.string().min(1).max(100).optional(),
+        customValue: z.number().int().optional().nullable(),
+        currency: z.string().max(10).optional(),
+        contentName: z.string().max(200).optional().nullable(),
+        active: z.number().int().min(0).max(1).optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
+      }
+      const rule = await storage.updateSignalRule(id, parsed.data);
+      if (!rule) return res.status(404).json({ error: "Rule not found" });
+      res.json({ rule });
+    } catch (error) {
+      console.error("Error updating signal rule:", error);
+      res.status(500).json({ message: "Failed to update signal rule" });
+    }
+  });
+
+  app.delete("/api/meta-conversions/signal-rules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid rule ID" });
+      const deleted = await storage.deleteSignalRule(id);
+      if (!deleted) return res.status(404).json({ error: "Rule not found" });
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error deleting signal rule:", error);
+      res.status(500).json({ message: "Failed to delete signal rule" });
     }
   });
 

@@ -208,6 +208,34 @@ export const insertMetaConversionUploadSchema = createInsertSchema(metaConversio
 export type InsertMetaConversionUpload = z.infer<typeof insertMetaConversionUploadSchema>;
 export type MetaConversionUpload = typeof metaConversionUploads.$inferSelect;
 
+export const audienceSignalRules = pgTable("audience_signal_rules", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: varchar("name", { length: 200 }).notNull(),
+  triggerEvent: varchar("trigger_event", { length: 30 }).notNull(),
+  conditions: jsonb("conditions").notNull().default({}),
+  metaEventName: varchar("meta_event_name", { length: 100 }).notNull(),
+  customValue: integer("custom_value"),
+  currency: varchar("currency", { length: 10 }).default("USD"),
+  contentName: varchar("content_name", { length: 200 }),
+  active: integer("active").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertAudienceSignalRuleSchema = z.object({
+  name: z.string().min(1).max(200),
+  triggerEvent: z.string().min(1).max(30),
+  conditions: z.record(z.any()).default({}),
+  metaEventName: z.string().min(1).max(100),
+  customValue: z.number().int().nullable().optional(),
+  currency: z.string().max(10).default("USD").nullable().optional(),
+  contentName: z.string().max(200).nullable().optional(),
+  active: z.number().int().min(0).max(1).default(1),
+});
+
+export type InsertAudienceSignalRule = z.infer<typeof insertAudienceSignalRuleSchema>;
+export type AudienceSignalRule = typeof audienceSignalRules.$inferSelect;
+
 export const LEAD_STEPS_SENIORS = [
   { number: 0, name: "Landing" },
   { number: 1, name: "Beneficiary" },

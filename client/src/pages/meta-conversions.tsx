@@ -12,8 +12,9 @@ import {
   Upload, ChevronDown, ChevronRight, CheckCircle2, XCircle, AlertTriangle,
   Mail, Phone, Globe, Fingerprint, MousePointerClick, Clock, History,
   ArrowUpDown, Loader2, Info, Shield, ChevronLeft, ChevronsLeft, ChevronsRight,
-  Users, UserCheck, UserX, DollarSign, TrendingUp,
+  Users, UserCheck, UserX, DollarSign, TrendingUp, Plus, Pencil, Trash2,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { SiFacebook } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -119,6 +120,31 @@ interface AdAccount {
   business_name?: string;
 }
 
+interface SignalRuleConditions {
+  audience?: string[];
+  domain?: string[];
+  deviceType?: string[];
+  pageType?: string[];
+  minTimeOnStep?: number;
+  maxTimeOnStep?: number;
+  hasEmail?: boolean;
+  hasPhone?: boolean;
+}
+
+interface SignalRule {
+  id: number;
+  name: string;
+  triggerEvent: string;
+  conditions: SignalRuleConditions;
+  metaEventName: string;
+  customValue: number | null;
+  currency: string | null;
+  contentName: string | null;
+  active: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function getDefaultDates() {
   const end = new Date();
   const start = new Date();
@@ -162,6 +188,23 @@ export default function MetaConversionsPage() {
   const [selectedAdAccount, setSelectedAdAccount] = useState("");
   const [audiencePage, setAudiencePage] = useState(1);
   const [audienceTierFilter, setAudienceTierFilter] = useState("__all__");
+
+  const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
+  const [newRuleOpen, setNewRuleOpen] = useState(false);
+  const [ruleName, setRuleName] = useState("");
+  const [ruleTriggerEvent, setRuleTriggerEvent] = useState("page_land");
+  const [ruleMetaEventName, setRuleMetaEventName] = useState("");
+  const [ruleCustomValue, setRuleCustomValue] = useState("");
+  const [ruleCurrency, setRuleCurrency] = useState("USD");
+  const [ruleContentName, setRuleContentName] = useState("");
+  const [ruleCondAudience, setRuleCondAudience] = useState<string[]>([]);
+  const [ruleCondDomain, setRuleCondDomain] = useState<string[]>([]);
+  const [ruleCondDeviceType, setRuleCondDeviceType] = useState<string[]>([]);
+  const [ruleCondPageType, setRuleCondPageType] = useState<string[]>([]);
+  const [ruleCondMinTime, setRuleCondMinTime] = useState("");
+  const [ruleCondMaxTime, setRuleCondMaxTime] = useState("");
+  const [ruleCondHasEmail, setRuleCondHasEmail] = useState(false);
+  const [ruleCondHasPhone, setRuleCondHasPhone] = useState(false);
 
   const statusQuery = useQuery<CapiStatus>({
     queryKey: ["/api/meta-conversions/status"],
@@ -239,6 +282,132 @@ export default function MetaConversionsPage() {
       toast({ title: "Failed to mark as synced", description: err.message, variant: "destructive" });
     },
   });
+
+  const signalRulesQuery = useQuery<{ rules: SignalRule[] }>({
+    queryKey: ["/api/meta-conversions/signal-rules"],
+  });
+
+  const resetRuleForm = () => {
+    setRuleName("");
+    setRuleTriggerEvent("page_land");
+    setRuleMetaEventName("");
+    setRuleCustomValue("");
+    setRuleCurrency("USD");
+    setRuleContentName("");
+    setRuleCondAudience([]);
+    setRuleCondDomain([]);
+    setRuleCondDeviceType([]);
+    setRuleCondPageType([]);
+    setRuleCondMinTime("");
+    setRuleCondMaxTime("");
+    setRuleCondHasEmail(false);
+    setRuleCondHasPhone(false);
+  };
+
+  const populateRuleForm = (rule: SignalRule) => {
+    setRuleName(rule.name);
+    setRuleTriggerEvent(rule.triggerEvent);
+    setRuleMetaEventName(rule.metaEventName);
+    setRuleCustomValue(rule.customValue != null ? String(rule.customValue) : "");
+    setRuleCurrency(rule.currency || "USD");
+    setRuleContentName(rule.contentName || "");
+    setRuleCondAudience(rule.conditions.audience || []);
+    setRuleCondDomain(rule.conditions.domain || []);
+    setRuleCondDeviceType(rule.conditions.deviceType || []);
+    setRuleCondPageType(rule.conditions.pageType || []);
+    setRuleCondMinTime(rule.conditions.minTimeOnStep != null ? String(rule.conditions.minTimeOnStep) : "");
+    setRuleCondMaxTime(rule.conditions.maxTimeOnStep != null ? String(rule.conditions.maxTimeOnStep) : "");
+    setRuleCondHasEmail(rule.conditions.hasEmail || false);
+    setRuleCondHasPhone(rule.conditions.hasPhone || false);
+  };
+
+  const buildRulePayload = () => {
+    const conditions: SignalRuleConditions = {};
+    if (ruleCondAudience.length > 0) conditions.audience = ruleCondAudience;
+    if (ruleCondDomain.length > 0) conditions.domain = ruleCondDomain;
+    if (ruleCondDeviceType.length > 0) conditions.deviceType = ruleCondDeviceType;
+    if (ruleCondPageType.length > 0) conditions.pageType = ruleCondPageType;
+    if (ruleCondMinTime) conditions.minTimeOnStep = Number(ruleCondMinTime);
+    if (ruleCondMaxTime) conditions.maxTimeOnStep = Number(ruleCondMaxTime);
+    if (ruleCondHasEmail) conditions.hasEmail = true;
+    if (ruleCondHasPhone) conditions.hasPhone = true;
+    return {
+      name: ruleName,
+      triggerEvent: ruleTriggerEvent,
+      metaEventName: ruleMetaEventName,
+      customValue: ruleCustomValue ? Number(ruleCustomValue) : null,
+      currency: ruleCurrency || null,
+      contentName: ruleContentName || null,
+      conditions,
+    };
+  };
+
+  const createRuleMutation = useMutation({
+    mutationFn: async (payload: ReturnType<typeof buildRulePayload>) => {
+      const res = await apiRequest("POST", "/api/meta-conversions/signal-rules", payload);
+      return res.json() as Promise<{ rule: SignalRule }>;
+    },
+    onSuccess: () => {
+      toast({ title: "Signal rule created" });
+      setNewRuleOpen(false);
+      resetRuleForm();
+      qc.invalidateQueries({ queryKey: ["/api/meta-conversions/signal-rules"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to create rule", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateRuleMutation = useMutation({
+    mutationFn: async ({ id, ...payload }: ReturnType<typeof buildRulePayload> & { id: number; active?: number }) => {
+      const res = await apiRequest("PUT", `/api/meta-conversions/signal-rules/${id}`, payload);
+      return res.json() as Promise<{ rule: SignalRule }>;
+    },
+    onSuccess: () => {
+      toast({ title: "Signal rule updated" });
+      setEditingRuleId(null);
+      resetRuleForm();
+      qc.invalidateQueries({ queryKey: ["/api/meta-conversions/signal-rules"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to update rule", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteRuleMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/meta-conversions/signal-rules/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Signal rule deleted" });
+      qc.invalidateQueries({ queryKey: ["/api/meta-conversions/signal-rules"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to delete rule", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const toggleRuleActive = (rule: SignalRule) => {
+    updateRuleMutation.mutate({
+      id: rule.id,
+      name: rule.name,
+      triggerEvent: rule.triggerEvent,
+      metaEventName: rule.metaEventName,
+      customValue: rule.customValue,
+      currency: rule.currency,
+      contentName: rule.contentName,
+      conditions: rule.conditions,
+      active: rule.active === 1 ? 0 : 1,
+    });
+  };
+
+  const toggleConditionArray = (arr: string[], value: string, setter: (v: string[]) => void) => {
+    if (arr.includes(value)) {
+      setter(arr.filter(v => v !== value));
+    } else {
+      setter([...arr, value]);
+    }
+  };
 
   interface AudienceStat { tier: string; count: number; totalValue: number }
   interface AudienceStatsResult { stats: AudienceStat[] }
@@ -951,6 +1120,516 @@ export default function MetaConversionsPage() {
               ) : (
                 <p className="text-xs text-muted-foreground">No audience signals in this date range.</p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-signal-rules">
+            <CardHeader className="p-3 pb-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="text-xs font-semibold flex items-center gap-2">
+                  <Shield className="w-3 h-3" />
+                  Signal Rules
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { resetRuleForm(); setEditingRuleId(null); setNewRuleOpen(true); }}
+                  data-testid="button-new-rule"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  <span className="text-[10px]">New Rule</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-3 pt-0 space-y-2">
+              {newRuleOpen && (
+                <div className="border rounded-md p-3 space-y-3 bg-muted/30" data-testid="form-new-rule">
+                  <div className="text-[11px] font-semibold">New Signal Rule</div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-medium text-muted-foreground uppercase">Rule Name</label>
+                      <input
+                        type="text"
+                        value={ruleName}
+                        onChange={(e) => setRuleName(e.target.value)}
+                        className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                        data-testid="input-rule-name"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-medium text-muted-foreground uppercase">Trigger Event</label>
+                      <Select value={ruleTriggerEvent} onValueChange={setRuleTriggerEvent}>
+                        <SelectTrigger className="w-full" data-testid="select-rule-trigger">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="page_land">page_land</SelectItem>
+                          <SelectItem value="step_complete">step_complete</SelectItem>
+                          <SelectItem value="form_complete">form_complete</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-medium text-muted-foreground uppercase">Meta Event Name</label>
+                      <input
+                        type="text"
+                        value={ruleMetaEventName}
+                        onChange={(e) => setRuleMetaEventName(e.target.value)}
+                        placeholder="e.g. QualifiedLead"
+                        className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                        data-testid="input-rule-meta-event"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-medium text-muted-foreground uppercase">Custom Value</label>
+                      <input
+                        type="number"
+                        value={ruleCustomValue}
+                        onChange={(e) => setRuleCustomValue(e.target.value)}
+                        placeholder="Auto-calculate"
+                        className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                        data-testid="input-rule-custom-value"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-medium text-muted-foreground uppercase">Currency</label>
+                      <input
+                        type="text"
+                        value={ruleCurrency}
+                        onChange={(e) => setRuleCurrency(e.target.value)}
+                        className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                        data-testid="input-rule-currency"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-medium text-muted-foreground uppercase">Content Name</label>
+                      <input
+                        type="text"
+                        value={ruleContentName}
+                        onChange={(e) => setRuleContentName(e.target.value)}
+                        placeholder="Optional"
+                        className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                        data-testid="input-rule-content-name"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-semibold text-muted-foreground uppercase">Conditions</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground">Audience</label>
+                        <div className="space-y-1">
+                          {["seniors", "veterans", "first-responders"].map((v) => (
+                            <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={ruleCondAudience.includes(v)}
+                                onChange={() => toggleConditionArray(ruleCondAudience, v, setRuleCondAudience)}
+                                className="h-3 w-3 rounded-sm"
+                                data-testid={`checkbox-cond-audience-${v}`}
+                              />
+                              <span className="capitalize">{v}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground">Domain</label>
+                        <div className="space-y-1">
+                          {["blueskylife.net", "blueskylife.io"].map((v) => (
+                            <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={ruleCondDomain.includes(v)}
+                                onChange={() => toggleConditionArray(ruleCondDomain, v, setRuleCondDomain)}
+                                className="h-3 w-3 rounded-sm"
+                                data-testid={`checkbox-cond-domain-${v}`}
+                              />
+                              <span>{v}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground">Device Type</label>
+                        <div className="space-y-1">
+                          {["mobile", "desktop", "tablet"].map((v) => (
+                            <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={ruleCondDeviceType.includes(v)}
+                                onChange={() => toggleConditionArray(ruleCondDeviceType, v, setRuleCondDeviceType)}
+                                className="h-3 w-3 rounded-sm"
+                                data-testid={`checkbox-cond-device-${v}`}
+                              />
+                              <span className="capitalize">{v}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground">Page Type</label>
+                        <div className="space-y-1">
+                          {["lead", "call"].map((v) => (
+                            <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={ruleCondPageType.includes(v)}
+                                onChange={() => toggleConditionArray(ruleCondPageType, v, setRuleCondPageType)}
+                                className="h-3 w-3 rounded-sm"
+                                data-testid={`checkbox-cond-page-${v}`}
+                              />
+                              <span className="capitalize">{v}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground">Min Time on Step (s)</label>
+                        <input
+                          type="number"
+                          value={ruleCondMinTime}
+                          onChange={(e) => setRuleCondMinTime(e.target.value)}
+                          className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                          data-testid="input-cond-min-time"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground">Max Time on Step (s)</label>
+                        <input
+                          type="number"
+                          value={ruleCondMaxTime}
+                          onChange={(e) => setRuleCondMaxTime(e.target.value)}
+                          className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                          data-testid="input-cond-max-time"
+                        />
+                      </div>
+                      <div className="flex items-end gap-3">
+                        <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={ruleCondHasEmail}
+                            onChange={(e) => setRuleCondHasEmail(e.target.checked)}
+                            className="h-3 w-3 rounded-sm"
+                            data-testid="checkbox-cond-has-email"
+                          />
+                          <span>Has Email</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={ruleCondHasPhone}
+                            onChange={(e) => setRuleCondHasPhone(e.target.checked)}
+                            className="h-3 w-3 rounded-sm"
+                            data-testid="checkbox-cond-has-phone"
+                          />
+                          <span>Has Phone</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      disabled={!ruleName || !ruleMetaEventName || createRuleMutation.isPending}
+                      onClick={() => createRuleMutation.mutate(buildRulePayload())}
+                      data-testid="button-save-new-rule"
+                    >
+                      {createRuleMutation.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                      <span className="text-[10px]">Save Rule</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { setNewRuleOpen(false); resetRuleForm(); }}
+                      data-testid="button-cancel-new-rule"
+                    >
+                      <span className="text-[10px]">Cancel</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {signalRulesQuery.isLoading ? (
+                <div className="space-y-1">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ) : signalRulesQuery.data?.rules && signalRulesQuery.data.rules.length > 0 ? (
+                <div className="space-y-1">
+                  {signalRulesQuery.data.rules.map((rule) => (
+                    <div key={rule.id} data-testid={`rule-row-${rule.id}`}>
+                      <Collapsible open={editingRuleId === rule.id} onOpenChange={(open) => {
+                        if (open) {
+                          setEditingRuleId(rule.id);
+                          setNewRuleOpen(false);
+                          populateRuleForm(rule);
+                        } else {
+                          setEditingRuleId(null);
+                          resetRuleForm();
+                        }
+                      }}>
+                        <div className="flex items-center justify-between gap-2 p-2 rounded-md border flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <CollapsibleTrigger asChild>
+                              <Button size="icon" variant="ghost" data-testid={`button-expand-rule-${rule.id}`}>
+                                {editingRuleId === rule.id ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                              </Button>
+                            </CollapsibleTrigger>
+                            <span className="text-[11px] font-medium" data-testid={`text-rule-name-${rule.id}`}>{rule.name}</span>
+                            <Badge variant="outline" className="text-[9px]" data-testid={`badge-rule-trigger-${rule.id}`}>{rule.triggerEvent}</Badge>
+                            <Badge variant="secondary" className="text-[9px]" data-testid={`badge-rule-meta-event-${rule.id}`}>{rule.metaEventName}</Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="flex items-center gap-1.5 cursor-pointer"
+                              onClick={() => toggleRuleActive(rule)}
+                              data-testid={`toggle-rule-active-${rule.id}`}
+                            >
+                              <Switch
+                                checked={rule.active === 1}
+                                onCheckedChange={() => toggleRuleActive(rule)}
+                                className="scale-75"
+                              />
+                              <span className={`text-[9px] font-medium ${rule.active === 1 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                {rule.active === 1 ? "Active" : "Inactive"}
+                              </span>
+                            </div>
+                            <CollapsibleTrigger asChild>
+                              <Button size="icon" variant="ghost" data-testid={`button-edit-rule-${rule.id}`}>
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                            </CollapsibleTrigger>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => deleteRuleMutation.mutate(rule.id)}
+                              disabled={deleteRuleMutation.isPending}
+                              data-testid={`button-delete-rule-${rule.id}`}
+                            >
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                        <CollapsibleContent>
+                          <div className="border border-t-0 rounded-b-md p-3 space-y-3 bg-muted/30" data-testid={`form-edit-rule-${rule.id}`}>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-medium text-muted-foreground uppercase">Rule Name</label>
+                                <input
+                                  type="text"
+                                  value={ruleName}
+                                  onChange={(e) => setRuleName(e.target.value)}
+                                  className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                  data-testid="input-edit-rule-name"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-medium text-muted-foreground uppercase">Trigger Event</label>
+                                <Select value={ruleTriggerEvent} onValueChange={setRuleTriggerEvent}>
+                                  <SelectTrigger className="w-full" data-testid="select-edit-rule-trigger">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="page_land">page_land</SelectItem>
+                                    <SelectItem value="step_complete">step_complete</SelectItem>
+                                    <SelectItem value="form_complete">form_complete</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-medium text-muted-foreground uppercase">Meta Event Name</label>
+                                <input
+                                  type="text"
+                                  value={ruleMetaEventName}
+                                  onChange={(e) => setRuleMetaEventName(e.target.value)}
+                                  placeholder="e.g. QualifiedLead"
+                                  className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                  data-testid="input-edit-rule-meta-event"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-medium text-muted-foreground uppercase">Custom Value</label>
+                                <input
+                                  type="number"
+                                  value={ruleCustomValue}
+                                  onChange={(e) => setRuleCustomValue(e.target.value)}
+                                  placeholder="Auto-calculate"
+                                  className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                  data-testid="input-edit-rule-custom-value"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-medium text-muted-foreground uppercase">Currency</label>
+                                <input
+                                  type="text"
+                                  value={ruleCurrency}
+                                  onChange={(e) => setRuleCurrency(e.target.value)}
+                                  className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                  data-testid="input-edit-rule-currency"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-medium text-muted-foreground uppercase">Content Name</label>
+                                <input
+                                  type="text"
+                                  value={ruleContentName}
+                                  onChange={(e) => setRuleContentName(e.target.value)}
+                                  placeholder="Optional"
+                                  className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                  data-testid="input-edit-rule-content-name"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="text-[10px] font-semibold text-muted-foreground uppercase">Conditions</div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground">Audience</label>
+                                  <div className="space-y-1">
+                                    {["seniors", "veterans", "first-responders"].map((v) => (
+                                      <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={ruleCondAudience.includes(v)}
+                                          onChange={() => toggleConditionArray(ruleCondAudience, v, setRuleCondAudience)}
+                                          className="h-3 w-3 rounded-sm"
+                                          data-testid={`checkbox-edit-cond-audience-${v}`}
+                                        />
+                                        <span className="capitalize">{v}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground">Domain</label>
+                                  <div className="space-y-1">
+                                    {["blueskylife.net", "blueskylife.io"].map((v) => (
+                                      <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={ruleCondDomain.includes(v)}
+                                          onChange={() => toggleConditionArray(ruleCondDomain, v, setRuleCondDomain)}
+                                          className="h-3 w-3 rounded-sm"
+                                          data-testid={`checkbox-edit-cond-domain-${v}`}
+                                        />
+                                        <span>{v}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground">Device Type</label>
+                                  <div className="space-y-1">
+                                    {["mobile", "desktop", "tablet"].map((v) => (
+                                      <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={ruleCondDeviceType.includes(v)}
+                                          onChange={() => toggleConditionArray(ruleCondDeviceType, v, setRuleCondDeviceType)}
+                                          className="h-3 w-3 rounded-sm"
+                                          data-testid={`checkbox-edit-cond-device-${v}`}
+                                        />
+                                        <span className="capitalize">{v}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground">Page Type</label>
+                                  <div className="space-y-1">
+                                    {["lead", "call"].map((v) => (
+                                      <label key={v} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={ruleCondPageType.includes(v)}
+                                          onChange={() => toggleConditionArray(ruleCondPageType, v, setRuleCondPageType)}
+                                          className="h-3 w-3 rounded-sm"
+                                          data-testid={`checkbox-edit-cond-page-${v}`}
+                                        />
+                                        <span className="capitalize">{v}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground">Min Time on Step (s)</label>
+                                  <input
+                                    type="number"
+                                    value={ruleCondMinTime}
+                                    onChange={(e) => setRuleCondMinTime(e.target.value)}
+                                    className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                    data-testid="input-edit-cond-min-time"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-medium text-muted-foreground">Max Time on Step (s)</label>
+                                  <input
+                                    type="number"
+                                    value={ruleCondMaxTime}
+                                    onChange={(e) => setRuleCondMaxTime(e.target.value)}
+                                    className="h-9 w-full rounded-md border px-2 text-[11px] bg-background"
+                                    data-testid="input-edit-cond-max-time"
+                                  />
+                                </div>
+                                <div className="flex items-end gap-3">
+                                  <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={ruleCondHasEmail}
+                                      onChange={(e) => setRuleCondHasEmail(e.target.checked)}
+                                      className="h-3 w-3 rounded-sm"
+                                      data-testid="checkbox-edit-cond-has-email"
+                                    />
+                                    <span>Has Email</span>
+                                  </label>
+                                  <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={ruleCondHasPhone}
+                                      onChange={(e) => setRuleCondHasPhone(e.target.checked)}
+                                      className="h-3 w-3 rounded-sm"
+                                      data-testid="checkbox-edit-cond-has-phone"
+                                    />
+                                    <span>Has Phone</span>
+                                  </label>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                disabled={!ruleName || !ruleMetaEventName || updateRuleMutation.isPending}
+                                onClick={() => updateRuleMutation.mutate({ id: rule.id, ...buildRulePayload() })}
+                                data-testid="button-save-edit-rule"
+                              >
+                                {updateRuleMutation.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                                <span className="text-[10px]">Save Changes</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => { setEditingRuleId(null); resetRuleForm(); }}
+                                data-testid="button-cancel-edit-rule"
+                              >
+                                <span className="text-[10px]">Cancel</span>
+                              </Button>
+                            </div>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
+                  ))}
+                </div>
+              ) : !signalRulesQuery.isLoading && !newRuleOpen ? (
+                <p className="text-[10px] text-muted-foreground text-center py-4" data-testid="text-no-rules">
+                  No signal rules configured. Click "+ New Rule" to create one.
+                </p>
+              ) : null}
             </CardContent>
           </Card>
 
