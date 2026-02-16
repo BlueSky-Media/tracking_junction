@@ -58,6 +58,7 @@ export const trackingEvents = pgTable("tracking_events", {
   browserVersion: varchar("browser_version", { length: 100 }),
   osVersion: varchar("os_version", { length: 100 }),
   ipType: varchar("ip_type", { length: 10 }),
+  leadTier: varchar("lead_tier", { length: 30 }),
 }, (table) => [
   index("idx_events_session").on(table.sessionId),
   index("idx_events_page_type").on(table.page, table.pageType),
@@ -67,6 +68,7 @@ export const trackingEvents = pgTable("tracking_events", {
   index("idx_events_event_type").on(table.eventType),
   index("idx_events_utm_campaign").on(table.utmCampaign),
   index("idx_events_device_type").on(table.deviceType),
+  index("idx_events_lead_tier").on(table.leadTier),
 ]);
 
 export const requestLogs = pgTable("request_logs", {

@@ -2,9 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { trackingEventApiSchema } from "@shared/schema";
+import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import * as facebook from "./facebook";
-import { buildConversionEvent, sendConversionEvents, MetaConversionError } from "./meta-conversions";
+import { buildConversionEvent, sendConversionEvents, MetaConversionError, fireAudienceSignal } from "./meta-conversions";
+import { calculateAnnualPremiumEstimate, getCapiEventName, classifyCustomerTier } from "./lead-scoring";
 
 const PII_FIELDS = ["first_name", "last_name", "email", "phone", "firstName", "lastName"];
 
@@ -162,6 +164,57 @@ export async function registerRoutes(
         osVersion: data.os_version || null,
         ipType: data.ip_type || null,
       });
+
+      if (data.event_type === "form_complete" || data.event_type === "disqualified") {
+        (async () => {
+          try {
+            const pageLand = await storage.getSessionPageLandEvent(data.session_id);
+
+            const signalData = {
+              eventId: event.eventId,
+              sessionId: event.sessionId,
+              eventTimestamp: event.eventTimestamp,
+              pageUrl: event.pageUrl,
+              email: event.email,
+              phone: event.phone,
+              firstName: event.firstName,
+              lastName: event.lastName,
+              geoState: event.geoState,
+              country: event.country,
+              externalId: event.externalId || pageLand?.externalId || null,
+              ipAddress: event.ipAddress || pageLand?.ipAddress || null,
+              userAgent: event.userAgent || pageLand?.userAgent || null,
+              fbp: event.fbp || pageLand?.fbp || null,
+              fbc: event.fbc || pageLand?.fbc || null,
+              fbclid: event.fbclid || pageLand?.fbclid || null,
+            };
+
+            if (data.event_type === "form_complete") {
+              const budget = (data.quiz_answers as any)?.budget || (data.quiz_answers as any)?.["Budget Affordability"] || "";
+              const annualValue = calculateAnnualPremiumEstimate(String(budget));
+              const tier = "qualified";
+              const capiEventName = getCapiEventName(tier);
+
+              await storage.updateEventLeadTier(event.id, tier);
+              await fireAudienceSignal(capiEventName, signalData, annualValue, data.page);
+            } else {
+              const tier = "disqualified";
+              const capiEventName = getCapiEventName(tier);
+
+              await storage.updateEventLeadTier(event.id, tier);
+              await fireAudienceSignal(capiEventName, {
+                ...signalData,
+                email: null,
+                phone: null,
+                firstName: null,
+                lastName: null,
+              }, 0, data.page);
+            }
+          } catch (err) {
+            console.error("[CAPI Audience] Fire-and-forget error:", err);
+          }
+        })();
+      }
 
       const successResponse = { ok: true };
 
@@ -814,7 +867,7 @@ export async function registerRoutes(
         page: audience,
       });
 
-      const uploadedIds = await storage.getUploadedEventIds();
+      const uploadStatuses = await storage.getUploadedEventStatuses();
 
       const events = formCompletes.map((e) => ({
         id: e.id,
@@ -841,7 +894,8 @@ export async function registerRoutes(
         ipAddress: !!e.ipAddress,
         hasEmail: !!e.email,
         hasPhone: !!e.phone,
-        uploaded: uploadedIds.has(e.id),
+        uploaded: uploadStatuses.has(e.id),
+        uploadStatus: uploadStatuses.get(e.id) || "pending",
         geoState: e.geoState,
         deviceType: e.deviceType,
         placement: e.sessionPlacement || e.placement,
@@ -853,7 +907,12 @@ export async function registerRoutes(
         utmId: e.sessionUtmId || e.utmId,
       }));
 
-      res.json({ events, total: events.length, uploaded: events.filter(e => e.uploaded).length });
+      res.json({
+        events,
+        total: events.length,
+        uploaded: events.filter(e => e.uploadStatus === "sent").length,
+        synced: events.filter(e => e.uploadStatus === "synced").length,
+      });
     } catch (error) {
       console.error("Error fetching missing conversions:", error);
       res.status(500).json({ message: "Failed to fetch conversion data" });
@@ -1036,6 +1095,23 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/meta-conversions/mark-synced", isAuthenticated, async (req, res) => {
+    try {
+      const { eventIds } = req.body as { eventIds: number[] };
+      if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
+        return res.status(400).json({ message: "eventIds array is required" });
+      }
+      if (eventIds.length > 500) {
+        return res.status(400).json({ message: "Maximum 500 events per request" });
+      }
+      const count = await storage.bulkMarkSynced(eventIds);
+      res.json({ marked: count, total: eventIds.length });
+    } catch (error) {
+      console.error("Error marking events as synced:", error);
+      res.status(500).json({ message: "Failed to mark events as synced" });
+    }
+  });
+
   app.get("/api/meta-conversions/history", isAuthenticated, async (_req, res) => {
     try {
       const history = await storage.getMetaUploadHistory(100);
@@ -1043,6 +1119,112 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching upload history:", error);
       res.status(500).json({ message: "Failed to fetch upload history" });
+    }
+  });
+
+  const policySoldSchema = z.object({
+    session_id: z.string().min(1),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
+    first_name: z.string().optional(),
+    last_name: z.string().optional(),
+    policy_type: z.string().min(1),
+    annual_premium: z.number().positive(),
+    geo_state: z.string().max(10).optional(),
+    country: z.string().max(10).optional(),
+  });
+
+  app.post("/api/webhook/policy-sold", async (req, res) => {
+    const apiKey = req.headers["x-api-key"] as string;
+    const expectedKey = process.env.WEBHOOK_API_KEY;
+
+    if (!expectedKey || apiKey !== expectedKey) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    try {
+      const parsed = policySoldSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
+      }
+
+      const data = parsed.data;
+
+      const pageLand = await storage.getSessionPageLandEvent(data.session_id);
+
+      const tier = classifyCustomerTier(data.annual_premium);
+      const capiEventName = getCapiEventName(tier);
+
+      const signalData = {
+        eventId: `policy_${data.session_id}`,
+        sessionId: data.session_id,
+        eventTimestamp: new Date(),
+        pageUrl: null,
+        email: data.email || null,
+        phone: data.phone || null,
+        firstName: data.first_name || null,
+        lastName: data.last_name || null,
+        geoState: data.geo_state || pageLand?.geoState || null,
+        country: data.country || pageLand?.country || null,
+        externalId: pageLand?.externalId || null,
+        ipAddress: pageLand?.ipAddress || null,
+        userAgent: pageLand?.userAgent || null,
+        fbp: pageLand?.fbp || null,
+        fbc: pageLand?.fbc || null,
+        fbclid: pageLand?.fbclid || null,
+      };
+
+      const result = await fireAudienceSignal(capiEventName, signalData, data.annual_premium, data.policy_type);
+
+      console.log(`[Webhook] Policy sold: session=${data.session_id}, tier=${tier}, premium=${data.annual_premium}, capi=${result.success}`);
+
+      res.json({ ok: true, tier, capiEventName, capiFired: result.success });
+    } catch (error) {
+      console.error("[Webhook] Policy sold error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/meta-conversions/audience-stats", isAuthenticated, async (req, res) => {
+    try {
+      const { startDate, endDate, audience } = req.query as { startDate?: string; endDate?: string; audience?: string };
+      const stats = await storage.getLeadTierStats({
+        startDate,
+        endDate,
+        page: audience && audience !== "__all__" ? audience : undefined,
+      });
+      res.json({ stats });
+    } catch (error) {
+      console.error("Error fetching audience stats:", error);
+      res.status(500).json({ message: "Failed to fetch audience stats" });
+    }
+  });
+
+  app.get("/api/meta-conversions/audience-events", isAuthenticated, async (req, res) => {
+    try {
+      const { startDate, endDate, audience, tier, page: pageStr } = req.query as {
+        startDate?: string; endDate?: string; audience?: string; tier?: string; page?: string;
+      };
+      const page = Math.max(1, parseInt(pageStr || "1", 10));
+      const result = await storage.getLeadTierEvents(
+        {
+          startDate,
+          endDate,
+          page: audience && audience !== "__all__" ? audience : undefined,
+          tier: tier && tier !== "__all__" ? tier : undefined,
+        },
+        page,
+        50,
+      );
+      res.json({
+        events: result.events,
+        total: result.total,
+        page,
+        totalPages: Math.max(1, Math.ceil(result.total / 50)),
+      });
+    } catch (error) {
+      console.error("Error fetching audience events:", error);
+      res.status(500).json({ message: "Failed to fetch audience events" });
     }
   });
 

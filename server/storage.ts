@@ -216,6 +216,12 @@ export interface IStorage {
   blockPhone(phone: string, reason?: string): Promise<BlockedNumber>;
   unblockPhone(phone: string): Promise<void>;
   bulkUnblockPhones(phones: string[]): Promise<number>;
+  getUploadedEventStatuses(): Promise<Map<number, string>>;
+  bulkMarkSynced(eventIds: number[]): Promise<number>;
+  updateEventLeadTier(id: number, leadTier: string): Promise<void>;
+  getSessionPageLandEvent(sessionId: string): Promise<TrackingEvent | null>;
+  getLeadTierStats(filters: { startDate?: string; endDate?: string; page?: string }): Promise<{ tier: string; count: number; totalValue: number }[]>;
+  getLeadTierEvents(filters: { startDate?: string; endDate?: string; page?: string; tier?: string }, page: number, limit: number): Promise<{ events: TrackingEvent[]; total: number }>;
 }
 
 function addFilterCondition(conditions: any[], column: any, value: string | string[] | undefined) {
@@ -1442,6 +1448,7 @@ class DatabaseStorage implements IStorage {
       browserVersion: row.browser_version,
       osVersion: row.os_version,
       ipType: row.ip_type,
+      leadTier: row.lead_tier,
       receivedAt: row.received_at ? new Date(row.received_at) : new Date(),
     };
   }
@@ -1450,10 +1457,44 @@ class DatabaseStorage implements IStorage {
     const rows = await db.select({ trackingEventId: metaConversionUploads.trackingEventId })
       .from(metaConversionUploads)
       .where(and(
-        eq(metaConversionUploads.status, "sent"),
+        or(eq(metaConversionUploads.status, "sent"), eq(metaConversionUploads.status, "synced")),
         ne(metaConversionUploads.pixelId, "TEST"),
       ));
     return new Set(rows.map(r => r.trackingEventId));
+  }
+
+  async getUploadedEventStatuses(): Promise<Map<number, string>> {
+    const rows = await db.select({
+      trackingEventId: metaConversionUploads.trackingEventId,
+      status: metaConversionUploads.status,
+    })
+      .from(metaConversionUploads)
+      .where(ne(metaConversionUploads.pixelId, "TEST"));
+    const map = new Map<number, string>();
+    for (const r of rows) {
+      map.set(r.trackingEventId, r.status);
+    }
+    return map;
+  }
+
+  async bulkMarkSynced(eventIds: number[]): Promise<number> {
+    if (eventIds.length === 0) return 0;
+    const pixelId = process.env.FACEBOOK_PIXEL_ID || "UNKNOWN";
+    let count = 0;
+    for (const id of eventIds) {
+      try {
+        await db.insert(metaConversionUploads).values({
+          trackingEventId: id,
+          sessionId: "",
+          pixelId,
+          status: "synced",
+          eventsReceived: 1,
+        });
+        count++;
+      } catch {
+      }
+    }
+    return count;
   }
 
   async recordMetaUpload(upload: InsertMetaConversionUpload): Promise<MetaConversionUpload> {
@@ -1521,6 +1562,88 @@ class DatabaseStorage implements IStorage {
       adsetName: r.effective_adset_name,
       count: Number(r.count),
     }));
+  }
+
+  async updateEventLeadTier(id: number, leadTier: string): Promise<void> {
+    await db.update(trackingEvents)
+      .set({ leadTier })
+      .where(eq(trackingEvents.id, id));
+  }
+
+  async getSessionPageLandEvent(sessionId: string): Promise<TrackingEvent | null> {
+    const [event] = await db.select()
+      .from(trackingEvents)
+      .where(and(
+        eq(trackingEvents.sessionId, sessionId),
+        eq(trackingEvents.eventType, "page_land"),
+      ))
+      .orderBy(trackingEvents.eventTimestamp)
+      .limit(1);
+    return event || null;
+  }
+
+  async getLeadTierStats(filters: { startDate?: string; endDate?: string; page?: string }): Promise<{ tier: string; count: number; totalValue: number }[]> {
+    const conditions: SQL[] = [isNotNull(trackingEvents.leadTier)];
+
+    if (filters.startDate) {
+      conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
+    }
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setDate(end.getDate() + 1);
+      conditions.push(lte(trackingEvents.eventTimestamp, end));
+    }
+    if (filters.page) {
+      conditions.push(eq(trackingEvents.page, filters.page));
+    }
+
+    const rows = await db.select({
+      tier: trackingEvents.leadTier,
+      count: count(),
+    })
+      .from(trackingEvents)
+      .where(and(...conditions))
+      .groupBy(trackingEvents.leadTier);
+
+    return rows.map(r => ({
+      tier: r.tier || "unknown",
+      count: Number(r.count),
+      totalValue: 0,
+    }));
+  }
+
+  async getLeadTierEvents(filters: { startDate?: string; endDate?: string; page?: string; tier?: string }, page: number, limit: number): Promise<{ events: TrackingEvent[]; total: number }> {
+    const conditions: SQL[] = [isNotNull(trackingEvents.leadTier)];
+
+    if (filters.startDate) {
+      conditions.push(gte(trackingEvents.eventTimestamp, new Date(filters.startDate)));
+    }
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setDate(end.getDate() + 1);
+      conditions.push(lte(trackingEvents.eventTimestamp, end));
+    }
+    if (filters.page) {
+      conditions.push(eq(trackingEvents.page, filters.page));
+    }
+    if (filters.tier) {
+      conditions.push(eq(trackingEvents.leadTier, filters.tier));
+    }
+
+    const whereClause = and(...conditions);
+
+    const [totalResult] = await db.select({ count: count() })
+      .from(trackingEvents)
+      .where(whereClause);
+
+    const events = await db.select()
+      .from(trackingEvents)
+      .where(whereClause)
+      .orderBy(desc(trackingEvents.eventTimestamp))
+      .limit(limit)
+      .offset((page - 1) * limit);
+
+    return { events, total: Number(totalResult.count) };
   }
 }
 

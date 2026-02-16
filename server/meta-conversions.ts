@@ -33,6 +33,11 @@ export interface ConversionEventData {
     fbc?: string;
     fbclid?: string;
   };
+  customData?: {
+    value?: number;
+    currency?: string;
+    content_name?: string;
+  };
 }
 
 interface MetaServerEvent {
@@ -81,7 +86,7 @@ function formatEventForMeta(event: ConversionEventData): MetaServerEvent {
     userData.fbc = event.userData.fbc;
   }
 
-  return {
+  const result: MetaServerEvent & { custom_data?: Record<string, any> } = {
     event_name: event.eventName,
     event_time: event.eventTime,
     event_id: event.eventId,
@@ -89,6 +94,15 @@ function formatEventForMeta(event: ConversionEventData): MetaServerEvent {
     action_source: event.actionSource,
     user_data: userData,
   };
+
+  if (event.customData) {
+    result.custom_data = {};
+    if (event.customData.value !== undefined) result.custom_data.value = event.customData.value;
+    if (event.customData.currency) result.custom_data.currency = event.customData.currency;
+    if (event.customData.content_name) result.custom_data.content_name = event.customData.content_name;
+  }
+
+  return result;
 }
 
 export interface CAPIResponse {
@@ -191,4 +205,83 @@ export function buildConversionEvent(formCompleteEvent: {
       fbclid: formCompleteEvent.fbclid || undefined,
     },
   };
+}
+
+export interface AudienceSignalData {
+  eventId?: string | null;
+  sessionId: string;
+  eventTimestamp: Date;
+  pageUrl?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  geoState?: string | null;
+  country?: string | null;
+  externalId?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  fbp?: string | null;
+  fbc?: string | null;
+  fbclid?: string | null;
+}
+
+export function buildAudienceEvent(
+  capiEventName: string,
+  data: AudienceSignalData,
+  value: number,
+  contentName?: string,
+): ConversionEventData {
+  return {
+    eventName: capiEventName,
+    eventTime: Math.floor(data.eventTimestamp.getTime() / 1000),
+    eventId: `${capiEventName.toLowerCase()}_${data.eventId || data.sessionId}`,
+    eventSourceUrl: data.pageUrl || undefined,
+    actionSource: "website",
+    userData: {
+      email: data.email || undefined,
+      phone: data.phone || undefined,
+      firstName: data.firstName || undefined,
+      lastName: data.lastName || undefined,
+      state: data.geoState || undefined,
+      country: data.country || undefined,
+      externalId: data.externalId || undefined,
+      clientIpAddress: data.ipAddress || undefined,
+      clientUserAgent: data.userAgent || undefined,
+      fbp: data.fbp || undefined,
+      fbc: data.fbc || undefined,
+      fbclid: data.fbclid || undefined,
+    },
+    customData: {
+      value,
+      currency: "USD",
+      content_name: contentName,
+    },
+  };
+}
+
+export async function fireAudienceSignal(
+  capiEventName: string,
+  data: AudienceSignalData,
+  value: number,
+  contentName?: string,
+): Promise<{ success: boolean; error?: string }> {
+  const pixelId = process.env.FACEBOOK_PIXEL_ID;
+  const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+
+  if (!pixelId || !accessToken) {
+    console.log(`[CAPI Audience] Skipping ${capiEventName} — CAPI not configured`);
+    return { success: false, error: "CAPI not configured" };
+  }
+
+  try {
+    const event = buildAudienceEvent(capiEventName, data, value, contentName);
+    const response = await sendConversionEvents(pixelId, accessToken, [event]);
+    console.log(`[CAPI Audience] Fired ${capiEventName} for session ${data.sessionId}, events_received: ${response.events_received}`);
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof MetaConversionError ? error.message : String(error);
+    console.error(`[CAPI Audience] Failed to fire ${capiEventName} for session ${data.sessionId}:`, msg);
+    return { success: false, error: msg };
+  }
 }

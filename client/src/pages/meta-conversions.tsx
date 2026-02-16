@@ -12,6 +12,7 @@ import {
   Upload, ChevronDown, ChevronRight, CheckCircle2, XCircle, AlertTriangle,
   Mail, Phone, Globe, Fingerprint, MousePointerClick, Clock, History,
   ArrowUpDown, Loader2, Info, Shield, ChevronLeft, ChevronsLeft, ChevronsRight,
+  Users, UserCheck, UserX, DollarSign, TrendingUp,
 } from "lucide-react";
 import { SiFacebook } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +51,7 @@ interface CapiEvent {
   hasEmail: boolean;
   hasPhone: boolean;
   uploaded: boolean;
+  uploadStatus: "sent" | "synced" | "pending";
   geoState: string | null;
   deviceType: string | null;
   placement: string | null;
@@ -65,6 +67,7 @@ interface MissingResult {
   events: CapiEvent[];
   total: number;
   uploaded: number;
+  synced: number;
 }
 
 interface ComparisonRow {
@@ -147,6 +150,7 @@ export default function MetaConversionsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
+  const [activeTab, setActiveTab] = useState<"events" | "audiences">("events");
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [endDate, setEndDate] = useState(defaults.endDate);
   const [audience, setAudience] = useState("__all__");
@@ -156,6 +160,8 @@ export default function MetaConversionsPage() {
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedAdAccount, setSelectedAdAccount] = useState("");
+  const [audiencePage, setAudiencePage] = useState(1);
+  const [audienceTierFilter, setAudienceTierFilter] = useState("__all__");
 
   const statusQuery = useQuery<CapiStatus>({
     queryKey: ["/api/meta-conversions/status"],
@@ -219,15 +225,77 @@ export default function MetaConversionsPage() {
     },
   });
 
+  const syncMutation = useMutation({
+    mutationFn: async (payload: { eventIds: number[] }) => {
+      const res = await apiRequest("POST", "/api/meta-conversions/mark-synced", payload);
+      return res.json() as Promise<{ marked: number; total: number }>;
+    },
+    onSuccess: (data) => {
+      toast({ title: `Marked ${data.marked} events as synced` });
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["/api/meta-conversions/missing"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to mark as synced", description: err.message, variant: "destructive" });
+    },
+  });
+
+  interface AudienceStat { tier: string; count: number; totalValue: number }
+  interface AudienceStatsResult { stats: AudienceStat[] }
+  interface AudienceEvent {
+    id: number; sessionId: string; page: string; eventType: string;
+    eventTimestamp: string; leadTier: string | null;
+    firstName: string | null; lastName: string | null;
+    email: string | null; phone: string | null;
+    domain: string; deviceType: string | null;
+  }
+  interface AudienceEventsResult {
+    events: AudienceEvent[]; total: number; page: number; totalPages: number;
+  }
+
+  const audienceStatsQuery = useQuery<AudienceStatsResult>({
+    queryKey: ["/api/meta-conversions/audience-stats", startDate, endDate, audience],
+    enabled: activeTab === "audiences",
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      if (audience && audience !== "__all__") params.set("audience", audience);
+      const res = await fetch(`/api/meta-conversions/audience-stats?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+  });
+
+  const audienceEventsQuery = useQuery<AudienceEventsResult>({
+    queryKey: ["/api/meta-conversions/audience-events", startDate, endDate, audience, audienceTierFilter, audiencePage],
+    enabled: activeTab === "audiences",
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      if (audience && audience !== "__all__") params.set("audience", audience);
+      if (audienceTierFilter && audienceTierFilter !== "__all__") params.set("tier", audienceTierFilter);
+      params.set("page", audiencePage.toString());
+      const res = await fetch(`/api/meta-conversions/audience-events?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+  });
+
   const events = eventsQuery.data?.events || [];
   const totalEvents = eventsQuery.data?.total || 0;
   const uploadedCount = eventsQuery.data?.uploaded || 0;
+  const syncedCount = eventsQuery.data?.synced || 0;
   const totalPages = Math.max(1, Math.ceil(totalEvents / 50));
 
-  const missingEvents = useMemo(() => events.filter(e => !e.uploaded), [events]);
-  const allMissingIds = useMemo(() => missingEvents.map(e => e.id), [missingEvents]);
+  const pendingEvents = useMemo(() => events.filter(e => e.uploadStatus === "pending"), [events]);
+  const allPendingIds = useMemo(() => pendingEvents.map(e => e.id), [pendingEvents]);
 
-  const allVisibleSelected = events.length > 0 && events.every(e => e.uploaded || selected.has(e.id));
+  const missingEvents = pendingEvents;
+  const allMissingIds = allPendingIds;
+
+  const allVisibleSelected = events.length > 0 && events.every(e => e.uploadStatus !== "pending" || selected.has(e.id));
 
   const toggleSelect = (id: number) => {
     setSelected(prev => {
@@ -267,6 +335,27 @@ export default function MetaConversionsPage() {
         <Badge variant="outline" className="text-[9px]">CAPI</Badge>
       </div>
 
+      <div className="flex items-center gap-1" data-testid="tab-navigation">
+        <Button
+          size="sm"
+          variant={activeTab === "events" ? "default" : "outline"}
+          onClick={() => setActiveTab("events")}
+          data-testid="tab-events"
+        >
+          <Upload className="w-3 h-3 mr-1" />
+          <span className="text-[10px]">Events</span>
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "audiences" ? "default" : "outline"}
+          onClick={() => setActiveTab("audiences")}
+          data-testid="tab-audiences"
+        >
+          <Users className="w-3 h-3 mr-1" />
+          <span className="text-[10px]">Custom Audiences</span>
+        </Button>
+      </div>
+
       {statusQuery.isLoading ? (
         <Skeleton className="h-10 w-full" />
       ) : status && !isConfigured ? (
@@ -297,6 +386,8 @@ export default function MetaConversionsPage() {
         </Card>
       ) : null}
 
+      {activeTab === "events" && (
+      <div className="space-y-3" data-testid="events-tab-content">
       <Card>
         <CardContent className="p-3">
           <div className="flex items-end gap-3 flex-wrap">
@@ -367,13 +458,36 @@ export default function MetaConversionsPage() {
             {totalEvents} events
           </Badge>
           <Badge variant="outline" className="text-[9px]" data-testid="badge-uploaded-count">
-            {uploadedCount} uploaded
+            {uploadedCount} sent
+          </Badge>
+          <Badge variant="outline" className="text-[9px]" data-testid="badge-synced-count">
+            {syncedCount} synced
           </Badge>
           <Badge variant="outline" className="text-[9px]" data-testid="badge-missing-count">
-            {totalEvents - uploadedCount} missing
+            {allPendingIds.length} pending
           </Badge>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={selected.size === 0 || syncMutation.isPending}
+            onClick={() => syncMutation.mutate({ eventIds: Array.from(selected) })}
+            data-testid="button-mark-synced"
+          >
+            {syncMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+            <span className="text-[10px]">Mark {selected.size} as Synced</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={allPendingIds.length === 0 || syncMutation.isPending}
+            onClick={() => syncMutation.mutate({ eventIds: allPendingIds })}
+            data-testid="button-mark-all-synced"
+          >
+            {syncMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+            <span className="text-[10px]">Mark All as Synced ({allPendingIds.length})</span>
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -585,10 +699,15 @@ export default function MetaConversionsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="py-1 px-2 text-center">
-                          {ev.uploaded ? (
-                            <Badge variant="secondary" className="text-[8px]" data-testid={`badge-uploaded-${ev.id}`}>
+                          {ev.uploadStatus === "sent" ? (
+                            <Badge variant="secondary" className="text-[8px]" data-testid={`badge-sent-${ev.id}`}>
                               <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
                               Sent
+                            </Badge>
+                          ) : ev.uploadStatus === "synced" ? (
+                            <Badge variant="secondary" className="text-[8px]" data-testid={`badge-synced-${ev.id}`}>
+                              <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
+                              Synced
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[8px]" data-testid={`badge-pending-${ev.id}`}>
@@ -722,6 +841,256 @@ export default function MetaConversionsPage() {
           </CollapsibleContent>
         </Card>
       </Collapsible>
+      </div>
+      )}
+
+      {activeTab === "audiences" && (
+        <div className="space-y-3" data-testid="audiences-tab-content">
+          <Card>
+            <CardContent className="p-3">
+              <div className="flex items-end gap-3 flex-wrap">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground uppercase">Start Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => { setStartDate(e.target.value); setAudiencePage(1); }}
+                    className="h-9 rounded-md border px-2 text-[11px] bg-background"
+                    data-testid="input-audience-start-date"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground uppercase">End Date</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => { setEndDate(e.target.value); setAudiencePage(1); }}
+                    className="h-9 rounded-md border px-2 text-[11px] bg-background"
+                    data-testid="input-audience-end-date"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground uppercase">Audience</label>
+                  <Select value={audience} onValueChange={(v) => { setAudience(v); setAudiencePage(1); }}>
+                    <SelectTrigger className="h-9 w-[130px] text-[11px]" data-testid="select-audience-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Audiences</SelectItem>
+                      <SelectItem value="seniors">Seniors</SelectItem>
+                      <SelectItem value="veterans">Veterans</SelectItem>
+                      <SelectItem value="first-responders">First Responders</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground uppercase">Tier</label>
+                  <Select value={audienceTierFilter} onValueChange={(v) => { setAudienceTierFilter(v); setAudiencePage(1); }}>
+                    <SelectTrigger className="h-9 w-[160px] text-[11px]" data-testid="select-tier-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Tiers</SelectItem>
+                      <SelectItem value="QualifiedLead">Qualified Lead</SelectItem>
+                      <SelectItem value="DisqualifiedLead">Disqualified Lead</SelectItem>
+                      <SelectItem value="HighValueCustomer">High Value Customer</SelectItem>
+                      <SelectItem value="LowValueCustomer">Low Value Customer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="p-3 pb-2">
+              <CardTitle className="text-xs font-semibold flex items-center gap-2">
+                <TrendingUp className="w-3 h-3" />
+                Audience Signal Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              {audienceStatsQuery.isLoading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : audienceStatsQuery.data?.stats && audienceStatsQuery.data.stats.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {(() => {
+                    const stats = audienceStatsQuery.data.stats;
+                    const tierConfig: Record<string, { icon: typeof UserCheck; label: string; color: string }> = {
+                      QualifiedLead: { icon: UserCheck, label: "Qualified Leads", color: "text-green-600 dark:text-green-400" },
+                      DisqualifiedLead: { icon: UserX, label: "Disqualified Leads", color: "text-red-500 dark:text-red-400" },
+                      HighValueCustomer: { icon: DollarSign, label: "High Value", color: "text-blue-600 dark:text-blue-400" },
+                      LowValueCustomer: { icon: DollarSign, label: "Low Value", color: "text-amber-600 dark:text-amber-400" },
+                    };
+                    const allTiers = ["QualifiedLead", "DisqualifiedLead", "HighValueCustomer", "LowValueCustomer"];
+                    return allTiers.map((tier) => {
+                      const stat = stats.find(s => s.tier === tier);
+                      const cfg = tierConfig[tier];
+                      const Icon = cfg.icon;
+                      return (
+                        <Card key={tier} data-testid={`stat-card-${tier}`}>
+                          <CardContent className="p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Icon className={`w-3 h-3 ${cfg.color}`} />
+                              <span className="text-[10px] text-muted-foreground">{cfg.label}</span>
+                            </div>
+                            <div className="text-lg font-bold" data-testid={`stat-count-${tier}`}>
+                              {stat?.count || 0}
+                            </div>
+                            {(tier === "HighValueCustomer" || tier === "LowValueCustomer") && stat && stat.totalValue > 0 && (
+                              <div className="text-[10px] text-muted-foreground" data-testid={`stat-value-${tier}`}>
+                                ${stat.totalValue.toLocaleString()} total value
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    });
+                  })()}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No audience signals in this date range.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <Info className="w-3 h-3 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground leading-tight">
+                  Audience signals are fired automatically to Meta CAPI when events are received.
+                  Use these Custom Audiences in Facebook Ads Manager to create Lookalike Audiences for targeting.
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="p-3 pb-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="text-xs font-semibold flex items-center gap-2">
+                  <Users className="w-3 h-3" />
+                  Audience Events
+                  {audienceEventsQuery.data && (
+                    <Badge variant="secondary" className="text-[9px]">
+                      {audienceEventsQuery.data.total} events
+                    </Badge>
+                  )}
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              {audienceEventsQuery.isLoading ? (
+                <Skeleton className="h-40 w-full" />
+              ) : audienceEventsQuery.data?.events && audienceEventsQuery.data.events.length > 0 ? (
+                <>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-[10px] w-[100px]">Timestamp</TableHead>
+                          <TableHead className="text-[10px] w-[80px]">Audience</TableHead>
+                          <TableHead className="text-[10px] w-[90px]">Event</TableHead>
+                          <TableHead className="text-[10px] w-[120px]">Tier</TableHead>
+                          <TableHead className="text-[10px] w-[100px]">Name</TableHead>
+                          <TableHead className="text-[10px] w-[80px]">Domain</TableHead>
+                          <TableHead className="text-[10px] w-[60px]">Device</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {audienceEventsQuery.data.events.map((ev) => {
+                          const tierBadge: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+                            QualifiedLead: { variant: "default", label: "Qualified" },
+                            DisqualifiedLead: { variant: "destructive", label: "Disqualified" },
+                            HighValueCustomer: { variant: "default", label: "High Value" },
+                            LowValueCustomer: { variant: "secondary", label: "Low Value" },
+                          };
+                          const tb = ev.leadTier ? tierBadge[ev.leadTier] : null;
+                          return (
+                            <TableRow key={ev.id} data-testid={`audience-event-row-${ev.id}`}>
+                              <TableCell className="text-[10px]">
+                                {format(new Date(ev.eventTimestamp), "MMM d, HH:mm")}
+                              </TableCell>
+                              <TableCell className="text-[10px] capitalize">{ev.page}</TableCell>
+                              <TableCell className="text-[10px]">
+                                <Badge variant="outline" className="text-[9px]">{ev.eventType}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                {tb ? (
+                                  <Badge variant={tb.variant} className="text-[9px]">
+                                    {tb.label}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-[10px]">
+                                {ev.firstName || ev.lastName
+                                  ? `${ev.firstName || ""} ${ev.lastName || ""}`.trim()
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="text-[10px]">{ev.domain}</TableCell>
+                              <TableCell className="text-[10px] capitalize">{ev.deviceType || "—"}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {audienceEventsQuery.data.totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-2 gap-2">
+                      <span className="text-[10px] text-muted-foreground">
+                        Page {audienceEventsQuery.data.page} of {audienceEventsQuery.data.totalPages}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={audiencePage <= 1}
+                          onClick={() => setAudiencePage(1)}
+                          data-testid="btn-audience-first-page"
+                        >
+                          <ChevronsLeft className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={audiencePage <= 1}
+                          onClick={() => setAudiencePage(p => Math.max(1, p - 1))}
+                          data-testid="btn-audience-prev-page"
+                        >
+                          <ChevronLeft className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={audiencePage >= audienceEventsQuery.data.totalPages}
+                          onClick={() => setAudiencePage(p => p + 1)}
+                          data-testid="btn-audience-next-page"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={audiencePage >= audienceEventsQuery.data.totalPages}
+                          onClick={() => setAudiencePage(audienceEventsQuery.data!.totalPages)}
+                          data-testid="btn-audience-last-page"
+                        >
+                          <ChevronsRight className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">No audience events found for the selected filters.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
