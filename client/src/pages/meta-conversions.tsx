@@ -13,7 +13,7 @@ import {
   Mail, Phone, Globe, Fingerprint, MousePointerClick, Clock, History,
   ArrowUpDown, Loader2, Info, Shield, ChevronLeft, ChevronsLeft, ChevronsRight,
   Users, UserCheck, UserX, DollarSign, TrendingUp, Plus, Pencil, Trash2,
-  Lock, Unlock,
+  Lock, Unlock, RefreshCw,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -418,6 +418,22 @@ export default function MetaConversionsPage() {
     },
     onError: (err: Error) => {
       toast({ title: "Failed to delete rule", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const reprocessMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/meta-conversions/reprocess-untiered");
+      return res.json() as Promise<{ processed: number; total: number; message?: string }>;
+    },
+    onSuccess: (data) => {
+      toast({ title: data.processed > 0 ? `Reprocessed ${data.processed} events` : (data.message || "No events to reprocess") });
+      qc.invalidateQueries({ queryKey: ["/api/meta-conversions/audience-stats"] });
+      qc.invalidateQueries({ queryKey: ["/api/meta-conversions/audience-events"] });
+      qc.invalidateQueries({ queryKey: ["/api/meta-conversions/signal-log"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to reprocess events", description: err.message, variant: "destructive" });
     },
   });
 
@@ -1195,10 +1211,10 @@ export default function MetaConversionsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">All Tiers</SelectItem>
-                      <SelectItem value="QualifiedLead">Qualified Lead</SelectItem>
-                      <SelectItem value="DisqualifiedLead">Disqualified Lead</SelectItem>
-                      <SelectItem value="HighValueCustomer">High Value Customer</SelectItem>
-                      <SelectItem value="LowValueCustomer">Low Value Customer</SelectItem>
+                      <SelectItem value="qualified">Qualified Lead</SelectItem>
+                      <SelectItem value="disqualified">Disqualified Lead</SelectItem>
+                      <SelectItem value="high_value_customer">High Value Customer</SelectItem>
+                      <SelectItem value="low_value_customer">Low Value Customer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1221,12 +1237,12 @@ export default function MetaConversionsPage() {
                   {(() => {
                     const stats = audienceStatsQuery.data.stats;
                     const tierConfig: Record<string, { icon: typeof UserCheck; label: string; color: string }> = {
-                      QualifiedLead: { icon: UserCheck, label: "Qualified Leads", color: "text-green-600 dark:text-green-400" },
-                      DisqualifiedLead: { icon: UserX, label: "Disqualified Leads", color: "text-red-500 dark:text-red-400" },
-                      HighValueCustomer: { icon: DollarSign, label: "High Value", color: "text-blue-600 dark:text-blue-400" },
-                      LowValueCustomer: { icon: DollarSign, label: "Low Value", color: "text-amber-600 dark:text-amber-400" },
+                      qualified: { icon: UserCheck, label: "Qualified Leads", color: "text-green-600 dark:text-green-400" },
+                      disqualified: { icon: UserX, label: "Disqualified Leads", color: "text-red-500 dark:text-red-400" },
+                      high_value_customer: { icon: DollarSign, label: "High Value", color: "text-blue-600 dark:text-blue-400" },
+                      low_value_customer: { icon: DollarSign, label: "Low Value", color: "text-amber-600 dark:text-amber-400" },
                     };
-                    const allTiers = ["QualifiedLead", "DisqualifiedLead", "HighValueCustomer", "LowValueCustomer"];
+                    const allTiers = ["qualified", "disqualified", "high_value_customer", "low_value_customer"];
                     return allTiers.map((tier) => {
                       const stat = stats.find(s => s.tier === tier);
                       const cfg = tierConfig[tier];
@@ -1241,7 +1257,7 @@ export default function MetaConversionsPage() {
                             <div className="text-lg font-bold" data-testid={`stat-count-${tier}`}>
                               {stat?.count || 0}
                             </div>
-                            {(tier === "HighValueCustomer" || tier === "LowValueCustomer") && stat && stat.totalValue > 0 && (
+                            {(tier === "high_value_customer" || tier === "low_value_customer") && stat && stat.totalValue > 0 && (
                               <div className="text-[10px] text-muted-foreground" data-testid={`stat-value-${tier}`}>
                                 ${stat.totalValue.toLocaleString()} total value
                               </div>
@@ -2032,12 +2048,24 @@ export default function MetaConversionsPage() {
 
           <Card>
             <CardContent className="p-3">
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <Info className="w-3 h-3 text-muted-foreground" />
-                <span className="text-[10px] text-muted-foreground leading-tight">
-                  Audience signals are fired automatically to Meta CAPI when events are received.
-                  Use these Custom Audiences in Facebook Ads Manager to create Lookalike Audiences for targeting.
-                </span>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-1">
+                  <Info className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <span className="text-[10px] text-muted-foreground leading-tight">
+                    Audience signals are fired automatically to Meta CAPI when events are received.
+                    Use these Custom Audiences in Facebook Ads Manager to create Lookalike Audiences for targeting.
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => reprocessMutation.mutate()}
+                  disabled={reprocessMutation.isPending}
+                  data-testid="button-reprocess-untiered"
+                >
+                  {reprocessMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                  <span className="text-[10px]">Reprocess</span>
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -2077,10 +2105,10 @@ export default function MetaConversionsPage() {
                       <TableBody>
                         {audienceEventsQuery.data.events.map((ev) => {
                           const tierBadge: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-                            QualifiedLead: { variant: "default", label: "Qualified" },
-                            DisqualifiedLead: { variant: "destructive", label: "Disqualified" },
-                            HighValueCustomer: { variant: "default", label: "High Value" },
-                            LowValueCustomer: { variant: "secondary", label: "Low Value" },
+                            qualified: { variant: "default", label: "Qualified" },
+                            disqualified: { variant: "destructive", label: "Disqualified" },
+                            high_value_customer: { variant: "default", label: "High Value" },
+                            low_value_customer: { variant: "secondary", label: "Low Value" },
                           };
                           const tb = ev.leadTier ? tierBadge[ev.leadTier] : null;
                           return (

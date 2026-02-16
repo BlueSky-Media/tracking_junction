@@ -1310,6 +1310,107 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/meta-conversions/reprocess-untiered", isAuthenticated, async (req, res) => {
+    try {
+      const untieredEvents = await storage.getUntieredFormCompleteEvents(200);
+      if (untieredEvents.length === 0) {
+        return res.json({ processed: 0, message: "No un-tiered events found" });
+      }
+
+      const activeRules = await storage.getActiveSignalRules();
+      if (activeRules.length === 0) {
+        return res.json({ processed: 0, message: "No active signal rules" });
+      }
+
+      let processed = 0;
+      for (const event of untieredEvents) {
+        const eventContext: EventContext = {
+          eventType: event.eventType || "form_complete",
+          page: event.page,
+          pageType: event.pageType,
+          domain: event.domain,
+          stepNumber: event.stepNumber,
+          stepName: event.stepName,
+          selectedValue: event.selectedValue || null,
+          timeOnStep: event.timeOnStep || null,
+          deviceType: event.deviceType || null,
+          geoState: event.geoState || null,
+          email: event.email || null,
+          phone: event.phone || null,
+          quizAnswers: (event.quizAnswers as Record<string, any>) || null,
+        };
+
+        const matchingRules = activeRules.filter(rule =>
+          rule.triggerEvent === eventContext.eventType &&
+          evaluateRuleConditions(rule.conditions as SignalRuleConditions, eventContext)
+        );
+
+        if (matchingRules.length === 0) continue;
+
+        const pageLand = await storage.getSessionPageLandEvent(event.sessionId);
+
+        for (const rule of matchingRules) {
+          const value = computeRuleValue(rule.customValue, eventContext);
+          const tierName = rule.metaEventName.toLowerCase().includes("disqualified") ? "disqualified"
+            : rule.metaEventName.toLowerCase().includes("highvalue") ? "high_value_customer"
+            : rule.metaEventName.toLowerCase().includes("lowvalue") ? "low_value_customer"
+            : "qualified";
+
+          await storage.updateEventLeadTier(event.id, tierName);
+
+          const signalData = {
+            eventId: event.eventId,
+            sessionId: event.sessionId,
+            eventTimestamp: event.eventTimestamp,
+            pageUrl: event.pageUrl,
+            email: event.email,
+            phone: event.phone,
+            firstName: event.firstName,
+            lastName: event.lastName,
+            geoState: event.geoState,
+            country: event.country,
+            externalId: event.externalId || pageLand?.externalId || null,
+            ipAddress: event.ipAddress || pageLand?.ipAddress || null,
+            userAgent: event.userAgent || pageLand?.userAgent || null,
+            fbp: event.fbp || pageLand?.fbp || null,
+            fbc: event.fbc || pageLand?.fbc || null,
+            fbclid: event.fbclid || pageLand?.fbclid || null,
+          };
+
+          const eventSignalData = tierName === "disqualified"
+            ? { ...signalData, email: null, phone: null, firstName: null, lastName: null }
+            : signalData;
+
+          const result = await fireAudienceSignal(
+            rule.metaEventName,
+            eventSignalData,
+            value,
+            rule.contentName || event.page,
+          );
+
+          await storage.insertSignalFireLog({
+            ruleId: rule.id,
+            ruleName: rule.name,
+            eventId: event.id,
+            sessionId: event.sessionId,
+            metaEventName: rule.metaEventName,
+            status: result.success ? "success" : "failed",
+            errorMessage: result.error || null,
+            eventValue: value,
+          });
+
+          console.log(`[Reprocess] Rule "${rule.name}" matched event ${event.id}, fired ${rule.metaEventName}, status: ${result.success ? "success" : "failed"}`);
+        }
+        processed++;
+      }
+
+      res.json({ processed, total: untieredEvents.length });
+    } catch (error) {
+      console.error("Error reprocessing un-tiered events:", error);
+      res.status(500).json({ message: "Failed to reprocess events" });
+    }
+  });
+
   app.get("/api/meta-conversions/audience-stats", isAuthenticated, async (req, res) => {
     try {
       const { startDate, endDate, audience } = req.query as { startDate?: string; endDate?: string; audience?: string };

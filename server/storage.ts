@@ -17,7 +17,7 @@ import {
   type SignalFireLog,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, ne, ilike, or, inArray, type SQL } from "drizzle-orm";
+import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, isNull, ne, ilike, or, inArray, type SQL } from "drizzle-orm";
 
 export interface AnalyticsFilters {
   page?: string | string[];
@@ -225,6 +225,7 @@ export interface IStorage {
   bulkMarkSynced(eventIds: number[]): Promise<number>;
   updateEventLeadTier(id: number, leadTier: string): Promise<void>;
   getSessionPageLandEvent(sessionId: string): Promise<TrackingEvent | null>;
+  getUntieredFormCompleteEvents(limit?: number): Promise<TrackingEvent[]>;
   getLeadTierStats(filters: { startDate?: string; endDate?: string; page?: string }): Promise<{ tier: string; count: number; totalValue: number }[]>;
   getLeadTierEvents(filters: { startDate?: string; endDate?: string; page?: string; tier?: string }, page: number, limit: number): Promise<{ events: TrackingEvent[]; total: number }>;
   getSignalRules(): Promise<AudienceSignalRule[]>;
@@ -1590,6 +1591,17 @@ class DatabaseStorage implements IStorage {
       .orderBy(trackingEvents.eventTimestamp)
       .limit(1);
     return event || null;
+  }
+
+  async getUntieredFormCompleteEvents(limit: number = 100): Promise<TrackingEvent[]> {
+    return db.select()
+      .from(trackingEvents)
+      .where(and(
+        eq(trackingEvents.eventType, "form_complete"),
+        isNull(trackingEvents.leadTier),
+      ))
+      .orderBy(desc(trackingEvents.eventTimestamp))
+      .limit(limit);
   }
 
   async getLeadTierStats(filters: { startDate?: string; endDate?: string; page?: string }): Promise<{ tier: string; count: number; totalValue: number }[]> {
