@@ -1140,17 +1140,16 @@ function AudienceFunnelPanel({
             return (
               <Fragment key={step.stepKey}>
                 <TableRow
-                  className={`h-5 ${hasBreakdown ? "cursor-pointer hover-elevate" : ""}`}
+                  className="h-5 cursor-pointer hover-elevate"
                   data-testid={`row-funnel-step-${audienceRow.groupValue}-${step.stepNumber}`}
-                  onClick={() => hasBreakdown && toggleStep(stepKey)}
+                  onClick={() => toggleStep(stepKey)}
                 >
                   <TableCell className="font-mono text-[9px] px-1.5 py-0 whitespace-nowrap">
                     <span className="inline-flex items-center gap-1">
-                      {hasBreakdown && (
-                        isExpanded
-                          ? <ChevronDown className="w-2.5 h-2.5 text-muted-foreground" />
-                          : <ChevronRight className="w-2.5 h-2.5 text-muted-foreground" />
-                      )}
+                      {isExpanded
+                        ? <ChevronDown className="w-2.5 h-2.5 text-muted-foreground" />
+                        : <ChevronRight className="w-2.5 h-2.5 text-muted-foreground" />
+                      }
                       {step.stepNumber}. {step.stepName}
                       {hasBreakdown && (
                         <Badge variant="secondary" className="text-[7px] px-1 py-0 leading-tight ml-0.5">
@@ -1180,29 +1179,35 @@ function AudienceFunnelPanel({
                     </div>
                   </TableCell>
                 </TableRow>
-                {isExpanded && hasBreakdown && (
+                {isExpanded && (
                   <TableRow className="bg-muted/10" data-testid={`row-funnel-step-responses-${audienceRow.groupValue}-${step.stepNumber}`}>
                     <TableCell colSpan={6} className="px-3 py-1.5">
-                      <div className="space-y-1">
-                        <div className="text-[8px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                          Responses ({breakdown.totalResponses.toLocaleString()} total)
-                        </div>
-                        {breakdown.options.map((option, idx) => (
-                          <div key={option.value} className="flex items-center gap-2" data-testid={`response-option-${audienceRow.groupValue}-${step.stepNumber}-${idx}`}>
-                            <span className="text-[9px] min-w-[100px] truncate">{option.value}</span>
-                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${RESPONSE_BAR_COLORS[idx % RESPONSE_BAR_COLORS.length]}`}
-                                style={{ width: `${option.percentage}%` }}
-                              />
-                            </div>
-                            <span className="text-[9px] font-mono text-muted-foreground min-w-[28px] text-right">{option.count}</span>
-                            <Badge variant="outline" className="text-[7px] px-1 py-0 font-mono min-w-[36px] justify-center">
-                              {option.percentage.toFixed(1)}%
-                            </Badge>
+                      {hasBreakdown ? (
+                        <div className="space-y-1">
+                          <div className="text-[8px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                            Responses ({breakdown.totalResponses.toLocaleString()} total)
                           </div>
-                        ))}
-                      </div>
+                          {breakdown.options.map((option, idx) => (
+                            <div key={option.value} className="flex items-center gap-2" data-testid={`response-option-${audienceRow.groupValue}-${step.stepNumber}-${idx}`}>
+                              <span className="text-[9px] min-w-[100px] truncate">{option.value}</span>
+                              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${RESPONSE_BAR_COLORS[idx % RESPONSE_BAR_COLORS.length]}`}
+                                  style={{ width: `${option.percentage}%` }}
+                                />
+                              </div>
+                              <span className="text-[9px] font-mono text-muted-foreground min-w-[28px] text-right">{option.count}</span>
+                              <Badge variant="outline" className="text-[7px] px-1 py-0 font-mono min-w-[36px] justify-center">
+                                {option.percentage.toFixed(1)}%
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-[9px] text-muted-foreground py-0.5">
+                          No response data available for this step.
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 )}
