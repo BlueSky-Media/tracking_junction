@@ -1302,7 +1302,7 @@ const adParams = {
   adset_name: params.get("adset_name") || undefined,
   adset_id: params.get("adset_id") || undefined,
   fbclid: params.get("fbclid") || undefined,
-  fbc: getCookie("_fbc") || (params.get("fbclid") ? "fb.1." + Date.now() + "." + params.get("fbclid") : undefined),
+  fbc: getCookie("_fbc") || undefined,
   fbp: getCookie("_fbp") || undefined,
   external_id: params.get("external_id") || undefined,
 };
