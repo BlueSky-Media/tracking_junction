@@ -192,6 +192,7 @@ export default function MetaConversionsPage() {
   const [adIdFilter, setAdIdFilter] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [pendingAutoSelect, setPendingAutoSelect] = useState<{ adId: string; adName: string; count: number } | null>(null);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedAdAccount, setSelectedAdAccount] = useState("");
@@ -615,6 +616,18 @@ export default function MetaConversionsPage() {
   const missingEvents = pendingEvents;
   const allMissingIds = allPendingIds;
 
+  useEffect(() => {
+    if (pendingAutoSelect && !eventsQuery.isFetching && events.length > 0) {
+      const { adId, adName, count } = pendingAutoSelect;
+      const adPending = events
+        .filter(e => e.uploadStatus === "pending" && (e.adId === adId || e.adName === adName))
+        .sort((a, b) => new Date(b.eventTimestamp).getTime() - new Date(a.eventTimestamp).getTime())
+        .slice(0, count);
+      setSelected(new Set(adPending.map(e => e.id)));
+      setPendingAutoSelect(null);
+    }
+  }, [pendingAutoSelect, eventsQuery.isFetching, events]);
+
   const allVisibleSelected = events.length > 0 && events.every(e => e.uploadStatus !== "pending" || selected.has(e.id));
 
   const toggleSelect = (id: number) => {
@@ -902,6 +915,11 @@ export default function MetaConversionsPage() {
                           onClick={() => {
                             setAdIdFilter(row.adId);
                             setPage(1);
+                            if (row.difference > 0) {
+                              setPendingAutoSelect({ adId: row.adId, adName: row.adName || row.adId, count: row.difference });
+                            } else {
+                              setSelected(new Set());
+                            }
                             document.getElementById("events-section")?.scrollIntoView({ behavior: "smooth" });
                           }}
                         >
@@ -917,7 +935,7 @@ export default function MetaConversionsPage() {
                       ))}
                     </TableBody>
                   </Table>
-                  <p className="text-[9px] text-muted-foreground mt-2">Click a row to filter events below by that ad</p>
+                  <p className="text-[9px] text-muted-foreground mt-2">Click a row to filter events below by that ad. Rows with +Diff will auto-select the most recent pending events matching the difference count.</p>
                 </div>
               )}
             </CardContent>
