@@ -1150,7 +1150,57 @@ export async function registerRoutes(
 
   app.get("/api/meta-conversions/history", isAuthenticated, async (_req, res) => {
     try {
-      const history = await storage.getMetaUploadHistory(100);
+      const uploads = await storage.getMetaUploadHistory(200);
+      const batchMap = new Map<string, {
+        id: number;
+        uploadedAt: string;
+        pixelId: string;
+        fbtraceId: string | null;
+        status: string;
+        eventsReceived: number;
+        eventCount: number;
+        testMode: boolean;
+        errorMessage: string | null;
+        events: { trackingEventId: number; sessionId: string; eventId: string | null; status: string }[];
+      }>();
+
+      for (const u of uploads) {
+        const key = u.fbtraceId || `single_${u.id}`;
+        const existing = batchMap.get(key);
+        if (existing) {
+          existing.eventCount++;
+          existing.events.push({
+            trackingEventId: u.trackingEventId,
+            sessionId: u.sessionId,
+            eventId: u.eventId,
+            status: u.status,
+          });
+          if (u.status === "error") existing.status = "error";
+          if (u.errorMessage && !existing.errorMessage) existing.errorMessage = u.errorMessage;
+        } else {
+          batchMap.set(key, {
+            id: u.id,
+            uploadedAt: u.uploadedAt instanceof Date ? u.uploadedAt.toISOString() : String(u.uploadedAt),
+            pixelId: u.pixelId,
+            fbtraceId: u.fbtraceId,
+            status: u.status === "error" ? "error" : "success",
+            eventsReceived: u.eventsReceived || 0,
+            eventCount: 1,
+            testMode: u.pixelId === "TEST",
+            errorMessage: u.errorMessage,
+            events: [{
+              trackingEventId: u.trackingEventId,
+              sessionId: u.sessionId,
+              eventId: u.eventId,
+              status: u.status,
+            }],
+          });
+        }
+      }
+
+      const history = Array.from(batchMap.values())
+        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+
       res.json({ history });
     } catch (error) {
       console.error("Error fetching upload history:", error);

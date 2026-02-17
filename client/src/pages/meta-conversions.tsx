@@ -105,12 +105,15 @@ interface UploadResult {
 
 interface HistoryEntry {
   id: number;
-  eventCount: number;
-  sentAt: string;
-  testMode: boolean;
-  sent: number;
-  received: number;
+  uploadedAt: string;
+  pixelId: string;
+  fbtraceId: string | null;
   status: string;
+  eventsReceived: number;
+  eventCount: number;
+  testMode: boolean;
+  errorMessage: string | null;
+  events: { trackingEventId: number; sessionId: string; eventId: string | null; status: string }[];
 }
 
 interface HistoryResult {
@@ -1269,9 +1272,8 @@ export default function MetaConversionsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Sent At</TableHead>
+                        <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap">Uploaded At</TableHead>
                         <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Events</TableHead>
-                        <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Sent</TableHead>
                         <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Received</TableHead>
                         <TableHead className="text-[10px] font-semibold py-1 px-2 text-center whitespace-nowrap">Mode</TableHead>
                         <TableHead className="text-[10px] font-semibold py-1 px-2 text-center whitespace-nowrap">Status</TableHead>
@@ -1281,11 +1283,10 @@ export default function MetaConversionsPage() {
                       {historyQuery.data.history.map((entry) => (
                         <TableRow key={entry.id} data-testid={`row-history-${entry.id}`}>
                           <TableCell className="text-[10px] py-1 px-2 whitespace-nowrap tabular-nums">
-                            {entry.sentAt ? format(new Date(entry.sentAt), "MMM d, h:mm a") : "-"}
+                            {entry.uploadedAt ? format(new Date(entry.uploadedAt), "MMM d, h:mm a") : "-"}
                           </TableCell>
                           <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{entry.eventCount}</TableCell>
-                          <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{entry.sent}</TableCell>
-                          <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{entry.received}</TableCell>
+                          <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{entry.eventsReceived}</TableCell>
                           <TableCell className="text-[10px] py-1 px-2 text-center">
                             {entry.testMode ? (
                               <Badge variant="outline" className="text-[8px]">Test</Badge>
