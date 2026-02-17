@@ -53,13 +53,20 @@ function fmtPct(v: number) {
   return v.toFixed(2) + "%";
 }
 
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function getDefaultDates() {
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - 7);
   return {
-    startDate: start.toISOString().split("T")[0],
-    endDate: end.toISOString().split("T")[0],
+    startDate: toLocalDateStr(start),
+    endDate: toLocalDateStr(end),
   };
 }
 
@@ -274,16 +281,16 @@ export default function FacebookAdsPage() {
     const end = new Date();
     const start = new Date();
     if (days === 0) {
-      setStartDate(end.toISOString().split("T")[0]);
-      setEndDate(end.toISOString().split("T")[0]);
+      setStartDate(toLocalDateStr(end));
+      setEndDate(toLocalDateStr(end));
     } else if (days === 1) {
       start.setDate(start.getDate() - 1);
-      setStartDate(start.toISOString().split("T")[0]);
-      setEndDate(start.toISOString().split("T")[0]);
+      setStartDate(toLocalDateStr(start));
+      setEndDate(toLocalDateStr(start));
     } else {
       start.setDate(start.getDate() - days);
-      setStartDate(start.toISOString().split("T")[0]);
-      setEndDate(end.toISOString().split("T")[0]);
+      setStartDate(toLocalDateStr(start));
+      setEndDate(toLocalDateStr(end));
     }
   };
 
