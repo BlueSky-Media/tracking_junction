@@ -53,20 +53,31 @@ function fmtPct(v: number) {
   return v.toFixed(2) + "%";
 }
 
-function toLocalDateStr(d: Date): string {
+function toTzDateStr(d: Date, tz?: string): string {
+  if (tz) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: tz,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
+      return parts;
+    } catch {}
+  }
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
-function getDefaultDates() {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 7);
+function getDefaultDates(tz?: string) {
+  const now = new Date();
+  const end = toTzDateStr(now, tz);
+  const start = new Date(now.getTime() - 7 * 86400000);
   return {
-    startDate: toLocalDateStr(start),
-    endDate: toLocalDateStr(end),
+    startDate: toTzDateStr(start, tz),
+    endDate: end,
   };
 }
 
@@ -277,26 +288,30 @@ export default function FacebookAdsPage() {
   const [currentDrillId, setCurrentDrillId] = useState<string>("");
   const [drilledCampaignId, setDrilledCampaignId] = useState<string>("");
 
-  const applyPreset = (days: number) => {
-    const end = new Date();
-    const start = new Date();
-    if (days === 0) {
-      setStartDate(toLocalDateStr(end));
-      setEndDate(toLocalDateStr(end));
-    } else if (days === 1) {
-      start.setDate(start.getDate() - 1);
-      setStartDate(toLocalDateStr(start));
-      setEndDate(toLocalDateStr(start));
-    } else {
-      start.setDate(start.getDate() - days);
-      setStartDate(toLocalDateStr(start));
-      setEndDate(toLocalDateStr(end));
-    }
-  };
-
   const { data: accounts, isLoading: accountsLoading, error: accountsError } = useQuery<AdAccount[]>({
     queryKey: ["/api/facebook/ad-accounts"],
   });
+
+  const selectedAccountObj = accounts?.find(a => a.id === selectedAccount);
+  const accountTz = selectedAccountObj?.timezone_name;
+
+  const applyPreset = (days: number) => {
+    const now = new Date();
+    if (days === 0) {
+      const today = toTzDateStr(now, accountTz);
+      setStartDate(today);
+      setEndDate(today);
+    } else if (days === 1) {
+      const yesterday = new Date(now.getTime() - 86400000);
+      const yd = toTzDateStr(yesterday, accountTz);
+      setStartDate(yd);
+      setEndDate(yd);
+    } else {
+      const start = new Date(now.getTime() - days * 86400000);
+      setStartDate(toTzDateStr(start, accountTz));
+      setEndDate(toTzDateStr(now, accountTz));
+    }
+  };
 
   const { data: accountInsights, isLoading: summaryLoading } = useQuery<NormalizedInsight[]>({
     queryKey: ["/api/facebook/account-insights", selectedAccount, startDate, endDate],
@@ -403,7 +418,7 @@ export default function FacebookAdsPage() {
               ) : accountsError ? (
                 <p className="text-[10px] text-destructive">Failed to load accounts. Check your access token.</p>
               ) : (
-                <Select value={selectedAccount} onValueChange={(v) => { setSelectedAccount(v); setDrillLevel("campaigns"); setBreadcrumbs([]); setCurrentDrillId(""); setDrilledCampaignId(""); }}>
+                <Select value={selectedAccount} onValueChange={(v) => { setSelectedAccount(v); setDrillLevel("campaigns"); setBreadcrumbs([]); setCurrentDrillId(""); setDrilledCampaignId(""); const acct = accounts?.find(a => a.id === v); if (acct?.timezone_name) { const d = getDefaultDates(acct.timezone_name); setStartDate(d.startDate); setEndDate(d.endDate); } }}>
                   <SelectTrigger className="w-[280px]" data-testid="select-ad-account">
                     <SelectValue placeholder="Select ad account" />
                   </SelectTrigger>
@@ -419,7 +434,9 @@ export default function FacebookAdsPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] font-medium text-muted-foreground uppercase">Date Range</label>
+              <label className="text-[10px] font-medium text-muted-foreground uppercase">
+                Date Range{accountTz && <span className="normal-case ml-1" data-testid="text-account-timezone">({accountTz})</span>}
+              </label>
               <div className="flex items-center gap-1">
                 <input
                   type="date"
