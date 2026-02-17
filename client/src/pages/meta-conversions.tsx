@@ -1161,6 +1161,7 @@ export default function MetaConversionsPage() {
                         </TableCell>
                         <TableCell className="py-1 px-2">
                           <div className="flex items-center gap-0.5 justify-center">
+                            <SignalIcon active={ev.fbc} icon={MousePointerClick} label="fbc" />
                             <SignalIcon active={ev.fbclid} icon={MousePointerClick} label="fbclid" />
                             <SignalIcon active={ev.fbp} icon={Fingerprint} label="fbp" />
                             <SignalIcon active={ev.hasEmail} icon={Mail} label="Email" />

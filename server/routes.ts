@@ -151,7 +151,7 @@ export async function registerRoutes(
         adsetName: data.adset_name || null,
         adsetId: data.adset_id || null,
         fbclid: data.fbclid || null,
-        fbc: data.fbc || null,
+        fbc: data.fbc || (data.fbclid ? `fb.1.${Date.now()}.${data.fbclid}` : null),
         fbp: data.fbp || null,
         quizAnswers: data.quiz_answers || null,
         pageUrl: data.page_url || null,
@@ -210,7 +210,7 @@ export async function registerRoutes(
             ipAddress: event.ipAddress || pageLand?.ipAddress || null,
             userAgent: event.userAgent || pageLand?.userAgent || null,
             fbp: event.fbp || pageLand?.fbp || null,
-            fbc: event.fbc || pageLand?.fbc || null,
+            fbc: event.fbc || pageLand?.fbc || ((event.fbclid || pageLand?.fbclid) ? `fb.1.${new Date(event.eventTimestamp).getTime()}.${event.fbclid || pageLand?.fbclid}` : null),
             fbclid: event.fbclid || pageLand?.fbclid || null,
           };
 
@@ -1057,7 +1057,7 @@ export async function registerRoutes(
           ipAddress: event.ipAddress,
           userAgent: event.userAgent,
           fbp: event.sessionFbp || event.fbp,
-          fbc: event.sessionFbc || event.fbc,
+          fbc: event.sessionFbc || event.fbc || (event.sessionFbclid || event.fbclid ? `fb.1.${new Date(event.eventTimestamp).getTime()}.${event.sessionFbclid || event.fbclid}` : null),
           fbclid: event.sessionFbclid || event.fbclid,
         }) });
       }
@@ -1206,7 +1206,7 @@ export async function registerRoutes(
         ipAddress: pageLand?.ipAddress || null,
         userAgent: pageLand?.userAgent || null,
         fbp: pageLand?.fbp || null,
-        fbc: pageLand?.fbc || null,
+        fbc: pageLand?.fbc || (pageLand?.fbclid ? `fb.1.${Date.now()}.${pageLand.fbclid}` : null),
         fbclid: pageLand?.fbclid || null,
       };
 
@@ -1373,7 +1373,7 @@ export async function registerRoutes(
             ipAddress: event.ipAddress || pageLand?.ipAddress || null,
             userAgent: event.userAgent || pageLand?.userAgent || null,
             fbp: event.fbp || pageLand?.fbp || null,
-            fbc: event.fbc || pageLand?.fbc || null,
+            fbc: event.fbc || pageLand?.fbc || ((event.fbclid || pageLand?.fbclid) ? `fb.1.${new Date(event.eventTimestamp).getTime()}.${event.fbclid || pageLand?.fbclid}` : null),
             fbclid: event.fbclid || pageLand?.fbclid || null,
           };
 
