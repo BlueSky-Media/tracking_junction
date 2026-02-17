@@ -8,19 +8,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Upload, ChevronDown, ChevronRight, CheckCircle2, XCircle, AlertTriangle,
   Mail, Phone, Globe, Fingerprint, MousePointerClick, Clock, History,
   ArrowUpDown, Loader2, Info, Shield, ChevronLeft, ChevronsLeft, ChevronsRight,
   Users, UserCheck, UserX, DollarSign, TrendingUp, Plus, Pencil, Trash2,
-  Lock, Unlock, RefreshCw,
+  Lock, Unlock, RefreshCw, CalendarIcon,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SiFacebook } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { format } from "date-fns";
+import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import {
   LEAD_STEPS_SENIORS, LEAD_STEPS_VETERANS, LEAD_STEPS_FIRST_RESPONDERS, CALL_STEPS,
 } from "@shared/schema";
@@ -154,13 +156,31 @@ interface SignalRule {
   updatedAt: string;
 }
 
+function toDateStr(d: Date): string {
+  return format(d, "yyyy-MM-dd");
+}
+
+const DATE_PRESETS: { label: string; getRange: () => { start: Date; end: Date } }[] = [
+  { label: "Today", getRange: () => { const d = new Date(); return { start: d, end: d }; } },
+  { label: "Yesterday", getRange: () => { const d = subDays(new Date(), 1); return { start: d, end: d }; } },
+  { label: "Last 7 Days", getRange: () => ({ start: subDays(new Date(), 6), end: new Date() }) },
+  { label: "Last 14 Days", getRange: () => ({ start: subDays(new Date(), 13), end: new Date() }) },
+  { label: "Last 30 Days", getRange: () => ({ start: subDays(new Date(), 29), end: new Date() }) },
+  { label: "This Week", getRange: () => ({ start: startOfWeek(new Date(), { weekStartsOn: 1 }), end: new Date() }) },
+  { label: "This Month", getRange: () => ({ start: startOfMonth(new Date()), end: new Date() }) },
+  { label: "Last Month", getRange: () => {
+    const prev = subMonths(new Date(), 1);
+    return { start: startOfMonth(prev), end: endOfMonth(prev) };
+  }},
+];
+
 function getDefaultDates() {
   const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 7);
+  const start = subDays(end, 6);
   return {
-    startDate: start.toISOString().split("T")[0],
-    endDate: end.toISOString().split("T")[0],
+    startDate: toDateStr(start),
+    endDate: toDateStr(end),
+    preset: "Last 7 Days",
   };
 }
 
@@ -188,6 +208,8 @@ export default function MetaConversionsPage() {
   const [activeTab, setActiveTab] = useState<"events" | "audiences">("events");
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [endDate, setEndDate] = useState(defaults.endDate);
+  const [datePreset, setDatePreset] = useState(defaults.preset);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [audience, setAudience] = useState("__all__");
   const [adIdFilter, setAdIdFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -725,24 +747,134 @@ export default function MetaConversionsPage() {
         <CardContent className="p-3">
           <div className="flex items-end gap-3 flex-wrap">
             <div className="space-y-1">
-              <label className="text-[10px] font-medium text-muted-foreground uppercase">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-                className="h-9 rounded-md border px-2 text-[11px] bg-background"
-                data-testid="input-start-date"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-muted-foreground uppercase">End Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-                className="h-9 rounded-md border px-2 text-[11px] bg-background"
-                data-testid="input-end-date"
-              />
+              <label className="text-[10px] font-medium text-muted-foreground uppercase">Date Range</label>
+              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-start text-left font-normal gap-2 min-w-[240px]"
+                    data-testid="button-date-range"
+                  >
+                    <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-[11px]">
+                      {datePreset !== "Custom"
+                        ? datePreset
+                        : `${format(new Date(startDate + "T00:00:00"), "MMM d, yyyy")} - ${format(new Date(endDate + "T00:00:00"), "MMM d, yyyy")}`}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 ml-auto text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <div className="flex">
+                    <div className="border-r p-2 space-y-0.5 min-w-[140px]">
+                      {DATE_PRESETS.map((preset) => (
+                        <button
+                          key={preset.label}
+                          data-testid={`btn-preset-${preset.label.toLowerCase().replace(/\s/g, "-")}`}
+                          className={`w-full text-left text-[11px] px-3 py-1.5 rounded-md transition-colors ${
+                            datePreset === preset.label
+                              ? "bg-primary text-primary-foreground"
+                              : "hover-elevate"
+                          }`}
+                          onClick={() => {
+                            const { start, end } = preset.getRange();
+                            setStartDate(toDateStr(start));
+                            setEndDate(toDateStr(end));
+                            setDatePreset(preset.label);
+                            setPage(1);
+                            setDatePickerOpen(false);
+                          }}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                      <div className="border-t my-1" />
+                      <button
+                        data-testid="btn-preset-custom"
+                        className={`w-full text-left text-[11px] px-3 py-1.5 rounded-md transition-colors ${
+                          datePreset === "Custom"
+                            ? "bg-primary text-primary-foreground"
+                            : "hover-elevate"
+                        }`}
+                        onClick={() => setDatePreset("Custom")}
+                      >
+                        Custom
+                      </button>
+                    </div>
+                    <div className="p-3">
+                      <div className="flex gap-2 mb-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-medium text-muted-foreground uppercase">Start</label>
+                          <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => {
+                              setStartDate(e.target.value);
+                              setDatePreset("Custom");
+                              setPage(1);
+                            }}
+                            className="h-9 rounded-md border px-2 text-[11px] bg-background w-[130px]"
+                            data-testid="input-start-date"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-medium text-muted-foreground uppercase">End</label>
+                          <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => {
+                              setEndDate(e.target.value);
+                              setDatePreset("Custom");
+                              setPage(1);
+                            }}
+                            className="h-9 rounded-md border px-2 text-[11px] bg-background w-[130px]"
+                            data-testid="input-end-date"
+                          />
+                        </div>
+                      </div>
+                      <Calendar
+                        mode="range"
+                        selected={{
+                          from: new Date(startDate + "T00:00:00"),
+                          to: new Date(endDate + "T00:00:00"),
+                        }}
+                        onSelect={(range) => {
+                          if (range?.from) {
+                            setStartDate(toDateStr(range.from));
+                            if (range.to) {
+                              setEndDate(toDateStr(range.to));
+                            } else {
+                              setEndDate(toDateStr(range.from));
+                            }
+                            setDatePreset("Custom");
+                            setPage(1);
+                          }
+                        }}
+                        numberOfMonths={2}
+                        className="rounded-md"
+                        data-testid="calendar-range"
+                      />
+                      <div className="flex justify-end gap-2 mt-3 pt-3 border-t">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDatePickerOpen(false)}
+                          data-testid="button-date-cancel"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => setDatePickerOpen(false)}
+                          data-testid="button-date-apply"
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-muted-foreground uppercase">Audience</label>

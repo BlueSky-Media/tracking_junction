@@ -6,8 +6,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, ChevronRight, ChevronDown, TrendingUp, DollarSign, Eye, MousePointerClick, Users, ArrowLeft } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { RefreshCw, ChevronRight, ChevronDown, TrendingUp, DollarSign, Eye, MousePointerClick, Users, ArrowLeft, CalendarIcon } from "lucide-react";
 import { SiFacebook } from "react-icons/si";
+import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
 
 interface NormalizedInsight {
   campaignId?: string;
@@ -81,13 +84,19 @@ function getDefaultDates(tz?: string) {
   };
 }
 
-const DATE_PRESETS = [
-  { label: "Today", days: 0 },
-  { label: "Yesterday", days: 1 },
-  { label: "Last 7 Days", days: 7 },
-  { label: "Last 14 Days", days: 14 },
-  { label: "Last 30 Days", days: 30 },
-  { label: "Last 90 Days", days: 90 },
+const FB_DATE_PRESETS: { label: string; getRange: (tz?: string) => { start: Date; end: Date } }[] = [
+  { label: "Today", getRange: () => { const d = new Date(); return { start: d, end: d }; } },
+  { label: "Yesterday", getRange: () => { const d = subDays(new Date(), 1); return { start: d, end: d }; } },
+  { label: "Last 7 Days", getRange: () => ({ start: subDays(new Date(), 6), end: new Date() }) },
+  { label: "Last 14 Days", getRange: () => ({ start: subDays(new Date(), 13), end: new Date() }) },
+  { label: "Last 30 Days", getRange: () => ({ start: subDays(new Date(), 29), end: new Date() }) },
+  { label: "Last 90 Days", getRange: () => ({ start: subDays(new Date(), 89), end: new Date() }) },
+  { label: "This Week", getRange: () => ({ start: startOfWeek(new Date(), { weekStartsOn: 1 }), end: new Date() }) },
+  { label: "This Month", getRange: () => ({ start: startOfMonth(new Date()), end: new Date() }) },
+  { label: "Last Month", getRange: () => {
+    const prev = subMonths(new Date(), 1);
+    return { start: startOfMonth(prev), end: endOfMonth(prev) };
+  }},
 ];
 
 function StatCard({ label, value, icon: Icon, sub }: { label: string; value: string; icon: any; sub?: string }) {
@@ -283,6 +292,8 @@ export default function FacebookAdsPage() {
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [endDate, setEndDate] = useState(defaults.endDate);
+  const [datePreset, setDatePreset] = useState("Last 7 Days");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [drillLevel, setDrillLevel] = useState<DrillLevel>("campaigns");
   const [breadcrumbs, setBreadcrumbs] = useState<Breadcrumb[]>([]);
   const [currentDrillId, setCurrentDrillId] = useState<string>("");
@@ -295,22 +306,12 @@ export default function FacebookAdsPage() {
   const selectedAccountObj = accounts?.find(a => a.id === selectedAccount);
   const accountTz = selectedAccountObj?.timezone_name;
 
-  const applyPreset = (days: number) => {
-    const now = new Date();
-    if (days === 0) {
-      const today = toTzDateStr(now, accountTz);
-      setStartDate(today);
-      setEndDate(today);
-    } else if (days === 1) {
-      const yesterday = new Date(now.getTime() - 86400000);
-      const yd = toTzDateStr(yesterday, accountTz);
-      setStartDate(yd);
-      setEndDate(yd);
-    } else {
-      const start = new Date(now.getTime() - days * 86400000);
-      setStartDate(toTzDateStr(start, accountTz));
-      setEndDate(toTzDateStr(now, accountTz));
-    }
+  const applyPreset = (preset: typeof FB_DATE_PRESETS[number]) => {
+    const { start, end } = preset.getRange(accountTz);
+    setStartDate(toTzDateStr(start, accountTz));
+    setEndDate(toTzDateStr(end, accountTz));
+    setDatePreset(preset.label);
+    setDatePickerOpen(false);
   };
 
   const { data: accountInsights, isLoading: summaryLoading } = useQuery<NormalizedInsight[]>({
@@ -437,42 +438,127 @@ export default function FacebookAdsPage() {
               <label className="text-[10px] font-medium text-muted-foreground uppercase">
                 Date Range{accountTz && <span className="normal-case ml-1" data-testid="text-account-timezone">({accountTz})</span>}
               </label>
-              <div className="flex items-center gap-1">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="h-9 rounded-md border px-2 text-[11px] bg-background"
-                  data-testid="input-start-date"
-                />
-                <span className="text-[10px] text-muted-foreground">to</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="h-9 rounded-md border px-2 text-[11px] bg-background"
-                  data-testid="input-end-date"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 flex-wrap">
-              {DATE_PRESETS.map((p) => (
-                <Button
-                  key={p.label}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applyPreset(p.days)}
-                  className="text-[10px] h-7 px-2"
-                  data-testid={`btn-preset-${p.label.toLowerCase().replace(/\s/g, "-")}`}
-                >
-                  {p.label}
-                </Button>
-              ))}
+              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-start text-left font-normal gap-2 min-w-[240px]"
+                    data-testid="button-date-range"
+                  >
+                    <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-[11px]">
+                      {datePreset !== "Custom"
+                        ? datePreset
+                        : `${format(new Date(startDate + "T00:00:00"), "MMM d, yyyy")} - ${format(new Date(endDate + "T00:00:00"), "MMM d, yyyy")}`}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 ml-auto text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <div className="flex">
+                    <div className="border-r p-2 space-y-0.5 min-w-[140px]">
+                      {FB_DATE_PRESETS.map((preset) => (
+                        <button
+                          key={preset.label}
+                          data-testid={`btn-preset-${preset.label.toLowerCase().replace(/\s/g, "-")}`}
+                          className={`w-full text-left text-[11px] px-3 py-1.5 rounded-md transition-colors ${
+                            datePreset === preset.label
+                              ? "bg-primary text-primary-foreground"
+                              : "hover-elevate"
+                          }`}
+                          onClick={() => applyPreset(preset)}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                      <div className="border-t my-1" />
+                      <button
+                        data-testid="btn-preset-custom"
+                        className={`w-full text-left text-[11px] px-3 py-1.5 rounded-md transition-colors ${
+                          datePreset === "Custom"
+                            ? "bg-primary text-primary-foreground"
+                            : "hover-elevate"
+                        }`}
+                        onClick={() => setDatePreset("Custom")}
+                      >
+                        Custom
+                      </button>
+                    </div>
+                    <div className="p-3">
+                      <div className="flex gap-2 mb-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-medium text-muted-foreground uppercase">Start</label>
+                          <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => {
+                              setStartDate(e.target.value);
+                              setDatePreset("Custom");
+                            }}
+                            className="h-9 rounded-md border px-2 text-[11px] bg-background w-[130px]"
+                            data-testid="input-start-date"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-medium text-muted-foreground uppercase">End</label>
+                          <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => {
+                              setEndDate(e.target.value);
+                              setDatePreset("Custom");
+                            }}
+                            className="h-9 rounded-md border px-2 text-[11px] bg-background w-[130px]"
+                            data-testid="input-end-date"
+                          />
+                        </div>
+                      </div>
+                      <Calendar
+                        mode="range"
+                        selected={{
+                          from: new Date(startDate + "T00:00:00"),
+                          to: new Date(endDate + "T00:00:00"),
+                        }}
+                        onSelect={(range) => {
+                          if (range?.from) {
+                            setStartDate(toTzDateStr(range.from, accountTz));
+                            if (range.to) {
+                              setEndDate(toTzDateStr(range.to, accountTz));
+                            } else {
+                              setEndDate(toTzDateStr(range.from, accountTz));
+                            }
+                            setDatePreset("Custom");
+                          }
+                        }}
+                        numberOfMonths={2}
+                        className="rounded-md"
+                        data-testid="calendar-range"
+                      />
+                      <div className="flex justify-end gap-2 mt-3 pt-3 border-t">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDatePickerOpen(false)}
+                          data-testid="button-date-cancel"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => setDatePickerOpen(false)}
+                          data-testid="button-date-apply"
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {selectedAccount && (
-              <Button variant="outline" size="sm" onClick={() => refetchCampaigns()} className="text-[10px] h-7 gap-1" data-testid="btn-refresh-fb">
+              <Button variant="outline" size="sm" onClick={() => refetchCampaigns()} className="text-[10px] gap-1" data-testid="btn-refresh-fb">
                 <RefreshCw className="w-3 h-3" />
                 Refresh
               </Button>
