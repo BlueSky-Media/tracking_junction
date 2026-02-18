@@ -5,8 +5,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Ban, Download, Trash2, Search, Bot, Plus, Shield, Globe, MonitorSmartphone, ToggleLeft, ToggleRight } from "lucide-react";
+import { Ban, Download, Trash2, Search, Bot, Plus, Shield, Globe, MonitorSmartphone, ToggleLeft, ToggleRight, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -46,6 +47,10 @@ export default function BlockListPage() {
   const [newRuleValue, setNewRuleValue] = useState("");
   const [newRuleLabel, setNewRuleLabel] = useState("");
   const [isAddingRule, setIsAddingRule] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkIPs, setBulkIPs] = useState("");
+  const [bulkLabel, setBulkLabel] = useState("Blocked IP");
+  const [isBulkAdding, setIsBulkAdding] = useState(false);
 
   const blockedQuery = useQuery<BlockedNumber[]>({
     queryKey: ["/api/retell/blocked"],
@@ -143,6 +148,39 @@ export default function BlockListPage() {
     } finally {
       setIsAddingRule(false);
     }
+  };
+
+  const bulkAddRules = async () => {
+    const lines = bulkIPs.split(/[\n,]+/).map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) {
+      toast({ title: "No IPs found. Enter one per line or comma-separated.", variant: "destructive" });
+      return;
+    }
+    if (!bulkLabel.trim()) {
+      toast({ title: "Please provide a Bot Type Label", variant: "destructive" });
+      return;
+    }
+    setIsBulkAdding(true);
+    let added = 0;
+    let failed = 0;
+    for (const ip of lines) {
+      try {
+        const res = await fetch("/api/bot-rules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ ruleType: "ip_prefix", value: ip, label: bulkLabel.trim(), enabled: 1 }),
+        });
+        if (!res.ok) throw new Error("Failed");
+        added++;
+      } catch {
+        failed++;
+      }
+    }
+    toast({ title: `Added ${added} rule${added !== 1 ? "s" : ""}${failed > 0 ? `, ${failed} failed` : ""}` });
+    setBulkIPs("");
+    queryClient.invalidateQueries({ queryKey: ["/api/bot-rules"] });
+    setIsBulkAdding(false);
   };
 
   const toggleRule = async (rule: BotRuleEntry) => {
@@ -263,7 +301,54 @@ export default function BlockListPage() {
               <Plus className="w-3 h-3 mr-1" />
               <span className="text-[10px]">Add Rule</span>
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowBulkImport(!showBulkImport)}
+              data-testid="button-toggle-bulk-import"
+            >
+              <Upload className="w-3 h-3 mr-1" />
+              <span className="text-[10px]">Bulk Import</span>
+            </Button>
           </div>
+
+          {showBulkImport && (
+            <div className="border rounded-md p-3 space-y-2 bg-muted/20">
+              <div className="flex items-center gap-2">
+                <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-[11px] font-semibold">Bulk IP Import</span>
+              </div>
+              <Textarea
+                value={bulkIPs}
+                onChange={(e) => setBulkIPs(e.target.value)}
+                placeholder={"Paste IPs, one per line or comma-separated:\n34.213.179.155\n44.251.140.95\n34.212.215.48"}
+                className="text-[11px] font-mono min-h-[80px]"
+                data-testid="textarea-bulk-ips"
+              />
+              <div className="flex items-end gap-2 flex-wrap">
+                <div className="space-y-1 flex-1 min-w-[120px]">
+                  <label className="text-[9px] text-muted-foreground font-medium">Bot Type Label (applied to all)</label>
+                  <Input
+                    value={bulkLabel}
+                    onChange={(e) => setBulkLabel(e.target.value)}
+                    placeholder="e.g. Blocked IP"
+                    className="h-8 text-[11px]"
+                    data-testid="input-bulk-label"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={bulkAddRules}
+                  disabled={isBulkAdding || !bulkIPs.trim() || !bulkLabel.trim()}
+                  data-testid="button-bulk-add"
+                >
+                  <Upload className="w-3 h-3 mr-1" />
+                  <span className="text-[10px]">{isBulkAdding ? "Adding..." : `Add ${bulkIPs.split(/[\n,]+/).filter(l => l.trim()).length} IPs`}</span>
+                </Button>
+              </div>
+              <span className="text-[9px] text-muted-foreground">Each IP will be added as a separate IP Prefix rule.</span>
+            </div>
+          )}
 
           {botRulesQuery.isLoading ? (
             <div className="space-y-2">
