@@ -37,6 +37,7 @@ export interface AnalyticsFilters {
   geoState?: string | string[];
   selectedState?: string | string[];
   funnelId?: string | string[];
+  excludeBots?: boolean;
 }
 
 interface FunnelStep {
@@ -166,6 +167,10 @@ export interface IStorage {
   getEventLogs(filters: AnalyticsFilters, page: number, limit: number, search?: string): Promise<EventLogResult>;
   deleteAllEvents(): Promise<void>;
   purgeEventsWithoutFunnelId(): Promise<number>;
+  getAllEventsForBotRescan(): Promise<TrackingEvent[]>;
+  updateEventBotStatus(id: number, isBot: number, botReason: string | null): Promise<void>;
+  getBotStats(filters: AnalyticsFilters): Promise<{ totalEvents: number; botEvents: number; botSessions: number; humanEvents: number; humanSessions: number }>;
+  purgeBottraffic(): Promise<number>;
   deleteEvent(id: number): Promise<void>;
   deleteEventsBySession(sessionId: string): Promise<number>;
   deleteEventsBySessions(sessionIds: string[]): Promise<number>;
@@ -200,6 +205,8 @@ export interface IStorage {
       browserVersion: string | null;
       osVersion: string | null;
       ipType: string | null;
+      isBot: number;
+      botReason: string | null;
     }[];
     total: number;
     page: number;
@@ -280,6 +287,9 @@ function buildConditions(filters: AnalyticsFilters) {
   addFilterCondition(conditions, trackingEvents.geoState, filters.geoState);
   addFilterCondition(conditions, trackingEvents.selectedState, filters.selectedState);
   addFilterCondition(conditions, trackingEvents.funnelId, filters.funnelId);
+  if (filters.excludeBots) {
+    conditions.push(or(eq(trackingEvents.isBot, 0), sql`${trackingEvents.isBot} IS NULL`)!);
+  }
   return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
@@ -1091,6 +1101,44 @@ class DatabaseStorage implements IStorage {
     return result.length;
   }
 
+  async getAllEventsForBotRescan(): Promise<TrackingEvent[]> {
+    return await db.select().from(trackingEvents).orderBy(trackingEvents.id);
+  }
+
+  async updateEventBotStatus(id: number, isBot: number, botReason: string | null): Promise<void> {
+    await db.update(trackingEvents)
+      .set({ isBot, botReason })
+      .where(eq(trackingEvents.id, id));
+  }
+
+  async getBotStats(filters: AnalyticsFilters): Promise<{ totalEvents: number; botEvents: number; botSessions: number; humanEvents: number; humanSessions: number }> {
+    const conditions = buildConditions(filters) ? [buildConditions(filters)!] : [];
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const result = await db.select({
+      totalEvents: count(trackingEvents.id),
+      botEvents: sql<number>`COUNT(*) FILTER (WHERE ${trackingEvents.isBot} = 1)`,
+      botSessions: sql<number>`COUNT(DISTINCT ${trackingEvents.sessionId}) FILTER (WHERE ${trackingEvents.isBot} = 1)`,
+      humanEvents: sql<number>`COUNT(*) FILTER (WHERE ${trackingEvents.isBot} = 0 OR ${trackingEvents.isBot} IS NULL)`,
+      humanSessions: sql<number>`COUNT(DISTINCT ${trackingEvents.sessionId}) FILTER (WHERE ${trackingEvents.isBot} = 0 OR ${trackingEvents.isBot} IS NULL)`,
+    }).from(trackingEvents).where(where);
+
+    return {
+      totalEvents: Number(result[0]?.totalEvents || 0),
+      botEvents: Number(result[0]?.botEvents || 0),
+      botSessions: Number(result[0]?.botSessions || 0),
+      humanEvents: Number(result[0]?.humanEvents || 0),
+      humanSessions: Number(result[0]?.humanSessions || 0),
+    };
+  }
+
+  async purgeBottraffic(): Promise<number> {
+    const result = await db.delete(trackingEvents)
+      .where(eq(trackingEvents.isBot, 1))
+      .returning({ id: trackingEvents.id });
+    return result.length;
+  }
+
   async deleteEvent(id: number): Promise<void> {
     await db.delete(trackingEvents).where(eq(trackingEvents.id, id));
   }
@@ -1208,6 +1256,8 @@ class DatabaseStorage implements IStorage {
           return (lastWithAnswers?.quizAnswers as Record<string, string>) || null;
         })(),
         funnelId: firstEvent.funnelId || null,
+        isBot: events.some(e => e.isBot === 1) ? 1 : 0,
+        botReason: events.find(e => e.isBot === 1)?.botReason || null,
       };
     });
 

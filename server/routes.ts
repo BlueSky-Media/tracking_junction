@@ -7,6 +7,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import * as facebook from "./facebook";
 import { buildConversionEvent, sendConversionEvents, MetaConversionError, fireAudienceSignal } from "./meta-conversions";
 import { calculateAnnualPremiumEstimate, getCapiEventName, classifyCustomerTier, evaluateRuleConditions, computeRuleValue, type EventContext, type SignalRuleConditions } from "./lead-scoring";
+import { detectBot } from "./bot-detection";
 
 const PII_FIELDS = ["first_name", "last_name", "email", "phone", "firstName", "lastName"];
 
@@ -53,6 +54,7 @@ function parseFilters(query: any) {
     funnelId: parseMulti(query.funnelId as string | undefined),
     startTime: query.startTime as string | undefined,
     endTime: query.endTime as string | undefined,
+    excludeBots: query.excludeBots === "true" || query.excludeBots === "1",
   };
 }
 
@@ -113,6 +115,17 @@ export async function registerRoutes(
 
       const isFormComplete = data.event_type === "form_complete";
 
+      const botCheck = detectBot({
+        userAgent: data.user_agent || req.headers["user-agent"] || null,
+        ipAddress: data.ip_address || clientIp || null,
+        screenResolution: data.screen_resolution || null,
+        viewport: data.viewport || null,
+        language: data.language || null,
+        deviceType: data.device_type || null,
+        browser: data.browser || null,
+        os: data.os || null,
+      });
+
       const event = await storage.insertEvent({
         page: data.page,
         pageType: data.page_type,
@@ -165,6 +178,8 @@ export async function registerRoutes(
         osVersion: data.os_version || null,
         ipType: data.ip_type || null,
         funnelId: data.funnel_id || null,
+        isBot: botCheck.isBot ? 1 : 0,
+        botReason: botCheck.isBot ? botCheck.reasons.join(";") : null,
       });
 
       (async () => {
@@ -469,6 +484,56 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error purging events:", error);
       res.status(500).json({ message: "Failed to purge events" });
+    }
+  });
+
+  app.post("/api/analytics/rescan-bots", isAuthenticated, async (req, res) => {
+    try {
+      const allEvents = await storage.getAllEventsForBotRescan();
+      let flagged = 0;
+      for (const event of allEvents) {
+        const botCheck = detectBot({
+          userAgent: event.userAgent,
+          ipAddress: event.ipAddress,
+          screenResolution: event.screenResolution,
+          viewport: event.viewport,
+          language: event.language,
+          deviceType: event.deviceType,
+          browser: event.browser,
+          os: event.os,
+        });
+        const newIsBot = botCheck.isBot ? 1 : 0;
+        const newReason = botCheck.isBot ? botCheck.reasons.join(";") : null;
+        if (newIsBot !== (event.isBot || 0) || newReason !== event.botReason) {
+          await storage.updateEventBotStatus(event.id, newIsBot, newReason);
+          if (newIsBot) flagged++;
+        }
+      }
+      res.json({ message: `Rescanned ${allEvents.length} events, flagged ${flagged} as bots`, total: allEvents.length, flagged });
+    } catch (error) {
+      console.error("Error rescanning bots:", error);
+      res.status(500).json({ message: "Failed to rescan bots" });
+    }
+  });
+
+  app.get("/api/analytics/bot-stats", isAuthenticated, async (req, res) => {
+    try {
+      const filters = parseFilters(req.query);
+      const stats = await storage.getBotStats(filters);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching bot stats:", error);
+      res.status(500).json({ message: "Failed to fetch bot stats" });
+    }
+  });
+
+  app.delete("/api/analytics/purge-bots", isAuthenticated, async (req, res) => {
+    try {
+      const count = await storage.purgeBottraffic();
+      res.json({ message: `Purged ${count} bot events`, purged: count });
+    } catch (error) {
+      console.error("Error purging bots:", error);
+      res.status(500).json({ message: "Failed to purge bot traffic" });
     }
   });
 

@@ -15,7 +15,7 @@ import {
   CalendarIcon, ChevronLeft, ChevronsLeft, ChevronsRight,
   Filter, X, RefreshCw, Trash2,
   Play, Pause, Download, Ban, Phone, FileText, Clock,
-  MinusCircle, Save, Columns, Info, GripVertical,
+  MinusCircle, Save, Columns, Info, GripVertical, Shield, Bot,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTimezone } from "@/hooks/use-timezone";
@@ -207,6 +207,8 @@ interface SessionLogEntry {
   phone: string | null;
   quizAnswers: Record<string, string> | null;
   funnelId: string | null;
+  isBot: number;
+  botReason: string | null;
 }
 
 interface SessionLogResult {
@@ -229,6 +231,7 @@ interface Filters {
   os: string[];
   browser: string[];
   geoState: string[];
+  excludeBots: boolean;
 }
 
 interface FilterOptions {
@@ -361,6 +364,7 @@ function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, ex
   setFilterParam(params, "browser", filters.browser);
   setFilterParam(params, "geoState", filters.geoState);
   setFilterParam(params, "funnelId", filters.funnelId);
+  if (filters.excludeBots) params.set("excludeBots", "true");
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
       params.set(k, v);
@@ -406,6 +410,7 @@ function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logP
   setFilterParam(params, "browser", filters.browser);
   setFilterParam(params, "geoState", filters.geoState);
   setFilterParam(params, "funnelId", filters.funnelId);
+  if (filters.excludeBots) params.set("excludeBots", "true");
   if (search.trim()) params.set("search", search.trim());
   return params.toString();
 }
@@ -422,6 +427,7 @@ const emptyFilters: Filters = {
   os: [],
   browser: [],
   geoState: [],
+  excludeBots: true,
 };
 
 function MultiSelectDropdown({
@@ -511,7 +517,7 @@ function FilterPanel({
   testIdPrefix: string;
 }) {
   const [open, setOpen] = useState(false);
-  const activeCount = Object.values(filters).filter(v => v.length > 0).length;
+  const activeCount = Object.entries(filters).filter(([k, v]) => k !== "excludeBots" && Array.isArray(v) && v.length > 0).length;
 
   const handleChange = (key: keyof Filters, val: string[]) => {
     onChange({ ...filters, [key]: val });
@@ -622,7 +628,17 @@ function FilterPanel({
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 border-t pt-1.5">
+          <div className="flex items-center gap-3 border-t pt-1.5 flex-wrap">
+            <label className="flex items-center gap-1.5 cursor-pointer" data-testid={`${testIdPrefix}-exclude-bots-toggle`}>
+              <input
+                type="checkbox"
+                checked={filters.excludeBots}
+                onChange={(e) => onChange({ ...filters, excludeBots: e.target.checked })}
+                className="rounded border-muted-foreground"
+              />
+              <span className="text-[10px] text-muted-foreground">Exclude Bot Traffic</span>
+              <Shield className="w-3 h-3 text-muted-foreground" />
+            </label>
             <Button variant="outline" size="sm" onClick={() => setOpen(false)} data-testid={`${testIdPrefix}-close-filters`}>
               <span className="text-[10px]">Close</span>
             </Button>
@@ -1433,6 +1449,15 @@ function FunnelReport({
       <div className="flex items-center gap-2 mb-1 flex-wrap">
         <h3 className="text-[11px] font-semibold" data-testid="text-funnel-title">Funnel Summary</h3>
         <FilterPanel filters={filters} onChange={onFiltersChange} filterOptions={filterOptions} testIdPrefix="report" />
+        <Button
+          variant={filters.excludeBots ? "default" : "outline"}
+          size="sm"
+          onClick={() => onFiltersChange({ ...filters, excludeBots: !filters.excludeBots })}
+          data-testid="button-toggle-bots"
+        >
+          <Shield className="w-3 h-3 mr-1" />
+          <span className="text-[10px]">{filters.excludeBots ? "Bots Hidden" : "Show All"}</span>
+        </Button>
       </div>
       <div className="overflow-x-auto border rounded-md mb-2">
         <Table>
@@ -1593,6 +1618,18 @@ function getCellRenderer(key: string, session: SessionLogEntry, colWidths: Recor
     }
     case "sessionId":
       return <td key={key} className={`${cls} font-mono truncate`} style={style} title={session.sessionId}>{session.sessionId.substring(0, 10)}...</td>;
+    case "botStatus":
+      return (
+        <td key={key} className="px-1 py-0 overflow-hidden text-center" style={style} data-testid={`cell-bot-${session.sessionId}`}>
+          {session.isBot ? (
+            <Badge variant="secondary" className="text-[9px] py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30" title={session.botReason || "Bot detected"}>
+              <Bot className="w-2.5 h-2.5 mr-0.5" />Bot
+            </Badge>
+          ) : (
+            <span className="text-[9px] text-muted-foreground">{"\u2014"}</span>
+          )}
+        </td>
+      );
     case "events":
       return <td key={key} className={`${cls} font-mono text-center`} style={style}><Badge variant="outline" className="text-[9px] py-0">{session.eventCount}</Badge></td>;
     case "furthestStep":
@@ -1743,6 +1780,7 @@ const SESSION_COLUMNS: SessionColumn[] = [
   { key: "expand", label: "", resizable: false },
   { key: "lastActivity", label: "Last Activity", resizable: true },
   { key: "sessionId", label: "Session ID", resizable: true },
+  { key: "botStatus", label: "Bot", resizable: true, optional: true, defaultVisible: false },
   { key: "events", label: "Events", resizable: true, optional: true, defaultVisible: true },
   { key: "furthestStep", label: "Furthest Step", resizable: true, optional: true, defaultVisible: true },
   { key: "status", label: "Status", resizable: true, optional: true, defaultVisible: true },
@@ -1887,6 +1925,9 @@ function EventLogsSection({
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [deletingSession, setDeletingSession] = useState<string | null>(null);
+  const [rescanningBots, setRescanningBots] = useState(false);
+  const [purgingBots, setPurgingBots] = useState(false);
+  const [confirmPurgeBots, setConfirmPurgeBots] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -2043,6 +2084,43 @@ function EventLogsSection({
     }
   };
 
+  const rescanBots = async () => {
+    setRescanningBots(true);
+    try {
+      const res = await fetch("/api/analytics/rescan-bots", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to rescan");
+      const data = await res.json();
+      toast({ title: `Rescanned ${data.total} events, flagged ${data.flagged} as bots` });
+      await invalidateAnalytics();
+    } catch {
+      toast({ title: "Failed to rescan bot traffic", variant: "destructive" });
+    } finally {
+      setRescanningBots(false);
+    }
+  };
+
+  const purgeBots = async () => {
+    setPurgingBots(true);
+    try {
+      const res = await fetch("/api/analytics/purge-bots", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to purge");
+      const data = await res.json();
+      toast({ title: `Purged ${data.purged} bot events permanently` });
+      setConfirmPurgeBots(false);
+      await invalidateAnalytics();
+    } catch {
+      toast({ title: "Failed to purge bot traffic", variant: "destructive" });
+    } finally {
+      setPurgingBots(false);
+    }
+  };
+
   const totalCols = visibleColumns.length;
 
   return (
@@ -2193,7 +2271,49 @@ function EventLogsSection({
 
       {expanded && (
         <div className="mt-1.5 space-y-1.5">
-          <FilterPanel filters={filters} onChange={onFiltersChange} filterOptions={filterOptions} testIdPrefix="logs" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <FilterPanel filters={filters} onChange={onFiltersChange} filterOptions={filterOptions} testIdPrefix="logs" />
+            <Button
+              variant={filters.excludeBots ? "default" : "outline"}
+              size="sm"
+              onClick={() => onFiltersChange({ ...filters, excludeBots: !filters.excludeBots })}
+              data-testid="button-logs-toggle-bots"
+            >
+              <Shield className="w-3 h-3 mr-1" />
+              <span className="text-[10px]">{filters.excludeBots ? "Bots Hidden" : "Show All"}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={rescanBots}
+              disabled={rescanningBots}
+              data-testid="button-rescan-bots"
+            >
+              <RefreshCw className={`w-3 h-3 mr-1 ${rescanningBots ? "animate-spin" : ""}`} />
+              <span className="text-[10px]">{rescanningBots ? "Scanning..." : "Rescan Bots"}</span>
+            </Button>
+            {confirmPurgeBots ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-destructive font-medium">Permanently delete all bot events?</span>
+                <Button variant="destructive" size="sm" onClick={purgeBots} disabled={purgingBots} data-testid="button-confirm-purge-bots">
+                  <span className="text-[10px]">{purgingBots ? "..." : "Yes, Purge"}</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setConfirmPurgeBots(false)} data-testid="button-cancel-purge-bots">
+                  <span className="text-[10px]">Cancel</span>
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmPurgeBots(true)}
+                data-testid="button-purge-bots"
+              >
+                <Trash2 className="w-3 h-3 mr-1" />
+                <span className="text-[10px]">Purge Bots</span>
+              </Button>
+            )}
+          </div>
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
             <Input
@@ -2364,6 +2484,17 @@ function SessionLogRow({
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-x-3 gap-y-0.5 text-[10px]">
                 <DetailField label="Session ID" value={session.sessionId} />
                 <DetailField label="Audience" value={session.page} />
+                {session.isBot ? (
+                  <div>
+                    <span className="text-muted-foreground text-[9px]">Bot Status</span>
+                    <div className="flex items-center gap-1">
+                      <Badge variant="secondary" className="text-[9px] py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30">
+                        <Bot className="w-2.5 h-2.5 mr-0.5" />Bot
+                      </Badge>
+                      <span className="text-[9px] text-muted-foreground" title={session.botReason || ""}>{session.botReason?.split(";").join(", ")}</span>
+                    </div>
+                  </div>
+                ) : null}
                 <DetailField label="Funnel ID" value={session.funnelId ? formatFunnelLabel(session.funnelId) : "\u2014"} />
                 <DetailField label="Funnel Type" value={session.pageType} />
                 <DetailField label="Domain" value={session.domain} />
