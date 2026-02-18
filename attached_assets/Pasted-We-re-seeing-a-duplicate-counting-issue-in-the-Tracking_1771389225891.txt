@@ -1,0 +1,25 @@
+We're seeing a duplicate counting issue in the TrackingJunction aggregate stats view for step 6 "Quote Form" on our seniors quote page.
+
+What we're seeing:
+
+The aggregate view for step 6 "Quote Form" shows a badge of "2" and "RESPONSES (5 TOTAL)" with two separate rows both labeled "submitted" — one with count 4 (80%) and one with count 1 (20%).
+However, when we drill into an individual record/session, only ONE form_complete event fires for step 6 with value "submitted". The step breakdown shows exactly 7 events: step 0 (page_land), steps 1-5 (step_complete), and step 6 (form_complete / submitted). There is no duplicate in the individual record.
+What we expect:
+
+The aggregate view should show a single "submitted" row combining all responses, not two separate "submitted" rows.
+What we suspect:
+
+TrackingJunction may be splitting the aggregate count based on event_type (step_complete vs form_complete) even though the selected_value is the same ("submitted"). Step 6 fires as form_complete while steps 1-5 fire as step_complete. If the aggregation groups by both selected_value AND event_type, it would create two separate "submitted" buckets.
+Alternatively, there may be stale data from earlier tests when our code was accidentally firing both a step_complete and a form_complete for the same step. We've since fixed the code to only fire one form_complete event for step 6. If old records with step_complete type for step 6 still exist in the database, they could be creating the second "submitted" row in aggregates.
+Questions:
+
+Does the aggregate response breakdown group by event_type in addition to selected_value? If so, can it be changed to group only by selected_value for the step responses view?
+Can you check if there are any old records in the database where step 6 "Quote Form" has event_type: 'step_complete' instead of form_complete? Those would be from our earlier buggy code and could be purged.
+Is there a way to clear/reset the aggregate stats for a specific page so we can start fresh with clean data?
+Page being tested: https://blueskylife.net/final-expense/quote/rb-lead-fjk6dsa04dfx/seniors
+
+Current tracking flow for this page (after our fix):
+
+Steps 0-5: Each fires one sendTrackingEvent() call to TJ with event_type: 'step_complete'
+Step 6 (Quote Form): Fires ONE sendTrackingEvent() call to TJ with event_type: 'form_complete' and selected_value: 'submitted'
+No other TJ calls are made for step 6

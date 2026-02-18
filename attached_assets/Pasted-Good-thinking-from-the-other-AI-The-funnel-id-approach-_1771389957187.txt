@@ -1,0 +1,43 @@
+Good thinking from the other AI. The funnel_id approach is the right solution here. My original plan to just change the grouping in the query would actually make things worse — it would blindly merge data from completely different funnels (like combining "Name" step responses from the lead-gen page with "Quote Form" responses from the quote page) instead of properly separating them.
+
+A dedicated funnel_id column gives you clean, per-funnel analytics without cross-contamination. It's a straightforward change on the TrackingJunction side:
+
+Add the column to the schema and database
+Accept it in the tracking event payload
+Add it as a filter option in the dashboard (alongside page, domain, etc.)
+The existing buildConditions filter system already supports this pattern, so it slots in naturally
+On the data cleanup question — rather than deleting old data outright, I'd suggest we can add a filter in the UI to show "only events with funnel_id" once you start sending it. That way you keep historical data but get a clean view going forward. But if you'd prefer to purge old test data from specific URLs, that's doable too.
+
+Here's the implementation plan:
+
+Scroll to latest
+Add funnel ID to data
+Update data input to store funnel ID
+Filter data by funnel ID
+Add funnel ID filter to dashboard
+Add API to list funnels, clean data
+Review changes, test all features
+
+Great — the TrackingJunction side is ready to accept funnel_id. Now we just need to add it to our tracking calls on each of the 6 landing pages.
+
+The implementation is straightforward:
+
+Update sendTrackingEvent in tracking.ts to accept and include an optional funnel_id in the payload
+Add a funnel_id constant to each of the 6 landing pages and pass it through every tracking call
+Here's the funnel ID mapping we'll use:
+
+Page	Funnel ID
+Seniors Lead-Gen	lead-seniors-f3q8
+Veterans Lead-Gen	lead-veterans-f3q8
+Seniors Quote (with lead info)	quote-lead-seniors-fjk6
+Veterans Quote (with lead info)	quote-lead-veterans-fjk6
+Seniors Quote (no lead info)	quote-seniors-fjk6
+Veterans Quote (no lead info)	quote-veterans-fjk6
+
+Scroll to latest
+Add tracking ID to event options
+Add tracking ID to senior landing
+Add tracking ID to veteran landing
+Add tracking ID to senior quote landing
+Add tracking ID to veteran quote landing
+Rebuild and check production bundles

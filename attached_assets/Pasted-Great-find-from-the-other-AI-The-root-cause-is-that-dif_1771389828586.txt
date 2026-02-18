@@ -1,0 +1,30 @@
+Great find from the other AI! The root cause is that different funnels share the same page identifier, so step 6 events from the lead-gen page ("Name" step) and the quote page ("Quote Form" step) get mixed together in the aggregate view. A unique funnel SKU per page would solve this cleanly. Here's your follow-up prompt:
+
+Follow-up prompt for the TrackingJunction AI:
+
+Thanks for the root cause analysis. The issue is confirmed — different funnels sharing the same page identifier causes their events to merge in the aggregate view, creating confusing breakdowns.
+
+Proposed solution: Unique Funnel ID per page
+
+We want to add a funnel_id field to every tracking event sent to TrackingJunction. This would be a unique identifier per landing page variant, allowing us to filter and aggregate stats per funnel cleanly. Since events are already tracked by session_id, the funnel_id would let us scope aggregate views to a specific funnel without cross-contamination from other pages that happen to share the same page value.
+
+Here are the 6 landing pages we're running, each needing a unique funnel ID:
+
+Page	URL Path	Funnel ID	Description
+Seniors Lead-Gen	/final-expense/rb-f3q8n1z7rp0x/seniors	lead-seniors-f3q8	Lead-gen quiz + contact capture
+Veterans Lead-Gen	/final-expense/rb-f3q8n1z7rp0x/veterans	lead-veterans-f3q8	Lead-gen quiz + contact capture
+Seniors Quote (with lead info)	/final-expense/quote/rb-lead-fjk6dsa04dfx/seniors	quote-lead-seniors-fjk6	Quote quiz + contact capture + Quoteplicity redirect
+Veterans Quote (with lead info)	/final-expense/quote/rb-lead-fjk6dsa04dfx/veterans	quote-lead-veterans-fjk6	Quote quiz + contact capture + Quoteplicity redirect
+Seniors Quote (no lead info)	/final-expense/quote/rb-fjk6dsa04dfx/seniors	quote-seniors-fjk6	Quote quiz + Quoteplicity redirect (no contact forms)
+Veterans Quote (no lead info)	/final-expense/quote/rb-fjk6dsa04dfx/veterans	quote-veterans-fjk6	Quote quiz + Quoteplicity redirect (no contact forms)
+What we need on the TrackingJunction side:
+
+Accept a funnel_id field in the tracking event payload. We'll send it with every event alongside session_id, page, step_number, etc.
+Filter aggregates by funnel_id — the breakdown/stats views should be able to scope to a specific funnel_id so we only see data from that one funnel, not mixed across funnels.
+Store funnel_id in the database — add it as a column to the events table so historical data can also be filtered.
+Update the getBreakdown query — when a funnel_id filter is provided, only include events matching that funnel. This would completely eliminate the cross-funnel contamination issue.
+On our side, we'll update the frontend tracking code to include funnel_id in every sendTrackingEvent() call. The funnel ID will be set as a constant at the top of each landing page component.
+
+Additional question: Can you also add a way to purge/delete old test data that was recorded before this fix? We'd like to start with a clean slate for each funnel once the funnel_id field is in place. Specifically, any events from the URLs listed above that don't have a funnel_id set can be considered old test data.
+
+Once the TJ side confirms they've added funnel_id support, I can quickly add the funnel IDs to each of our 6 landing pages and include them in every tracking call. Want me to draft the task list for our side of the implementation now, or wait until you hear back?
