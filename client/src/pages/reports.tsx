@@ -1619,18 +1619,20 @@ function getCellRenderer(key: string, session: SessionLogEntry, colWidths: Recor
     }
     case "sessionId":
       return <td key={key} className={`${cls} font-mono truncate`} style={style} title={session.sessionId}>{session.sessionId.substring(0, 10)}...</td>;
-    case "botStatus":
+    case "botStatus": {
+      const botType = session.botReason?.split("|")[0] || "Bot";
       return (
         <td key={key} className="px-1 py-0 overflow-hidden text-center" style={style} data-testid={`cell-bot-${session.sessionId}`}>
           {session.isBot ? (
             <Badge variant="secondary" className="text-[9px] py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30" title={session.botReason || "Bot detected"}>
-              <Bot className="w-2.5 h-2.5 mr-0.5" />Bot
+              <Bot className="w-2.5 h-2.5 mr-0.5" />{botType}
             </Badge>
           ) : (
             <span className="text-[9px] text-muted-foreground">{"\u2014"}</span>
           )}
         </td>
       );
+    }
     case "events":
       return <td key={key} className={`${cls} font-mono text-center`} style={style}><Badge variant="outline" className="text-[9px] py-0">{session.eventCount}</Badge></td>;
     case "furthestStep":
@@ -1783,7 +1785,7 @@ const SESSION_COLUMNS: SessionColumn[] = [
   { key: "expand", label: "", resizable: false },
   { key: "lastActivity", label: "Last Activity", resizable: true },
   { key: "sessionId", label: "Session ID", resizable: true },
-  { key: "botStatus", label: "Bot", resizable: true, optional: true, defaultVisible: false },
+  { key: "botStatus", label: "Bot Type", resizable: true, optional: true, defaultVisible: false },
   { key: "events", label: "Events", resizable: true, optional: true, defaultVisible: true },
   { key: "furthestStep", label: "Furthest Step", resizable: true, optional: true, defaultVisible: true },
   { key: "status", label: "Status", resizable: true, optional: true, defaultVisible: true },
@@ -2490,12 +2492,12 @@ function SessionLogRow({
                 <DetailField label="Audience" value={session.page} />
                 {session.isBot ? (
                   <div>
-                    <span className="text-muted-foreground text-[9px]">Bot Status</span>
-                    <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground text-[9px]">Bot Type</span>
+                    <div className="flex items-center gap-1 flex-wrap">
                       <Badge variant="secondary" className="text-[9px] py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30">
-                        <Bot className="w-2.5 h-2.5 mr-0.5" />Bot
+                        <Bot className="w-2.5 h-2.5 mr-0.5" />{session.botReason?.split("|")[0] || "Bot"}
                       </Badge>
-                      <span className="text-[9px] text-muted-foreground" title={session.botReason || ""}>{session.botReason?.split(";").join(", ")}</span>
+                      <span className="text-[9px] text-muted-foreground" title={session.botReason || ""}>{(session.botReason?.split("|")[1] || session.botReason || "").split(";").join(", ")}</span>
                     </div>
                   </div>
                 ) : null}

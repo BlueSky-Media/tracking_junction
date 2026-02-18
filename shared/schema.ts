@@ -188,6 +188,23 @@ export const insertBlockedNumberSchema = createInsertSchema(blockedNumbers).omit
 export type InsertBlockedNumber = z.infer<typeof insertBlockedNumberSchema>;
 export type BlockedNumber = typeof blockedNumbers.$inferSelect;
 
+export const botRules = pgTable("bot_rules", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  ruleType: varchar("rule_type", { length: 20 }).notNull(),
+  value: text("value").notNull(),
+  label: varchar("label", { length: 100 }).notNull(),
+  enabled: integer("enabled").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertBotRuleSchema = createInsertSchema(botRules).omit({
+  id: true as const,
+  createdAt: true as const,
+});
+
+export type InsertBotRule = z.infer<typeof insertBotRuleSchema>;
+export type BotRule = typeof botRules.$inferSelect;
+
 export const metaConversionUploads = pgTable("meta_conversion_uploads", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   trackingEventId: integer("tracking_event_id").notNull(),

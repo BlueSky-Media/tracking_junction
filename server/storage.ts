@@ -2,6 +2,7 @@ import {
   trackingEvents,
   requestLogs,
   blockedNumbers,
+  botRules,
   metaConversionUploads,
   audienceSignalRules,
   signalFireLog,
@@ -10,6 +11,8 @@ import {
   type InsertRequestLog,
   type RequestLog,
   type BlockedNumber,
+  type InsertBotRule,
+  type BotRule,
   type InsertMetaConversionUpload,
   type MetaConversionUpload,
   type InsertAudienceSignalRule,
@@ -169,6 +172,10 @@ export interface IStorage {
   purgeEventsWithoutFunnelId(): Promise<number>;
   getAllEventsForBotRescan(): Promise<TrackingEvent[]>;
   updateEventBotStatus(id: number, isBot: number, botReason: string | null): Promise<void>;
+  getBotRules(): Promise<BotRule[]>;
+  insertBotRule(rule: InsertBotRule): Promise<BotRule>;
+  updateBotRule(id: number, updates: Partial<InsertBotRule>): Promise<BotRule | null>;
+  deleteBotRule(id: number): Promise<boolean>;
   getBotStats(filters: AnalyticsFilters): Promise<{ totalEvents: number; botEvents: number; botSessions: number; humanEvents: number; humanSessions: number }>;
   purgeBottraffic(): Promise<number>;
   deleteEvent(id: number): Promise<void>;
@@ -1110,6 +1117,28 @@ class DatabaseStorage implements IStorage {
     await db.update(trackingEvents)
       .set({ isBot, botReason })
       .where(eq(trackingEvents.id, id));
+  }
+
+  async getBotRules(): Promise<BotRule[]> {
+    return await db.select().from(botRules).orderBy(desc(botRules.createdAt));
+  }
+
+  async insertBotRule(rule: InsertBotRule): Promise<BotRule> {
+    const [result] = await db.insert(botRules).values(rule as any).returning();
+    return result;
+  }
+
+  async updateBotRule(id: number, updates: Partial<InsertBotRule>): Promise<BotRule | null> {
+    const [result] = await db.update(botRules)
+      .set(updates as any)
+      .where(eq(botRules.id, id))
+      .returning();
+    return result || null;
+  }
+
+  async deleteBotRule(id: number): Promise<boolean> {
+    const result = await db.delete(botRules).where(eq(botRules.id, id)).returning();
+    return result.length > 0;
   }
 
   async getBotStats(filters: AnalyticsFilters): Promise<{ totalEvents: number; botEvents: number; botSessions: number; humanEvents: number; humanSessions: number }> {

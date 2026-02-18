@@ -115,6 +115,19 @@ export async function registerRoutes(
 
       const isFormComplete = data.event_type === "form_complete";
 
+      let customRulesForDetection: { id: number; ruleType: "ip_prefix" | "ua_pattern"; value: string; label: string; enabled: boolean; createdAt: string }[] = [];
+      try {
+        const customRules = await storage.getBotRules();
+        customRulesForDetection = customRules.map(r => ({
+          id: r.id,
+          ruleType: r.ruleType as "ip_prefix" | "ua_pattern",
+          value: r.value,
+          label: r.label,
+          enabled: r.enabled === 1,
+          createdAt: r.createdAt?.toISOString() || "",
+        }));
+      } catch {}
+
       const botCheck = detectBot({
         userAgent: data.user_agent || req.headers["user-agent"] || null,
         ipAddress: data.ip_address || clientIp || null,
@@ -124,7 +137,7 @@ export async function registerRoutes(
         deviceType: data.device_type || null,
         browser: data.browser || null,
         os: data.os || null,
-      });
+      }, customRulesForDetection);
 
       const event = await storage.insertEvent({
         page: data.page,
@@ -179,7 +192,7 @@ export async function registerRoutes(
         ipType: data.ip_type || null,
         funnelId: data.funnel_id || null,
         isBot: botCheck.isBot ? 1 : 0,
-        botReason: botCheck.isBot ? botCheck.reasons.join(";") : null,
+        botReason: botCheck.isBot ? (botCheck.botType ? botCheck.botType + "|" + botCheck.reasons.join(";") : botCheck.reasons.join(";")) : null,
       });
 
       (async () => {
@@ -490,6 +503,15 @@ export async function registerRoutes(
   app.post("/api/analytics/rescan-bots", isAuthenticated, async (req, res) => {
     try {
       const allEvents = await storage.getAllEventsForBotRescan();
+      const customRules = await storage.getBotRules();
+      const customRulesForDetection = customRules.map(r => ({
+        id: r.id,
+        ruleType: r.ruleType as "ip_prefix" | "ua_pattern",
+        value: r.value,
+        label: r.label,
+        enabled: r.enabled === 1,
+        createdAt: r.createdAt?.toISOString() || "",
+      }));
       let flagged = 0;
       for (const event of allEvents) {
         const botCheck = detectBot({
@@ -501,9 +523,9 @@ export async function registerRoutes(
           deviceType: event.deviceType,
           browser: event.browser,
           os: event.os,
-        });
+        }, customRulesForDetection);
         const newIsBot = botCheck.isBot ? 1 : 0;
-        const newReason = botCheck.isBot ? botCheck.reasons.join(";") : null;
+        const newReason = botCheck.isBot ? (botCheck.botType ? botCheck.botType + "|" + botCheck.reasons.join(";") : botCheck.reasons.join(";")) : null;
         if (newIsBot !== (event.isBot || 0) || newReason !== event.botReason) {
           await storage.updateEventBotStatus(event.id, newIsBot, newReason);
           if (newIsBot) flagged++;
@@ -534,6 +556,67 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error purging bots:", error);
       res.status(500).json({ message: "Failed to purge bot traffic" });
+    }
+  });
+
+  app.get("/api/bot-rules", isAuthenticated, async (_req, res) => {
+    try {
+      const rules = await storage.getBotRules();
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching bot rules:", error);
+      res.status(500).json({ message: "Failed to fetch bot rules" });
+    }
+  });
+
+  app.post("/api/bot-rules", isAuthenticated, async (req, res) => {
+    try {
+      const { ruleType, value, label, enabled } = req.body;
+      if (!ruleType || !value || !label) {
+        return res.status(400).json({ message: "ruleType, value, and label are required" });
+      }
+      if (!["ip_prefix", "ua_pattern"].includes(ruleType)) {
+        return res.status(400).json({ message: "ruleType must be ip_prefix or ua_pattern" });
+      }
+      const rule = await storage.insertBotRule({
+        ruleType,
+        value,
+        label,
+        enabled: enabled !== undefined ? enabled : 1,
+      });
+      res.json(rule);
+    } catch (error) {
+      console.error("Error creating bot rule:", error);
+      res.status(500).json({ message: "Failed to create bot rule" });
+    }
+  });
+
+  app.patch("/api/bot-rules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates: any = {};
+      if (req.body.enabled !== undefined) updates.enabled = req.body.enabled;
+      if (req.body.value !== undefined) updates.value = req.body.value;
+      if (req.body.label !== undefined) updates.label = req.body.label;
+      if (req.body.ruleType !== undefined) updates.ruleType = req.body.ruleType;
+      const rule = await storage.updateBotRule(id, updates);
+      if (!rule) return res.status(404).json({ message: "Rule not found" });
+      res.json(rule);
+    } catch (error) {
+      console.error("Error updating bot rule:", error);
+      res.status(500).json({ message: "Failed to update bot rule" });
+    }
+  });
+
+  app.delete("/api/bot-rules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteBotRule(id);
+      if (!deleted) return res.status(404).json({ message: "Rule not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting bot rule:", error);
+      res.status(500).json({ message: "Failed to delete bot rule" });
     }
   });
 
