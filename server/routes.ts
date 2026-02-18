@@ -1001,6 +1001,51 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/facebook/daily-campaign-insights", isAuthenticated, async (req, res) => {
+    try {
+      if (!facebook.isConfigured()) {
+        return res.status(500).json({ message: "Facebook API not configured" });
+      }
+      const adAccountId = req.query.adAccountId as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!adAccountId || !startDate || !endDate) {
+        return res.status(400).json({ message: "adAccountId, startDate, endDate required" });
+      }
+      const insights = await facebook.getDailyCampaignInsights(adAccountId, startDate, endDate);
+      res.json(insights);
+    } catch (error) {
+      if (error instanceof facebook.FacebookApiError) {
+        return res.status(error.httpStatus).json({ message: error.message, code: error.code });
+      }
+      console.error("Error fetching daily campaign insights:", error);
+      res.status(500).json({ message: "Failed to fetch daily campaign insights" });
+    }
+  });
+
+  app.get("/api/facebook/all-insights", isAuthenticated, async (req, res) => {
+    try {
+      if (!facebook.isConfigured()) {
+        return res.status(500).json({ message: "Facebook API not configured" });
+      }
+      const adAccountId = req.query.adAccountId as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const includeRaw = req.query.includeRaw === "true";
+      if (!adAccountId || !startDate || !endDate) {
+        return res.status(400).json({ message: "adAccountId, startDate, endDate required" });
+      }
+      const insights = await facebook.getAdInsightsAll(adAccountId, startDate, endDate, includeRaw);
+      res.json(insights);
+    } catch (error) {
+      if (error instanceof facebook.FacebookApiError) {
+        return res.status(error.httpStatus).json({ message: error.message, code: error.code });
+      }
+      console.error("Error fetching all insights:", error);
+      res.status(500).json({ message: "Failed to fetch all insights" });
+    }
+  });
+
   app.post("/api/facebook/refresh-token", isAuthenticated, async (_req, res) => {
     try {
       const result = await facebook.refreshAccessToken();

@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,7 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { RefreshCw, ChevronRight, ChevronDown, TrendingUp, DollarSign, Eye, MousePointerClick, Users, ArrowLeft, CalendarIcon } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ChevronRight, ChevronDown, TrendingUp, DollarSign, Eye, MousePointerClick, Users, CalendarIcon, Columns3, Target, Link2 } from "lucide-react";
 import { SiFacebook } from "react-icons/si";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
 
@@ -32,6 +35,37 @@ interface NormalizedInsight {
   purchases: number;
   costPerPurchase: number;
   linkClicks: number;
+  results: number;
+  resultRate: number;
+  costPerResult: number;
+  outboundClicks: number;
+  costPerOutboundClick: number;
+  outboundCtr: number;
+  thruPlays: number;
+  costPerThruPlay: number;
+  videoPlays: number;
+  videoAvgPlayTime: number;
+  videoP25: number;
+  videoP50: number;
+  videoP75: number;
+  videoP95: number;
+  videoP100: number;
+  video2SecPlays: number;
+  costPer2SecPlay: number;
+  video3SecPlays: number;
+  costPer3SecPlay: number;
+  video3SecRate: number;
+  searches: number;
+  costPerCall: number;
+  callRate: number;
+  contacts: number;
+  costPerContact: number;
+  contactRate: number;
+  landingPageConversionRate: number;
+  costPer1000Reached: number;
+  qualityRanking: string;
+  engagementRateRanking: string;
+  conversionRateRanking: string;
   dateStart: string;
   dateStop: string;
 }
@@ -46,26 +80,23 @@ interface AdAccount {
   business_name?: string;
 }
 
-function fmt$(v: number) {
-  return "$" + v.toFixed(2);
-}
-function fmtN(v: number) {
-  return v.toLocaleString();
-}
-function fmtPct(v: number) {
-  return v.toFixed(2) + "%";
+function fmt$(v: number) { return "$" + v.toFixed(2); }
+function fmtN(v: number) { return v.toLocaleString(); }
+function fmtPct(v: number) { return v.toFixed(2) + "%"; }
+function fmtTime(seconds: number) {
+  if (seconds < 60) return seconds.toFixed(1) + "s";
+  return Math.floor(seconds / 60) + "m " + Math.round(seconds % 60) + "s";
 }
 
 function toTzDateStr(d: Date, tz?: string): string {
   if (tz) {
     try {
-      const parts = new Intl.DateTimeFormat("en-CA", {
+      return new Intl.DateTimeFormat("en-CA", {
         timeZone: tz,
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
       }).format(d);
-      return parts;
     } catch {}
   }
   const y = d.getFullYear();
@@ -76,15 +107,13 @@ function toTzDateStr(d: Date, tz?: string): string {
 
 function getDefaultDates(tz?: string) {
   const now = new Date();
-  const end = toTzDateStr(now, tz);
-  const start = new Date(now.getTime() - 7 * 86400000);
   return {
-    startDate: toTzDateStr(start, tz),
-    endDate: end,
+    startDate: toTzDateStr(new Date(now.getTime() - 7 * 86400000), tz),
+    endDate: toTzDateStr(now, tz),
   };
 }
 
-const FB_DATE_PRESETS: { label: string; getRange: (tz?: string) => { start: Date; end: Date } }[] = [
+const FB_DATE_PRESETS: { label: string; getRange: () => { start: Date; end: Date } }[] = [
   { label: "Today", getRange: () => { const d = new Date(); return { start: d, end: d }; } },
   { label: "Yesterday", getRange: () => { const d = subDays(new Date(), 1); return { start: d, end: d }; } },
   { label: "Last 7 Days", getRange: () => ({ start: subDays(new Date(), 6), end: new Date() }) },
@@ -99,7 +128,112 @@ const FB_DATE_PRESETS: { label: string; getRange: (tz?: string) => { start: Date
   }},
 ];
 
-function StatCard({ label, value, icon: Icon, sub }: { label: string; value: string; icon: any; sub?: string }) {
+type DrillLevel = "campaigns" | "adsets" | "ads";
+
+interface ColumnDef {
+  key: string;
+  label: string;
+  isCustom?: boolean;
+  render: (row: NormalizedInsight) => string | JSX.Element;
+  align?: "left" | "right";
+}
+
+function RankingBadge({ value }: { value: string }) {
+  if (!value || value === "" || value === "UNKNOWN") return <span className="text-muted-foreground">-</span>;
+  const lower = value.toLowerCase().replace(/_/g, " ");
+  if (value.includes("ABOVE_AVERAGE")) {
+    return <Badge variant="outline" className="text-[9px] border-green-500/50 text-green-600 dark:text-green-400 no-default-hover-elevate no-default-active-elevate">{lower}</Badge>;
+  }
+  if (value === "AVERAGE") {
+    return <Badge variant="outline" className="text-[9px] border-yellow-500/50 text-yellow-600 dark:text-yellow-400 no-default-hover-elevate no-default-active-elevate">{lower}</Badge>;
+  }
+  if (value.includes("BELOW_AVERAGE")) {
+    return <Badge variant="outline" className="text-[9px] border-red-500/50 text-red-600 dark:text-red-400 no-default-hover-elevate no-default-active-elevate">{lower}</Badge>;
+  }
+  return <Badge variant="outline" className="text-[9px] no-default-hover-elevate no-default-active-elevate">{lower}</Badge>;
+}
+
+function buildColumns(drillLevel: DrillLevel): ColumnDef[] {
+  const nameLabel = drillLevel === "campaigns" ? "Campaign" : drillLevel === "adsets" ? "Ad Set" : "Ad";
+
+  const getName = (row: NormalizedInsight) => {
+    if (drillLevel === "campaigns") return row.campaignName || row.campaignId || "-";
+    if (drillLevel === "adsets") return row.adsetName || row.adsetId || "-";
+    return row.adName || row.adId || "-";
+  };
+
+  return [
+    { key: "name", label: nameLabel, align: "left", render: (row) => getName(row) },
+    { key: "delivery", label: "Delivery", align: "left", render: () => <Badge variant="outline" className="text-[9px] no-default-hover-elevate no-default-active-elevate">Active</Badge> },
+    { key: "campaignId", label: "Campaign ID", align: "left", render: (row) => row.campaignId || "-" },
+    { key: "adsetId", label: "Ad Set ID", align: "left", render: (row) => row.adsetId || "-" },
+    { key: "adId", label: "Ad ID", align: "left", render: (row) => row.adId || "-" },
+    { key: "budget", label: "Budget", align: "right", render: (row) => fmt$(row.spend) },
+    { key: "amountSpent", label: "Amount Spent", align: "right", render: (row) => fmt$(row.spend) },
+    { key: "frequency", label: "Frequency", align: "right", render: (row) => row.frequency.toFixed(2) },
+    { key: "impressions", label: "Impressions", align: "right", render: (row) => fmtN(row.impressions) },
+    { key: "cpm", label: "CPM", align: "right", render: (row) => fmt$(row.cpm) },
+    { key: "reach", label: "Reach", align: "right", render: (row) => fmtN(row.reach) },
+    { key: "costPer1000Reached", label: "Cost per 1,000 Reached", align: "right", render: (row) => fmt$(row.costPer1000Reached) },
+    { key: "cpc", label: "CPC (All)", align: "right", render: (row) => fmt$(row.cpc) },
+    { key: "clicks", label: "Clicks (All)", align: "right", render: (row) => fmtN(row.clicks) },
+    { key: "ctr", label: "CTR (All)", align: "right", render: (row) => fmtPct(row.ctr) },
+    { key: "cpcLinkClick", label: "CPC (Link Click)", align: "right", render: (row) => row.linkClicks > 0 ? fmt$(row.spend / row.linkClicks) : "-" },
+    { key: "linkClicks", label: "Link Clicks", align: "right", render: (row) => row.linkClicks > 0 ? fmtN(row.linkClicks) : "-" },
+    { key: "costPerOutboundClick", label: "Cost per Outbound Click", align: "right", render: (row) => row.costPerOutboundClick > 0 ? fmt$(row.costPerOutboundClick) : "-" },
+    { key: "outboundClicks", label: "Outbound Clicks", align: "right", render: (row) => row.outboundClicks > 0 ? fmtN(row.outboundClicks) : "-" },
+    { key: "outboundCtr", label: "Outbound CTR", align: "right", render: (row) => row.outboundCtr > 0 ? fmtPct(row.outboundCtr) : "-" },
+    { key: "results", label: "Results", align: "right", render: (row) => row.results > 0 ? fmtN(row.results) : "-" },
+    { key: "resultRate", label: "Result Rate", align: "right", render: (row) => row.resultRate > 0 ? fmtPct(row.resultRate) : "-" },
+    { key: "costPerResult", label: "Cost per Result", align: "right", render: (row) => row.costPerResult > 0 ? fmt$(row.costPerResult) : "-" },
+    { key: "leads", label: "Leads", align: "right", render: (row) => row.leads > 0 ? fmtN(row.leads) : "-" },
+    { key: "costPerLead", label: "Cost Per Lead", align: "right", isCustom: true, render: (row) => row.leads > 0 ? fmt$(row.spend / row.leads) : "-" },
+    { key: "landingPageConversionRate", label: "Landing Page Conv. Rate", align: "right", isCustom: true, render: (row) => row.linkClicks > 0 ? fmtPct((row.leads / row.linkClicks) * 100) : "-" },
+    { key: "searches", label: "Searches", align: "right", render: (row) => row.searches > 0 ? fmtN(row.searches) : "-" },
+    { key: "costPerCall", label: "Cost Per Call", align: "right", isCustom: true, render: (row) => row.searches > 0 ? fmt$(row.spend / row.searches) : "-" },
+    { key: "callRate", label: "Call Rate", align: "right", isCustom: true, render: (row) => row.leads > 0 ? fmtPct((row.searches / row.leads) * 100) : "-" },
+    { key: "contacts", label: "Contacts", align: "right", render: (row) => row.contacts > 0 ? fmtN(row.contacts) : "-" },
+    { key: "costPerContact", label: "Cost Per Contact", align: "right", isCustom: true, render: (row) => row.contacts > 0 ? fmt$(row.spend / row.contacts) : "-" },
+    { key: "contactRate", label: "Contact Rate", align: "right", isCustom: true, render: (row) => row.leads > 0 ? fmtPct((row.contacts / row.leads) * 100) : "-" },
+    { key: "videoPlays", label: "Video Plays", align: "right", render: (row) => row.videoPlays > 0 ? fmtN(row.videoPlays) : "-" },
+    { key: "costPerThruPlay", label: "Cost per ThruPlay", align: "right", render: (row) => row.costPerThruPlay > 0 ? fmt$(row.costPerThruPlay) : "-" },
+    { key: "thruPlays", label: "ThruPlays", align: "right", render: (row) => row.thruPlays > 0 ? fmtN(row.thruPlays) : "-" },
+    { key: "video2SecPlays", label: "2-Sec Video Plays", align: "right", render: (row) => row.video2SecPlays > 0 ? fmtN(row.video2SecPlays) : "-" },
+    { key: "costPer2SecPlay", label: "Cost per 2-Sec Play", align: "right", render: (row) => row.costPer2SecPlay > 0 ? fmt$(row.costPer2SecPlay) : "-" },
+    { key: "video3SecPlays", label: "3-Sec Video Plays", align: "right", render: (row) => row.video3SecPlays > 0 ? fmtN(row.video3SecPlays) : "-" },
+    { key: "costPer3SecPlay", label: "Cost per 3-Sec Play", align: "right", render: (row) => row.costPer3SecPlay > 0 ? fmt$(row.costPer3SecPlay) : "-" },
+    { key: "video3SecRate", label: "3-Sec Rate per Impr.", align: "right", render: (row) => row.video3SecRate > 0 ? fmtPct(row.video3SecRate) : "-" },
+    { key: "videoAvgPlayTime", label: "Avg Play Time", align: "right", render: (row) => row.videoAvgPlayTime > 0 ? fmtTime(row.videoAvgPlayTime) : "-" },
+    { key: "videoP25", label: "Video 25%", align: "right", render: (row) => row.videoP25 > 0 ? fmtN(row.videoP25) : "-" },
+    { key: "videoP50", label: "Video 50%", align: "right", render: (row) => row.videoP50 > 0 ? fmtN(row.videoP50) : "-" },
+    { key: "videoP75", label: "Video 75%", align: "right", render: (row) => row.videoP75 > 0 ? fmtN(row.videoP75) : "-" },
+    { key: "videoP95", label: "Video 95%", align: "right", render: (row) => row.videoP95 > 0 ? fmtN(row.videoP95) : "-" },
+    { key: "videoP100", label: "Video 100%", align: "right", render: (row) => row.videoP100 > 0 ? fmtN(row.videoP100) : "-" },
+    { key: "qualityRanking", label: "Quality Ranking", align: "left", render: (row) => <RankingBadge value={row.qualityRanking} /> },
+    { key: "engagementRateRanking", label: "Engagement Ranking", align: "left", render: (row) => <RankingBadge value={row.engagementRateRanking} /> },
+    { key: "conversionRateRanking", label: "Conversion Ranking", align: "left", render: (row) => <RankingBadge value={row.conversionRateRanking} /> },
+  ];
+}
+
+const ALL_COLUMN_KEYS = buildColumns("campaigns").map(c => c.key);
+const STORAGE_KEY = "fb-ads-visible-columns";
+
+function loadVisibleColumns(): Set<string> {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const arr = JSON.parse(stored);
+      if (Array.isArray(arr) && arr.length > 0) return new Set(arr);
+    }
+  } catch {}
+  return new Set(ALL_COLUMN_KEYS);
+}
+
+function saveVisibleColumns(cols: Set<string>) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(cols)));
+}
+
+function StatCard({ label, value, icon: Icon }: { label: string; value: string; icon: any }) {
   return (
     <Card>
       <CardContent className="p-3">
@@ -107,7 +241,6 @@ function StatCard({ label, value, icon: Icon, sub }: { label: string; value: str
           <div className="min-w-0">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide truncate">{label}</p>
             <p className="text-lg font-bold tabular-nums" data-testid={`stat-${label.toLowerCase().replace(/\s/g, "-")}`}>{value}</p>
-            {sub && <p className="text-[10px] text-muted-foreground truncate">{sub}</p>}
           </div>
           <div className="shrink-0 p-2 rounded-md bg-primary/10">
             <Icon className="w-4 h-4 text-primary" />
@@ -118,175 +251,6 @@ function StatCard({ label, value, icon: Icon, sub }: { label: string; value: str
   );
 }
 
-function CampaignTable({ data, onDrill }: { data: NormalizedInsight[]; onDrill: (id: string, name: string) => void }) {
-  const sorted = useMemo(() => [...data].sort((a, b) => b.spend - a.spend), [data]);
-
-  if (sorted.length === 0) {
-    return <p className="text-[10px] text-muted-foreground text-center py-4">No campaign data for this period.</p>;
-  }
-
-  return (
-    <div className="overflow-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap sticky left-0 bg-background z-10">Campaign</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Spend</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Impr.</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Reach</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Clicks</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CTR</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CPC</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CPM</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Freq.</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Leads</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CPL</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Link Clicks</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sorted.map((row) => (
-            <TableRow
-              key={row.campaignId}
-              className="cursor-pointer hover-elevate"
-              onClick={() => onDrill(row.campaignId!, row.campaignName || row.campaignId!)}
-              data-testid={`row-campaign-${row.campaignId}`}
-            >
-              <TableCell className="text-[10px] py-1 px-2 max-w-[200px] truncate sticky left-0 bg-background z-10">
-                <div className="flex items-center gap-1">
-                  <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="truncate font-medium">{row.campaignName || row.campaignId}</span>
-                </div>
-              </TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums font-medium">{fmt$(row.spend)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtN(row.impressions)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtN(row.reach)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtN(row.clicks)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtPct(row.ctr)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmt$(row.cpc)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmt$(row.cpm)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{row.frequency.toFixed(2)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{row.leads > 0 ? fmtN(row.leads) : "-"}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{row.costPerLead > 0 ? fmt$(row.costPerLead) : "-"}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{row.linkClicks > 0 ? fmtN(row.linkClicks) : "-"}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function AdsetTable({ data, onDrill }: { data: NormalizedInsight[]; onDrill: (id: string, name: string) => void }) {
-  const sorted = useMemo(() => [...data].sort((a, b) => b.spend - a.spend), [data]);
-
-  if (sorted.length === 0) {
-    return <p className="text-[10px] text-muted-foreground text-center py-4">No ad set data for this period.</p>;
-  }
-
-  return (
-    <div className="overflow-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap sticky left-0 bg-background z-10">Ad Set</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Spend</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Impr.</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Reach</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Clicks</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CTR</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CPC</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CPM</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Leads</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CPL</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sorted.map((row) => (
-            <TableRow
-              key={row.adsetId}
-              className="cursor-pointer hover-elevate"
-              onClick={() => onDrill(row.adsetId!, row.adsetName || row.adsetId!)}
-              data-testid={`row-adset-${row.adsetId}`}
-            >
-              <TableCell className="text-[10px] py-1 px-2 max-w-[200px] truncate sticky left-0 bg-background z-10">
-                <div className="flex items-center gap-1">
-                  <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="truncate font-medium">{row.adsetName || row.adsetId}</span>
-                </div>
-              </TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums font-medium">{fmt$(row.spend)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtN(row.impressions)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtN(row.reach)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtN(row.clicks)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtPct(row.ctr)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmt$(row.cpc)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmt$(row.cpm)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{row.leads > 0 ? fmtN(row.leads) : "-"}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{row.costPerLead > 0 ? fmt$(row.costPerLead) : "-"}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function AdTable({ data }: { data: NormalizedInsight[] }) {
-  const sorted = useMemo(() => [...data].sort((a, b) => b.spend - a.spend), [data]);
-
-  if (sorted.length === 0) {
-    return <p className="text-[10px] text-muted-foreground text-center py-4">No ad data for this period.</p>;
-  }
-
-  return (
-    <div className="overflow-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 whitespace-nowrap sticky left-0 bg-background z-10">Ad</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Spend</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Impr.</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Reach</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Clicks</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CTR</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CPC</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CPM</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">Leads</TableHead>
-            <TableHead className="text-[10px] font-semibold py-1 px-2 text-right whitespace-nowrap">CPL</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sorted.map((row) => (
-            <TableRow key={row.adId} data-testid={`row-ad-${row.adId}`}>
-              <TableCell className="text-[10px] py-1 px-2 max-w-[200px] truncate sticky left-0 bg-background z-10">
-                <span className="truncate font-medium">{row.adName || row.adId}</span>
-              </TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums font-medium">{fmt$(row.spend)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtN(row.impressions)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtN(row.reach)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtN(row.clicks)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmtPct(row.ctr)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmt$(row.cpc)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{fmt$(row.cpm)}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{row.leads > 0 ? fmtN(row.leads) : "-"}</TableCell>
-              <TableCell className="text-[10px] py-1 px-2 text-right tabular-nums">{row.costPerLead > 0 ? fmt$(row.costPerLead) : "-"}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-type DrillLevel = "campaigns" | "adsets" | "ads";
-
-interface Breadcrumb {
-  level: DrillLevel;
-  id: string;
-  name: string;
-}
-
 export default function FacebookAdsPage() {
   const defaults = getDefaultDates();
   const [selectedAccount, setSelectedAccount] = useState<string>("");
@@ -295,9 +259,27 @@ export default function FacebookAdsPage() {
   const [datePreset, setDatePreset] = useState("Last 7 Days");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [drillLevel, setDrillLevel] = useState<DrillLevel>("campaigns");
-  const [breadcrumbs, setBreadcrumbs] = useState<Breadcrumb[]>([]);
+  const [breadcrumbs, setBreadcrumbs] = useState<{ level: DrillLevel; id: string; name: string }[]>([]);
   const [currentDrillId, setCurrentDrillId] = useState<string>("");
   const [drilledCampaignId, setDrilledCampaignId] = useState<string>("");
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(loadVisibleColumns);
+
+  useEffect(() => {
+    saveVisibleColumns(visibleColumns);
+  }, [visibleColumns]);
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (key === "name") return next;
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const { data: accounts, isLoading: accountsLoading, error: accountsError } = useQuery<AdAccount[]>({
     queryKey: ["/api/facebook/ad-accounts"],
@@ -307,7 +289,7 @@ export default function FacebookAdsPage() {
   const accountTz = selectedAccountObj?.timezone_name;
 
   const applyPreset = (preset: typeof FB_DATE_PRESETS[number]) => {
-    const { start, end } = preset.getRange(accountTz);
+    const { start, end } = preset.getRange();
     setStartDate(toTzDateStr(start, accountTz));
     setEndDate(toTzDateStr(end, accountTz));
     setDatePreset(preset.label);
@@ -324,7 +306,7 @@ export default function FacebookAdsPage() {
     },
   });
 
-  const { data: campaigns, isLoading: campaignsLoading, refetch: refetchCampaigns } = useQuery<NormalizedInsight[]>({
+  const { data: campaigns, isLoading: campaignsLoading } = useQuery<NormalizedInsight[]>({
     queryKey: ["/api/facebook/campaigns", selectedAccount, startDate, endDate],
     enabled: !!selectedAccount && drillLevel === "campaigns",
     queryFn: async () => {
@@ -356,6 +338,18 @@ export default function FacebookAdsPage() {
 
   const summary = accountInsights?.[0];
 
+  const currentData = useMemo(() => {
+    const raw = drillLevel === "campaigns" ? campaigns : drillLevel === "adsets" ? adsets : ads;
+    if (!raw) return [];
+    return [...raw].sort((a, b) => b.spend - a.spend);
+  }, [drillLevel, campaigns, adsets, ads]);
+
+  const isTableLoading = drillLevel === "campaigns" ? campaignsLoading : drillLevel === "adsets" ? adsetsLoading : adsLoading;
+
+  const columns = useMemo(() => buildColumns(drillLevel), [drillLevel]);
+  const allColumnDefs = useMemo(() => buildColumns("campaigns"), []);
+  const visibleCols = useMemo(() => columns.filter(c => visibleColumns.has(c.key)), [columns, visibleColumns]);
+
   const drillIntoCampaign = (campaignId: string, campaignName: string) => {
     setDrilledCampaignId(campaignId);
     setCurrentDrillId(campaignId);
@@ -379,34 +373,40 @@ export default function FacebookAdsPage() {
       setBreadcrumbs([]);
     } else {
       const bc = breadcrumbs[index];
-      const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
-      setBreadcrumbs(newBreadcrumbs);
+      setBreadcrumbs(breadcrumbs.slice(0, index + 1));
       setCurrentDrillId(bc.id);
       setDrillLevel(bc.level);
     }
   };
 
-  const goBack = () => {
-    if (drillLevel === "ads") {
-      setCurrentDrillId(drilledCampaignId);
-      setDrillLevel("adsets");
-      setBreadcrumbs(prev => prev.slice(0, -1));
+  const getRowKey = (row: NormalizedInsight) => {
+    if (drillLevel === "campaigns") return row.campaignId || "";
+    if (drillLevel === "adsets") return row.adsetId || "";
+    return row.adId || "";
+  };
+
+  const getRowName = (row: NormalizedInsight) => {
+    if (drillLevel === "campaigns") return row.campaignName || row.campaignId || "";
+    if (drillLevel === "adsets") return row.adsetName || row.adsetId || "";
+    return row.adName || row.adId || "";
+  };
+
+  const onRowClick = (row: NormalizedInsight) => {
+    if (drillLevel === "campaigns") {
+      drillIntoCampaign(row.campaignId!, row.campaignName || row.campaignId!);
     } else if (drillLevel === "adsets") {
-      setDrillLevel("campaigns");
-      setCurrentDrillId("");
-      setDrilledCampaignId("");
-      setBreadcrumbs([]);
+      drillIntoAdset(row.adsetId!, row.adsetName || row.adsetId!);
     }
   };
 
-  const isTableLoading = drillLevel === "campaigns" ? campaignsLoading : drillLevel === "adsets" ? adsetsLoading : adsLoading;
+  const canDrill = drillLevel !== "ads";
 
   return (
     <div className="p-3 space-y-3" data-testid="page-facebook-ads">
       <div className="flex items-center gap-2 flex-wrap">
         <SiFacebook className="w-5 h-5 text-[#1877F2]" />
         <h1 className="text-base font-bold">Facebook Ads</h1>
-        <Badge variant="outline" className="text-[9px]">Meta Marketing API v24.0</Badge>
+        <Badge variant="outline" className="text-[9px] no-default-hover-elevate no-default-active-elevate">Meta Marketing API v24.0</Badge>
       </div>
 
       <Card>
@@ -419,7 +419,19 @@ export default function FacebookAdsPage() {
               ) : accountsError ? (
                 <p className="text-[10px] text-destructive">Failed to load accounts. Check your access token.</p>
               ) : (
-                <Select value={selectedAccount} onValueChange={(v) => { setSelectedAccount(v); setDrillLevel("campaigns"); setBreadcrumbs([]); setCurrentDrillId(""); setDrilledCampaignId(""); const acct = accounts?.find(a => a.id === v); if (acct?.timezone_name) { const d = getDefaultDates(acct.timezone_name); setStartDate(d.startDate); setEndDate(d.endDate); } }}>
+                <Select value={selectedAccount} onValueChange={(v) => {
+                  setSelectedAccount(v);
+                  setDrillLevel("campaigns");
+                  setBreadcrumbs([]);
+                  setCurrentDrillId("");
+                  setDrilledCampaignId("");
+                  const acct = accounts?.find(a => a.id === v);
+                  if (acct?.timezone_name) {
+                    const d = getDefaultDates(acct.timezone_name);
+                    setStartDate(d.startDate);
+                    setEndDate(d.endDate);
+                  }
+                }}>
                   <SelectTrigger className="w-[280px]" data-testid="select-ad-account">
                     <SelectValue placeholder="Select ad account" />
                   </SelectTrigger>
@@ -471,48 +483,8 @@ export default function FacebookAdsPage() {
                           {preset.label}
                         </button>
                       ))}
-                      <div className="border-t my-1" />
-                      <button
-                        data-testid="btn-preset-custom"
-                        className={`w-full text-left text-[11px] px-3 py-1.5 rounded-md transition-colors ${
-                          datePreset === "Custom"
-                            ? "bg-primary text-primary-foreground"
-                            : "hover-elevate"
-                        }`}
-                        onClick={() => setDatePreset("Custom")}
-                      >
-                        Custom
-                      </button>
                     </div>
-                    <div className="p-3">
-                      <div className="flex gap-2 mb-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-medium text-muted-foreground uppercase">Start</label>
-                          <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => {
-                              setStartDate(e.target.value);
-                              setDatePreset("Custom");
-                            }}
-                            className="h-9 rounded-md border px-2 text-[11px] bg-background w-[130px]"
-                            data-testid="input-start-date"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-medium text-muted-foreground uppercase">End</label>
-                          <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => {
-                              setEndDate(e.target.value);
-                              setDatePreset("Custom");
-                            }}
-                            className="h-9 rounded-md border px-2 text-[11px] bg-background w-[130px]"
-                            data-testid="input-end-date"
-                          />
-                        </div>
-                      </div>
+                    <div className="p-2">
                       <Calendar
                         mode="range"
                         selected={{
@@ -522,131 +494,183 @@ export default function FacebookAdsPage() {
                         onSelect={(range) => {
                           if (range?.from) {
                             setStartDate(toTzDateStr(range.from, accountTz));
-                            if (range.to) {
-                              setEndDate(toTzDateStr(range.to, accountTz));
-                            } else {
-                              setEndDate(toTzDateStr(range.from, accountTz));
-                            }
+                            setEndDate(toTzDateStr(range.to || range.from, accountTz));
                             setDatePreset("Custom");
                           }
                         }}
                         numberOfMonths={2}
-                        className="rounded-md"
-                        data-testid="calendar-range"
+                        data-testid="calendar-date-range"
                       />
-                      <div className="flex justify-end gap-2 mt-3 pt-3 border-t">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDatePickerOpen(false)}
-                          data-testid="button-date-cancel"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => setDatePickerOpen(false)}
-                          data-testid="button-date-apply"
-                        >
-                          Apply
-                        </Button>
-                      </div>
                     </div>
                   </div>
                 </PopoverContent>
               </Popover>
             </div>
 
-            {selectedAccount && (
-              <Button variant="outline" size="sm" onClick={() => refetchCampaigns()} className="text-[10px] gap-1" data-testid="btn-refresh-fb">
-                <RefreshCw className="w-3 h-3" />
-                Refresh
-              </Button>
-            )}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" data-testid="button-columns">
+                  <Columns3 className="w-3.5 h-3.5 mr-1.5" />
+                  <span className="text-[11px]">Columns</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Customize Columns</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 flex gap-2 mb-3">
+                  <Button variant="outline" size="sm" onClick={() => setVisibleColumns(new Set(ALL_COLUMN_KEYS))} data-testid="button-show-all-columns">
+                    <span className="text-[11px]">Show All</span>
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setVisibleColumns(new Set(["name"]))} data-testid="button-hide-all-columns">
+                    <span className="text-[11px]">Hide All</span>
+                  </Button>
+                </div>
+                <ScrollArea className="h-[calc(100vh-10rem)]">
+                  <div className="space-y-1 pr-4">
+                    {allColumnDefs.map((col) => (
+                      <label
+                        key={col.key}
+                        className="flex items-center gap-2 py-1.5 px-2 rounded-md hover-elevate cursor-pointer"
+                        data-testid={`column-toggle-${col.key}`}
+                      >
+                        <Checkbox
+                          checked={visibleColumns.has(col.key)}
+                          onCheckedChange={() => toggleColumn(col.key)}
+                          disabled={col.key === "name"}
+                        />
+                        <span className="text-[11px] flex-1">{col.label}</span>
+                        {col.isCustom && (
+                          <Badge variant="secondary" className="text-[8px] no-default-hover-elevate no-default-active-elevate">Custom</Badge>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </SheetContent>
+            </Sheet>
           </div>
         </CardContent>
       </Card>
 
+      {selectedAccount && summary && !summaryLoading && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+          <StatCard label="Total Spend" value={fmt$(summary.spend)} icon={DollarSign} />
+          <StatCard label="Impressions" value={fmtN(summary.impressions)} icon={Eye} />
+          <StatCard label="Reach" value={fmtN(summary.reach)} icon={Users} />
+          <StatCard label="Clicks" value={fmtN(summary.clicks)} icon={MousePointerClick} />
+          <StatCard label="CTR" value={fmtPct(summary.ctr)} icon={TrendingUp} />
+          <StatCard label="Leads" value={fmtN(summary.leads)} icon={Target} />
+          <StatCard label="CPL" value={summary.leads > 0 ? fmt$(summary.spend / summary.leads) : "-"} icon={DollarSign} />
+          <StatCard label="Link Clicks" value={summary.linkClicks > 0 ? fmtN(summary.linkClicks) : "-"} icon={Link2} />
+        </div>
+      )}
+
+      {selectedAccount && summaryLoading && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Card key={i}><CardContent className="p-3"><Skeleton className="h-12 w-full" /></CardContent></Card>
+          ))}
+        </div>
+      )}
+
+      {breadcrumbs.length > 0 && (
+        <div className="flex items-center gap-1 text-[11px] flex-wrap" data-testid="breadcrumbs">
+          <button
+            className="text-primary font-medium hover-elevate px-1.5 py-0.5 rounded-md"
+            onClick={() => navigateToBreadcrumb(0)}
+            data-testid="breadcrumb-campaigns"
+          >
+            Campaigns
+          </button>
+          {breadcrumbs.slice(1).map((bc, i) => (
+            <span key={i} className="flex items-center gap-1">
+              <ChevronRight className="w-3 h-3 text-muted-foreground" />
+              <button
+                className={`px-1.5 py-0.5 rounded-md ${i === breadcrumbs.length - 2 ? "font-medium text-foreground" : "text-primary font-medium hover-elevate"}`}
+                onClick={() => navigateToBreadcrumb(i + 1)}
+                data-testid={`breadcrumb-${bc.level}-${bc.id}`}
+              >
+                {bc.name}
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {selectedAccount && (
-        <>
-          {summaryLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20" />)}
-            </div>
-          ) : summary ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              <StatCard label="Total Spend" value={fmt$(summary.spend)} icon={DollarSign} />
-              <StatCard label="Impressions" value={fmtN(summary.impressions)} icon={Eye} />
-              <StatCard label="Reach" value={fmtN(summary.reach)} icon={Users} />
-              <StatCard label="Clicks" value={fmtN(summary.clicks)} icon={MousePointerClick} sub={`CTR: ${fmtPct(summary.ctr)}`} />
-              <StatCard label="CPC" value={fmt$(summary.cpc)} icon={TrendingUp} sub={`CPM: ${fmt$(summary.cpm)}`} />
-              <StatCard label="Leads" value={fmtN(summary.leads)} icon={TrendingUp} sub={summary.costPerLead > 0 ? `CPL: ${fmt$(summary.costPerLead)}` : undefined} />
-            </div>
-          ) : null}
-
-          <Card>
-            <CardHeader className="p-3 pb-0">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  {drillLevel !== "campaigns" && (
-                    <Button variant="ghost" size="icon" onClick={goBack} data-testid="btn-drill-back">
-                      <ArrowLeft className="w-4 h-4" />
-                    </Button>
-                  )}
-                  <CardTitle className="text-xs font-semibold">
-                    {drillLevel === "campaigns" ? "Campaigns" : drillLevel === "adsets" ? "Ad Sets" : "Ads"}
-                  </CardTitle>
-                </div>
-
-                {breadcrumbs.length > 0 && (
-                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground flex-wrap">
-                    <span
-                      className="cursor-pointer hover:text-foreground"
-                      onClick={() => navigateToBreadcrumb(0)}
-                      data-testid="breadcrumb-root"
-                    >
-                      All Campaigns
+        <div className="overflow-auto border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {visibleCols.map((col, ci) => (
+                  <TableHead
+                    key={col.key}
+                    className={`text-[10px] font-semibold py-1 px-2 whitespace-nowrap ${ci === 0 ? "sticky left-0 bg-background z-20" : ""} ${col.align === "right" ? "text-right" : ""}`}
+                  >
+                    <span className="flex items-center gap-1">
+                      {col.label}
+                      {col.isCustom && <Badge variant="secondary" className="text-[7px] px-1 py-0 no-default-hover-elevate no-default-active-elevate">C</Badge>}
                     </span>
-                    {breadcrumbs.slice(1).map((bc, i) => (
-                      <span key={i} className="flex items-center gap-1">
-                        <ChevronRight className="w-3 h-3" />
-                        <span
-                          className={i < breadcrumbs.length - 2 ? "cursor-pointer hover:text-foreground" : "text-foreground font-medium"}
-                          onClick={() => i < breadcrumbs.length - 2 && navigateToBreadcrumb(i + 1)}
-                        >
-                          {bc.name}
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="p-2">
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {isTableLoading ? (
-                <div className="space-y-1">
-                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
-                </div>
-              ) : drillLevel === "campaigns" ? (
-                <CampaignTable data={campaigns || []} onDrill={drillIntoCampaign} />
-              ) : drillLevel === "adsets" ? (
-                <AdsetTable data={adsets || []} onDrill={drillIntoAdset} />
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {visibleCols.map((col, ci) => (
+                      <TableCell key={col.key} className={`py-1 px-2 ${ci === 0 ? "sticky left-0 bg-background z-10" : ""}`}>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : currentData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={visibleCols.length} className="text-center text-[10px] text-muted-foreground py-8">
+                    No data for this period.
+                  </TableCell>
+                </TableRow>
               ) : (
-                <AdTable data={ads || []} />
+                currentData.map((row) => {
+                  const rowKey = getRowKey(row);
+                  return (
+                    <TableRow
+                      key={rowKey}
+                      className={canDrill ? "cursor-pointer hover-elevate" : ""}
+                      onClick={canDrill ? () => onRowClick(row) : undefined}
+                      data-testid={`row-${drillLevel.slice(0, -1)}-${rowKey}`}
+                    >
+                      {visibleCols.map((col, ci) => (
+                        <TableCell
+                          key={col.key}
+                          className={`text-[10px] py-1 px-2 tabular-nums ${ci === 0 ? "sticky left-0 bg-background z-10 max-w-[200px]" : ""} ${col.align === "right" ? "text-right" : ""} ${col.key === "amountSpent" || col.key === "budget" ? "font-medium" : ""}`}
+                        >
+                          {ci === 0 ? (
+                            <div className="flex items-center gap-1">
+                              {canDrill && <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />}
+                              <span className="truncate font-medium">{col.render(row)}</span>
+                            </div>
+                          ) : (
+                            col.render(row)
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })
               )}
-            </CardContent>
-          </Card>
-        </>
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       {!selectedAccount && !accountsLoading && (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <SiFacebook className="w-10 h-10 text-[#1877F2] mx-auto mb-3" />
-            <p className="text-sm font-medium mb-1">Select an Ad Account</p>
-            <p className="text-[11px] text-muted-foreground">Choose a Facebook ad account above to view campaign performance data from Meta's Marketing API.</p>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-center py-16">
+          <p className="text-sm text-muted-foreground">Select an ad account to view campaign data.</p>
+        </div>
       )}
     </div>
   );
