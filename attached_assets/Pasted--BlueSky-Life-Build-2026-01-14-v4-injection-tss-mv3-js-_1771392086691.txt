@@ -1,0 +1,153 @@
+🚀 BlueSky Life Build: 2026-01-14-v4
+injection-tss-mv3.js:408 📊 GTM Event: Object
+injection-tss-mv3.js:408 ✅ External IDs retrieved from cookies
+injection-tss-mv3.js:413 🌍 Attempting IP geolocation via ipapi.co...
+injection-tss-mv3.js:408 ✅ External IDs retrieved from cookies
+injection-tss-mv3.js:408 📊 GTM Event: Object
+injection-tss-mv3.js:413 [MetaParamBuilder] SDK initialized successfully
+injection-tss-mv3.js:413 [MetaParamBuilder] Values captured: Object
+injection-tss-mv3.js:413 [MetaParamBuilder] Tracking data pushed to dataLayer: Object
+res4.applovin.com/p/l/loader.iife.js:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENTUnderstand this error
+static.hotjar.com/c/hotjar-6572091.js?sv=6:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENTUnderstand this error
+sw_iframe.html?origin=https%3A%2F%2Fblueskylife.net&1p=1:7 Executing inline script violates the following Content Security Policy directive 'script-src 'none''. Either the 'unsafe-inline' keyword, a hash ('sha256-UREszZU+yrNftQ3a4GtI7Eyw200/0zWWNrDXxVP96tA='), or a nonce ('nonce-...') is required to enable inline execution. The policy is report-only, so the violation has been logged but no further action has been taken.
+content.js:15 Creating a worker from 'https://trk.blueskylife.net/_/service_worker/6240/sw.js?origin=https%3A%2F%2Fblueskylife.net' violates the following Content Security Policy directive: "script-src 'none'". Note that 'worker-src' was not explicitly set, so 'script-src' is used as a fallback. The policy is report-only, so the violation has been logged but no further action has been taken.
+sw_iframe.html?origin=https%3A%2F%2Fblueskylife.net&1p=1:1 Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015' violates the following Content Security Policy directive: "script-src 'none'". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The policy is report-only, so the violation has been logged but no further action has been taken.
+vcd15cbe7772f49c399c6a5babf22c1241717689176015:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENTUnderstand this error
+final-expense?first_name=test&last_name=test&name=test+test&email=test%40test.com&phone=9292153114&state=FL&coverage_amount=25000&gender=Male&dob=1945-02-02&nicotine=never&r=&results_modal_override=hide&skip_confirmation=1:60 Compiling or instantiating a WebAssembly module violates the following Content Security policy directive because 'unsafe-eval' is not an allowed source of script: "script-src 'none'". The policy is report-only, so the violation has been logged but no further action has been taken.
+injection-tss-mv3.js:413 🌍 ipapi.co response: Object
+injection-tss-mv3.js:413 🌍 Geolocation success (ipapi.co): Object
+injection-tss-mv3.js:413 📡 TJ Event: page_land step=0 Landing Object
+index.iife.js:1 📡 TJ OK: page_land step=0
+injection-tss-mv3.js:408 📊 GTM Event: {event: 'button_click', button_name: 'button-age-45-85', button_value: '45-85'}
+injection-tss-mv3.js:413 📡 TJ Event: step_complete step=1 Age {session_id: '69518ed1-29d7-4a7f-923b-34e33112a8d3', event_id: 'evt_1771391943378_dnngb8l7im', page: 'seniors', page_type: 'lead', domain: 'blueskylife.net', …}
+injection-tss-mv3.js:413 Step1_Complete fired: selected event_id: evt_1771391943379_yx0z64nq external_id: set pii: none
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+injection-tss-mv3.js:408 📊 GTM Event: {event: 'quiz_step', step_number: 2, step_name: 'State', audience: 'seniors'}
+injection-tss-mv3.js:413 📡 TJ OK: step_complete step=1
+injection-tss-mv3.js:413 📡 TJ Event: step_complete step=2 State {session_id: '69518ed1-29d7-4a7f-923b-34e33112a8d3', event_id: 'evt_1771391944862_77k0nmaq1x', page: 'seniors', page_type: 'lead', domain: 'blueskylife.net', …}
+injection-tss-mv3.js:413 Step2_Complete fired: FL event_id: evt_1771391944863_yspde35y external_id: set pii: none
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+injection-tss-mv3.js:413 📡 TJ OK: step_complete step=2
+injection-tss-mv3.js:408 📊 GTM Event: {event: 'quiz_step', step_number: 3, step_name: 'Beneficiary', audience: 'seniors'}
+injection-tss-mv3.js:408 📊 GTM Event: {event: 'button_click', button_name: 'button-beneficiary-grandchildren', button_value: 'Grandchildren'}
+injection-tss-mv3.js:413 📡 TJ Event: step_complete step=3 Beneficiary {session_id: '69518ed1-29d7-4a7f-923b-34e33112a8d3', event_id: 'evt_1771391946025_myb1prxb578', page: 'seniors', page_type: 'lead', domain: 'blueskylife.net', …}
+injection-tss-mv3.js:413 Step3_Complete fired: Grandchildren event_id: evt_1771391946026_53yhieib external_id: set pii: none
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+injection-tss-mv3.js:413 📡 TJ OK: step_complete step=3
+injection-tss-mv3.js:408 📊 GTM Event: {event: 'quiz_step', step_number: 4, step_name: 'Budget Affordability', audience: 'seniors'}
+injection-tss-mv3.js:408 📊 GTM Event: {event: 'button_click', button_name: 'button-budget-80100', button_value: '$80–$100'}
+injection-tss-mv3.js:413 📡 TJ Event: step_complete step=4 Budget Affordability {session_id: '69518ed1-29d7-4a7f-923b-34e33112a8d3', event_id: 'evt_1771391947320_c6slf1kqi9m', page: 'seniors', page_type: 'lead', domain: 'blueskylife.net', …}
+injection-tss-mv3.js:413 Step4_Complete fired: qualified event_id: evt_1771391947321_vayq2vc8 external_id: set pii: none
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+injection-tss-mv3.js:413 📡 TJ OK: step_complete step=4
+injection-tss-mv3.js:408 📊 GTM Event: {event: 'quiz_step', step_number: 5, step_name: 'Monthly Income', audience: 'seniors'}
+injection-tss-mv3.js:408 📊 GTM Event: {event: 'button_click', button_name: 'button-monthly-income-yes', button_value: 'Yes'}
+injection-tss-mv3.js:413 📡 TJ Event: step_complete step=5 Monthly Income {session_id: '69518ed1-29d7-4a7f-923b-34e33112a8d3', event_id: 'evt_1771391948594_b1pbi4ow24', page: 'seniors', page_type: 'lead', domain: 'blueskylife.net', …}
+injection-tss-mv3.js:413 Step5_Complete fired: selected event_id: evt_1771391948595_zrmj2u06 external_id: set pii: none
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+injection-tss-mv3.js:413 📡 TJ OK: step_complete step=5
+injection-tss-mv3.js:408 📊 GTM Event: {event: 'quiz_step', step_number: 6, step_name: 'Quote Form', audience: 'seniors'}
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+VM26:1  POST https://b.applovin.com/v1/pixel net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ constants-DxeVukv8.js:1
+k @ VM26:1
+await in k
+B @ VM26:1
+(anonymous) @ VM26:1Understand this error
+injection-tss-mv3.js:413 📡 TJ Event: form_complete step=6 Quote Form {session_id: '69518ed1-29d7-4a7f-923b-34e33112a8d3', event_id: 'evt_1771391973630_zcns392g4r', page: 'seniors', page_type: 'lead', domain: 'blueskylife.net', …}
