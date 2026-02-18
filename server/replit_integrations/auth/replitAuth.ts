@@ -162,8 +162,22 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   const { allowedUsers } = await import("@shared/models/auth");
   const { db } = await import("../../db");
-  const { eq, and } = await import("drizzle-orm");
-  const [allowed] = await db.select().from(allowedUsers).where(and(eq(allowedUsers.email, email.toLowerCase()), eq(allowedUsers.active, true)));
+  const { eq, and, count } = await import("drizzle-orm");
+
+  const normalizedEmail = email.toLowerCase();
+
+  const [{ total }] = await db.select({ total: count() }).from(allowedUsers);
+  if (total === 0) {
+    await db.insert(allowedUsers).values({
+      email: normalizedEmail,
+      role: "admin",
+      addedBy: "system",
+      active: true,
+    });
+    console.log(`[Auth] Auto-seeded first user as admin: ${normalizedEmail}`);
+  }
+
+  const [allowed] = await db.select().from(allowedUsers).where(and(eq(allowedUsers.email, normalizedEmail), eq(allowedUsers.active, true)));
   if (!allowed) {
     return res.status(403).json({ message: "Access denied. Your account has not been approved for access." });
   }
