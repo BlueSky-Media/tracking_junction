@@ -50,6 +50,7 @@ function parseFilters(query: any) {
     browser: parseMulti(query.browser as string | undefined),
     geoState: parseMulti(query.geoState as string | undefined),
     selectedState: parseMulti(query.selectedState as string | undefined),
+    funnelId: parseMulti(query.funnelId as string | undefined),
     startTime: query.startTime as string | undefined,
     endTime: query.endTime as string | undefined,
   };
@@ -163,6 +164,7 @@ export async function registerRoutes(
         browserVersion: data.browser_version || null,
         osVersion: data.os_version || null,
         ipType: data.ip_type || null,
+        funnelId: data.funnel_id || null,
       });
 
       (async () => {
@@ -457,6 +459,16 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting events:", error);
       res.status(500).json({ message: "Failed to delete events" });
+    }
+  });
+
+  app.delete("/api/analytics/purge-no-funnel", isAuthenticated, async (req, res) => {
+    try {
+      const count = await storage.purgeEventsWithoutFunnelId();
+      res.json({ message: `Purged ${count} events without funnel_id`, purged: count });
+    } catch (error) {
+      console.error("Error purging events:", error);
+      res.status(500).json({ message: "Failed to purge events" });
     }
   });
 

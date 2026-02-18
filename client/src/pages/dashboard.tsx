@@ -36,6 +36,7 @@ function buildQuery(filters: Filters): string {
   if (filters.utmCampaign !== "all") params.set("utmCampaign", filters.utmCampaign);
   if (filters.utmMedium !== "all") params.set("utmMedium", filters.utmMedium);
   if (filters.deviceType !== "all") params.set("deviceType", filters.deviceType);
+  if (filters.funnelId !== "all") params.set("funnelId", filters.funnelId);
   return params.toString();
 }
 
@@ -51,6 +52,7 @@ export default function DashboardPage() {
     page: "all",
     pageType: "all",
     domain: "all",
+    funnelId: "all",
     dateRange: undefined,
     utmSource: "all",
     utmCampaign: "all",

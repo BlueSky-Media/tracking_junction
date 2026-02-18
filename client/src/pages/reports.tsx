@@ -190,6 +190,7 @@ interface Filters {
   deviceType: string[];
   page: string[];
   pageType: string[];
+  funnelId: string[];
   utmSource: string[];
   utmCampaign: string[];
   utmMedium: string[];
@@ -205,6 +206,7 @@ interface FilterOptions {
   osList: string[];
   browsers: string[];
   geoStates: string[];
+  funnelIds: string[];
 }
 
 const DRILL_DIMENSIONS = [
@@ -325,6 +327,7 @@ function buildQueryParams(dateRange: DateRange | undefined, filters: Filters, ex
   setFilterParam(params, "os", filters.os);
   setFilterParam(params, "browser", filters.browser);
   setFilterParam(params, "geoState", filters.geoState);
+  setFilterParam(params, "funnelId", filters.funnelId);
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
       params.set(k, v);
@@ -369,6 +372,7 @@ function buildLogsQuery(dateRange: DateRange | undefined, filters: Filters, logP
   setFilterParam(params, "os", filters.os);
   setFilterParam(params, "browser", filters.browser);
   setFilterParam(params, "geoState", filters.geoState);
+  setFilterParam(params, "funnelId", filters.funnelId);
   if (search.trim()) params.set("search", search.trim());
   return params.toString();
 }
@@ -378,6 +382,7 @@ const emptyFilters: Filters = {
   deviceType: [],
   page: [],
   pageType: [],
+  funnelId: [],
   utmSource: [],
   utmCampaign: [],
   utmMedium: [],
@@ -574,6 +579,11 @@ function FilterPanel({
               <MultiSelectDropdown label="States" selected={filters.geoState} filterKey="geoState" onChange={handleChange} testId={`${testIdPrefix}-filter-state`} options={
                 (filterOptions?.geoStates || []).map(s => ({ value: s, label: s }))
               } />
+              {(filterOptions?.funnelIds || []).length > 0 && (
+                <MultiSelectDropdown label="Funnel" selected={filters.funnelId} filterKey="funnelId" onChange={handleChange} testId={`${testIdPrefix}-filter-funnel`} options={
+                  (filterOptions?.funnelIds || []).map(s => ({ value: s, label: s }))
+                } />
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 border-t pt-1.5">

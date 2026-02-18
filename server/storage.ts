@@ -36,6 +36,7 @@ export interface AnalyticsFilters {
   browser?: string | string[];
   geoState?: string | string[];
   selectedState?: string | string[];
+  funnelId?: string | string[];
 }
 
 interface FunnelStep {
@@ -159,11 +160,12 @@ export interface IStorage {
   getTimeHeatmap(filters: AnalyticsFilters): Promise<HeatmapCell[]>;
   getContactFormFunnel(filters: AnalyticsFilters): Promise<{ steps: ContactFunnelStep[] }>;
   getReferrerBreakdown(filters: AnalyticsFilters): Promise<ReferrerRow[]>;
-  getFilterOptions(): Promise<{ utmSources: string[]; utmCampaigns: string[]; utmMediums: string[]; osList: string[]; browsers: string[]; geoStates: string[] }>;
+  getFilterOptions(): Promise<{ utmSources: string[]; utmCampaigns: string[]; utmMediums: string[]; osList: string[]; browsers: string[]; geoStates: string[]; funnelIds: string[] }>;
   exportCsv(filters: AnalyticsFilters): Promise<string>;
   getDrilldown(filters: AnalyticsFilters, groupBy: string): Promise<DrilldownResult>;
   getEventLogs(filters: AnalyticsFilters, page: number, limit: number, search?: string): Promise<EventLogResult>;
   deleteAllEvents(): Promise<void>;
+  purgeEventsWithoutFunnelId(): Promise<number>;
   deleteEvent(id: number): Promise<void>;
   deleteEventsBySession(sessionId: string): Promise<number>;
   deleteEventsBySessions(sessionIds: string[]): Promise<number>;
@@ -277,6 +279,7 @@ function buildConditions(filters: AnalyticsFilters) {
   addFilterCondition(conditions, trackingEvents.browser, filters.browser);
   addFilterCondition(conditions, trackingEvents.geoState, filters.geoState);
   addFilterCondition(conditions, trackingEvents.selectedState, filters.selectedState);
+  addFilterCondition(conditions, trackingEvents.funnelId, filters.funnelId);
   return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
@@ -634,9 +637,9 @@ class DatabaseStorage implements IStorage {
 
   async getFilterOptions(): Promise<{
     utmSources: string[]; utmCampaigns: string[]; utmMediums: string[];
-    osList: string[]; browsers: string[]; geoStates: string[];
+    osList: string[]; browsers: string[]; geoStates: string[]; funnelIds: string[];
   }> {
-    const [sources, campaigns, mediums, osList, browsers, geoStates] = await Promise.all([
+    const [sources, campaigns, mediums, osList, browsers, geoStates, funnelIds] = await Promise.all([
       db.selectDistinct({ val: trackingEvents.utmSource })
         .from(trackingEvents)
         .where(isNotNull(trackingEvents.utmSource))
@@ -667,6 +670,11 @@ class DatabaseStorage implements IStorage {
         .where(isNotNull(trackingEvents.geoState))
         .orderBy(trackingEvents.geoState)
         .limit(60),
+      db.selectDistinct({ val: trackingEvents.funnelId })
+        .from(trackingEvents)
+        .where(isNotNull(trackingEvents.funnelId))
+        .orderBy(trackingEvents.funnelId)
+        .limit(100),
     ]);
 
     return {
@@ -676,6 +684,7 @@ class DatabaseStorage implements IStorage {
       osList: osList.map(s => s.val!).filter(Boolean),
       browsers: browsers.map(s => s.val!).filter(Boolean),
       geoStates: geoStates.map(s => s.val!).filter(Boolean),
+      funnelIds: funnelIds.map(s => s.val!).filter(Boolean),
     };
   }
 
@@ -1074,6 +1083,13 @@ class DatabaseStorage implements IStorage {
     await db.delete(trackingEvents);
   }
 
+  async purgeEventsWithoutFunnelId(): Promise<number> {
+    const result = await db.delete(trackingEvents)
+      .where(isNull(trackingEvents.funnelId))
+      .returning({ id: trackingEvents.id });
+    return result.length;
+  }
+
   async deleteEvent(id: number): Promise<void> {
     await db.delete(trackingEvents).where(eq(trackingEvents.id, id));
   }
@@ -1460,6 +1476,7 @@ class DatabaseStorage implements IStorage {
       osVersion: row.os_version,
       ipType: row.ip_type,
       leadTier: row.lead_tier,
+      funnelId: row.funnel_id,
       receivedAt: row.received_at ? new Date(row.received_at) : new Date(),
     };
   }

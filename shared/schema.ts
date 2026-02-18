@@ -59,6 +59,7 @@ export const trackingEvents = pgTable("tracking_events", {
   osVersion: varchar("os_version", { length: 100 }),
   ipType: varchar("ip_type", { length: 10 }),
   leadTier: varchar("lead_tier", { length: 30 }),
+  funnelId: varchar("funnel_id", { length: 100 }),
 }, (table) => [
   index("idx_events_session").on(table.sessionId),
   index("idx_events_page_type").on(table.page, table.pageType),
@@ -69,6 +70,7 @@ export const trackingEvents = pgTable("tracking_events", {
   index("idx_events_utm_campaign").on(table.utmCampaign),
   index("idx_events_device_type").on(table.deviceType),
   index("idx_events_lead_tier").on(table.leadTier),
+  index("idx_events_funnel_id").on(table.funnelId),
 ]);
 
 export const requestLogs = pgTable("request_logs", {
@@ -159,6 +161,7 @@ export const trackingEventApiSchema = z.object({
   browser_version: z.string().max(100).optional(),
   os_version: z.string().max(100).optional(),
   ip_type: z.string().max(10).optional(),
+  funnel_id: z.string().max(100).optional(),
 }).passthrough();
 
 export type InsertTrackingEvent = z.infer<typeof insertTrackingEventSchema>;

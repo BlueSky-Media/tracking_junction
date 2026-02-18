@@ -12,6 +12,7 @@ export interface Filters {
   page: string;
   pageType: string;
   domain: string;
+  funnelId: string;
   dateRange: DateRange | undefined;
   utmSource: string;
   utmCampaign: string;
@@ -36,6 +37,7 @@ export function DashboardFilters({ filters, onFiltersChange }: DashboardFiltersP
       page: "all",
       pageType: "all",
       domain: "all",
+      funnelId: "all",
       dateRange: undefined,
       utmSource: "all",
       utmCampaign: "all",
@@ -48,11 +50,11 @@ export function DashboardFilters({ filters, onFiltersChange }: DashboardFiltersP
     queryKey: ["/api/analytics/filter-options"],
   });
 
-  const options = filterOptionsQuery.data as { utmSources: string[]; utmCampaigns: string[]; utmMediums: string[] } | undefined;
+  const options = filterOptionsQuery.data as { utmSources: string[]; utmCampaigns: string[]; utmMediums: string[]; funnelIds: string[] } | undefined;
 
   const hasActiveFilters =
     filters.page !== "all" || filters.pageType !== "all" || filters.domain !== "all" ||
-    filters.dateRange !== undefined || filters.utmSource !== "all" ||
+    filters.funnelId !== "all" || filters.dateRange !== undefined || filters.utmSource !== "all" ||
     filters.utmCampaign !== "all" || filters.utmMedium !== "all" || filters.deviceType !== "all";
 
   const hasAdvancedFilters =
@@ -95,6 +97,20 @@ export function DashboardFilters({ filters, onFiltersChange }: DashboardFiltersP
             <SelectItem value="blueskylife.io">blueskylife.io</SelectItem>
           </SelectContent>
         </Select>
+
+        {options?.funnelIds && options.funnelIds.length > 0 && (
+          <Select value={filters.funnelId} onValueChange={(v) => update({ funnelId: v })}>
+            <SelectTrigger className="w-[200px]" data-testid="select-funnel-id">
+              <SelectValue placeholder="Funnel" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Funnels</SelectItem>
+              {options.funnelIds.map((f) => (
+                <SelectItem key={f} value={f}>{f}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Popover>
           <PopoverTrigger asChild>
