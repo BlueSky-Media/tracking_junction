@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -851,14 +852,17 @@ export default function AdMetricsPage() {
                       <div
                         className="text-sm text-muted-foreground prose prose-sm dark:prose-invert max-w-none"
                         dangerouslySetInnerHTML={{
-                          __html: aiInsights
-                            .replace(/```([\s\S]*?)```/g, '<pre class="bg-muted/50 rounded-md p-2 my-2 overflow-x-auto text-xs"><code>$1</code></pre>')
-                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/^\s*#{3}\s+(.+)$/gm, '<h3 class="font-semibold text-sm mt-2 mb-1">$1</h3>')
-                            .replace(/^\s*#{2}\s+(.+)$/gm, '<h2 class="font-semibold text-base mt-3 mb-1">$1</h2>')
-                            .replace(/^\s*#{1}\s+(.+)$/gm, '<h1 class="font-bold text-lg mt-3 mb-1">$1</h1>')
-                            .replace(/^\s*[-*]\s+(.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
-                            .replace(/\n/g, '<br/>')
+                          __html: DOMPurify.sanitize(
+                            aiInsights
+                              .replace(/```([\s\S]*?)```/g, '<pre class="bg-muted/50 rounded-md p-2 my-2 overflow-x-auto text-xs"><code>$1</code></pre>')
+                              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                              .replace(/^\s*#{3}\s+(.+)$/gm, '<h3 class="font-semibold text-sm mt-2 mb-1">$1</h3>')
+                              .replace(/^\s*#{2}\s+(.+)$/gm, '<h2 class="font-semibold text-base mt-3 mb-1">$1</h2>')
+                              .replace(/^\s*#{1}\s+(.+)$/gm, '<h1 class="font-bold text-lg mt-3 mb-1">$1</h1>')
+                              .replace(/^\s*[-*]\s+(.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
+                              .replace(/\n/g, '<br/>'),
+                            { ALLOWED_TAGS: ['pre', 'code', 'strong', 'h1', 'h2', 'h3', 'li', 'ul', 'br', 'p', 'div', 'span'], ALLOWED_ATTR: ['class'] }
+                          )
                         }}
                         data-testid="text-ai-insights"
                       />

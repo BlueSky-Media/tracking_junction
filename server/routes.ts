@@ -1955,6 +1955,9 @@ export async function registerRoutes(
       if (!dataContext) {
         return res.status(400).json({ message: "dataContext required" });
       }
+      if (typeof dataContext !== "string" || dataContext.length > 50000) {
+        return res.status(400).json({ message: "dataContext must be a string under 50000 characters" });
+      }
       const insights = await generateInsights(dataContext);
       res.json({ insights });
     } catch (error) {

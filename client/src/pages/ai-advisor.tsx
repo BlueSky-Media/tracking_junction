@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -80,7 +81,7 @@ interface NormalizedInsight {
 }
 
 function renderMarkdown(text: string): string {
-  return text
+  const raw = text
     .replace(/```([\s\S]*?)```/g, '<pre class="bg-muted/50 rounded-md p-2 my-2 overflow-x-auto text-xs"><code>$1</code></pre>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/^\s*#{3}\s+(.+)$/gm, '<h3 class="font-semibold text-sm mt-2 mb-1">$1</h3>')
@@ -89,6 +90,7 @@ function renderMarkdown(text: string): string {
     .replace(/^\s*[-*]\s+(.+)$/gm, '<li class="ml-4">$1</li>')
     .replace(/(<li.*<\/li>\n?)+/g, '<ul class="list-disc my-1">$&</ul>')
     .replace(/\n/g, '<br/>');
+  return DOMPurify.sanitize(raw, { ALLOWED_TAGS: ['pre', 'code', 'strong', 'h1', 'h2', 'h3', 'li', 'ul', 'br', 'p', 'div', 'span'], ALLOWED_ATTR: ['class'] });
 }
 
 function relativeTime(dateStr: string): string {
