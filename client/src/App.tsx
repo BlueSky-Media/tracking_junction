@@ -15,6 +15,8 @@ import BlockListPage from "@/pages/block-list";
 import FacebookAdsPage from "@/pages/facebook-ads";
 import MetaConversionsPage from "@/pages/meta-conversions";
 import UsersPage from "@/pages/users";
+import AiAdvisorPage from "@/pages/ai-advisor";
+import AdMetricsPage from "@/pages/ad-metrics";
 import PrivacyPage from "@/pages/privacy";
 import NotFound from "@/pages/not-found";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -50,6 +52,8 @@ function AuthenticatedLayout() {
               <Route path="/facebook-ads" component={FacebookAdsPage} />
               <Route path="/meta-conversions" component={MetaConversionsPage} />
               <Route path="/users" component={UsersPage} />
+              <Route path="/ad-metrics" component={AdMetricsPage} />
+              <Route path="/ai-advisor" component={AiAdvisorPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

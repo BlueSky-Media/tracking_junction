@@ -1,4 +1,5 @@
 export * from "./models/auth";
+export * from "./models/chat";
 
 import { pgTable, text, varchar, integer, timestamp, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";

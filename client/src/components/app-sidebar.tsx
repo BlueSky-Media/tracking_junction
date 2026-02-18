@@ -1,7 +1,7 @@
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useTimezone, TIMEZONE_OPTIONS } from "@/hooks/use-timezone";
-import { LayoutDashboard, BarChart3, FileText, LogOut, Server, Ban, Megaphone, Globe, Upload, Users } from "lucide-react";
+import { LayoutDashboard, BarChart3, FileText, LogOut, Server, Ban, Megaphone, Globe, Upload, Users, Brain, TrendingUp } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +27,8 @@ const navItems = [
   { title: "Server Logs", url: "/logs", icon: Server, testId: "nav-server-logs" },
   { title: "Facebook Ads", url: "/facebook-ads", icon: Megaphone, testId: "nav-facebook-ads" },
   { title: "Meta CAPI", url: "/meta-conversions", icon: Upload, testId: "nav-meta-conversions" },
+  { title: "Ad Metrics", url: "/ad-metrics", icon: TrendingUp, testId: "nav-ad-metrics" },
+  { title: "AI Advisor", url: "/ai-advisor", icon: Brain, testId: "nav-ai-advisor" },
   { title: "Block List", url: "/block-list", icon: Ban, testId: "nav-block-list" },
   { title: "Users", url: "/users", icon: Users, testId: "nav-users", adminOnly: true },
 ] as const;

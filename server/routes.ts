@@ -8,6 +8,10 @@ import * as facebook from "./facebook";
 import { buildConversionEvent, sendConversionEvents, MetaConversionError, fireAudienceSignal } from "./meta-conversions";
 import { calculateAnnualPremiumEstimate, getCapiEventName, classifyCustomerTier, evaluateRuleConditions, computeRuleValue, type EventContext, type SignalRuleConditions } from "./lead-scoring";
 import { detectBot } from "./bot-detection";
+import { streamChatResponse, generateConversationTitle, generateInsights, type ChatMessage } from "./ai-advisor";
+import { conversations, messages } from "@shared/schema";
+import { eq, desc, asc } from "drizzle-orm";
+import { db } from "./db";
 
 const PII_FIELDS = ["first_name", "last_name", "email", "phone", "firstName", "lastName"];
 
@@ -1819,6 +1823,143 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating user role:", error);
       res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  app.get("/api/chat/conversations", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.claims?.sub || "";
+      const rows = await db.select().from(conversations)
+        .where(eq(conversations.userId, userId))
+        .orderBy(desc(conversations.updatedAt));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      res.status(500).json({ message: "Failed to fetch conversations" });
+    }
+  });
+
+  app.post("/api/chat/conversations", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user?.claims?.sub || "";
+      const title = req.body.title || "New Conversation";
+      const [conv] = await db.insert(conversations).values({ userId, title }).returning();
+      res.json(conv);
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      res.status(500).json({ message: "Failed to create conversation" });
+    }
+  });
+
+  app.delete("/api/chat/conversations/:id", isAuthenticated, async (req, res) => {
+    try {
+      const convId = parseInt(req.params.id, 10);
+      await db.delete(messages).where(eq(messages.conversationId, convId));
+      await db.delete(conversations).where(eq(conversations.id, convId));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      res.status(500).json({ message: "Failed to delete conversation" });
+    }
+  });
+
+  app.get("/api/chat/conversations/:id/messages", isAuthenticated, async (req, res) => {
+    try {
+      const convId = parseInt(req.params.id, 10);
+      const rows = await db.select().from(messages)
+        .where(eq(messages.conversationId, convId))
+        .orderBy(asc(messages.createdAt));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/chat/send", isAuthenticated, async (req, res) => {
+    try {
+      const { conversationId, message, dataContext } = req.body;
+      if (!conversationId || !message) {
+        return res.status(400).json({ message: "conversationId and message required" });
+      }
+
+      await db.insert(messages).values({
+        conversationId,
+        role: "user",
+        content: message,
+      });
+
+      const history = await db.select().from(messages)
+        .where(eq(messages.conversationId, conversationId))
+        .orderBy(asc(messages.createdAt));
+
+      const chatMessages: ChatMessage[] = history.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+
+      let fullResponse = "";
+
+      streamChatResponse(
+        chatMessages,
+        dataContext || "",
+        (chunk) => {
+          fullResponse += chunk;
+          res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
+        },
+        async () => {
+          await db.insert(messages).values({
+            conversationId,
+            role: "assistant",
+            content: fullResponse,
+          });
+
+          await db.update(conversations)
+            .set({ updatedAt: new Date() })
+            .where(eq(conversations.id, conversationId));
+
+          if (history.length <= 1) {
+            const title = await generateConversationTitle(message);
+            await db.update(conversations)
+              .set({ title })
+              .where(eq(conversations.id, conversationId));
+            res.write(`data: ${JSON.stringify({ type: "title", title })}\n\n`);
+          }
+
+          res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+          res.end();
+        },
+        (err) => {
+          console.error("AI streaming error:", err);
+          res.write(`data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`);
+          res.end();
+        }
+      );
+    } catch (error) {
+      console.error("Error in chat send:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to send message" });
+      }
+    }
+  });
+
+  app.post("/api/chat/insights", isAuthenticated, async (req, res) => {
+    try {
+      const { dataContext } = req.body;
+      if (!dataContext) {
+        return res.status(400).json({ message: "dataContext required" });
+      }
+      const insights = await generateInsights(dataContext);
+      res.json({ insights });
+    } catch (error) {
+      console.error("Error generating insights:", error);
+      res.status(500).json({ message: "Failed to generate insights" });
     }
   });
 
