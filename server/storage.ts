@@ -207,6 +207,7 @@ export interface IStorage {
       ipType: string | null;
       isBot: number;
       botReason: string | null;
+      userAgent: string | null;
     }[];
     total: number;
     page: number;
@@ -1258,6 +1259,7 @@ class DatabaseStorage implements IStorage {
         funnelId: firstEvent.funnelId || null,
         isBot: events.some(e => e.isBot === 1) ? 1 : 0,
         botReason: events.find(e => e.isBot === 1)?.botReason || null,
+        userAgent: firstEvent.userAgent,
       };
     });
 
@@ -1529,6 +1531,8 @@ class DatabaseStorage implements IStorage {
       ipType: row.ip_type,
       leadTier: row.lead_tier,
       funnelId: row.funnel_id,
+      isBot: row.is_bot ?? 0,
+      botReason: row.bot_reason ?? null,
       receivedAt: row.received_at ? new Date(row.received_at) : new Date(),
     };
   }

@@ -201,6 +201,7 @@ interface SessionLogEntry {
   browserVersion: string | null;
   osVersion: string | null;
   ipType: string | null;
+  userAgent: string | null;
   firstName: string | null;
   lastName: string | null;
   email: string | null;
@@ -1690,6 +1691,8 @@ function getCellRenderer(key: string, session: SessionLogEntry, colWidths: Recor
       return <td key={key} className={cls} style={style}>{session.language || "\u2014"}</td>;
     case "selectedState":
       return <td key={key} className={cls} style={style}>{session.selectedState || "\u2014"}</td>;
+    case "userAgent":
+      return <td key={key} className={`${cls} truncate`} style={style} title={session.userAgent || ""}>{session.userAgent || "\u2014"}</td>;
     case "ipAddress":
       return <td key={key} className={`${cls} font-mono`} style={style}>{session.ipAddress || "\u2014"}</td>;
     case "firstName":
@@ -1791,6 +1794,7 @@ const SESSION_COLUMNS: SessionColumn[] = [
   { key: "device", label: "Device", resizable: true, optional: true, defaultVisible: true },
   { key: "os", label: "OS", resizable: true, optional: true, defaultVisible: true },
   { key: "browser", label: "Browser", resizable: true, optional: true, defaultVisible: true },
+  { key: "userAgent", label: "User Agent", resizable: true, optional: true, defaultVisible: false },
   { key: "ipAddress", label: "IP Address", resizable: true, optional: true, defaultVisible: false },
   { key: "geoState", label: "Geo State", resizable: true, optional: true, defaultVisible: false },
   { key: "country", label: "Country", resizable: true, optional: true, defaultVisible: false },
@@ -2503,6 +2507,9 @@ function SessionLogRow({
                 <DetailField label="Browser" value={session.browser || "\u2014"} />
                 <DetailField label="Browser Version" value={session.browserVersion || "\u2014"} />
                 <DetailField label="OS Version" value={session.osVersion || "\u2014"} />
+                <div className="col-span-2">
+                  <DetailField label="User Agent" value={session.userAgent || "\u2014"} />
+                </div>
                 {session.events.length > 0 && (() => {
                   const ev = session.events;
                   const find = (fn: (e: EventLog) => string | null | undefined) => {
