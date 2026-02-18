@@ -1165,40 +1165,48 @@ function AudienceFunnelPanel({
   });
 
   return (
-    <div className="overflow-x-auto border rounded-md mb-2" data-testid={`funnel-audience-${audienceRow.groupValue}`}>
-      <Table>
-        <TableHeader>
-          <TableRow className="h-5 bg-muted/30">
-            <TableHead colSpan={6} className="text-[10px] px-1.5 py-0 font-semibold capitalize">
+    <div className="border rounded-md mb-2" data-testid={`funnel-audience-${audienceRow.groupValue}`}>
+      <table className="w-full text-[9px]" style={{ tableLayout: "fixed" }}>
+        <colgroup>
+          <col style={{ width: "38%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "20%" }} />
+        </colgroup>
+        <thead>
+          <tr className="h-5 bg-muted/30 border-b">
+            <th colSpan={6} className="text-[10px] px-1.5 py-0 font-semibold capitalize text-left">
               {displayLabel || audienceRow.groupValue}
               <span className="text-muted-foreground font-normal ml-2">
                 Lands: {audLands.toLocaleString()}
                 {audFormComplete > 0 && <> | Form Complete: {audFormComplete} | Form CVR: {audFormCvr.toFixed(1)}%</>}
               </span>
-            </TableHead>
-          </TableRow>
-          <TableRow className="h-5">
-            <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Step</TableHead>
-            <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Count</TableHead>
-            <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap" title="Conversion from previous step">CVR</TableHead>
-            <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap" title="Conversion from landing">Land CVR</TableHead>
-            <TableHead className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap">Drop-off</TableHead>
-            <TableHead className="text-[9px] px-1.5 py-0 whitespace-nowrap">Drop-off Visual</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow className="h-5 bg-muted/20">
-            <TableCell className="font-mono text-[9px] px-1.5 py-0">0. Landing</TableCell>
-            <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">{audLands.toLocaleString()}</TableCell>
-            <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">100.0%</TableCell>
-            <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
-            <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</TableCell>
-            <TableCell className="px-1.5 py-0">
+            </th>
+          </tr>
+          <tr className="h-5 border-b">
+            <th className="text-[9px] px-1.5 py-0 whitespace-nowrap text-left font-medium text-muted-foreground">Step</th>
+            <th className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap font-medium text-muted-foreground">Count</th>
+            <th className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap font-medium text-muted-foreground" title="Conversion from previous step">CVR</th>
+            <th className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap font-medium text-muted-foreground" title="Conversion from landing">Land CVR</th>
+            <th className="text-[9px] px-1.5 py-0 text-right whitespace-nowrap font-medium text-muted-foreground">Drop-off</th>
+            <th className="text-[9px] px-1.5 py-0 whitespace-nowrap text-left font-medium text-muted-foreground">Drop-off Visual</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="h-5 bg-muted/20 border-b">
+            <td className="font-mono text-[9px] px-1.5 py-0">0. Landing</td>
+            <td className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">{audLands.toLocaleString()}</td>
+            <td className="font-mono text-[9px] px-1.5 py-0 text-right">100.0%</td>
+            <td className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</td>
+            <td className="font-mono text-[9px] px-1.5 py-0 text-right">{"\u2014"}</td>
+            <td className="px-1.5 py-0">
               <div className="w-full bg-muted rounded-sm h-2.5">
                 <div className="h-2.5 rounded-sm bg-primary" style={{ width: "100%" }} />
               </div>
-            </TableCell>
-          </TableRow>
+            </td>
+          </tr>
           {audSteps.map((step) => {
             const barWidth = audLands > 0 ? Math.max(1, (step.completions / audLands) * 100) : 0;
             const isHighDropOff = step.dropOff > 50;
@@ -1209,16 +1217,16 @@ function AudienceFunnelPanel({
             const hasBreakdown = breakdown && breakdown.options.length > 0;
             return (
               <Fragment key={step.stepKey}>
-                <TableRow
-                  className="h-5 cursor-pointer hover-elevate"
+                <tr
+                  className="h-5 cursor-pointer hover-elevate border-b"
                   data-testid={`row-funnel-step-${audienceRow.groupValue}-${step.stepNumber}`}
                   onClick={() => toggleStep(stepKey)}
                 >
-                  <TableCell className="font-mono text-[9px] px-1.5 py-0 whitespace-nowrap">
+                  <td className="font-mono text-[9px] px-1.5 py-0 whitespace-nowrap overflow-hidden text-ellipsis">
                     <span className="inline-flex items-center gap-1">
                       {isExpanded
-                        ? <ChevronDown className="w-2.5 h-2.5 text-muted-foreground" />
-                        : <ChevronRight className="w-2.5 h-2.5 text-muted-foreground" />
+                        ? <ChevronDown className="w-2.5 h-2.5 text-muted-foreground flex-shrink-0" />
+                        : <ChevronRight className="w-2.5 h-2.5 text-muted-foreground flex-shrink-0" />
                       }
                       {step.stepNumber}. {step.stepName}
                       {hasBreakdown && (
@@ -1227,31 +1235,31 @@ function AudienceFunnelPanel({
                         </Badge>
                       )}
                     </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">
+                  </td>
+                  <td className="font-mono text-[9px] px-1.5 py-0 text-right font-bold">
                     {step.completions.toLocaleString()}
-                  </TableCell>
-                  <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.cvr < 30 ? "text-red-500" : step.cvr < 60 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
+                  </td>
+                  <td className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.cvr < 30 ? "text-red-500" : step.cvr < 60 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
                     {step.cvr.toFixed(1)}%
-                  </TableCell>
-                  <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.scvr < 50 ? "text-red-500" : step.scvr < 70 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
+                  </td>
+                  <td className={`font-mono text-[9px] px-1.5 py-0 text-right ${step.scvr < 50 ? "text-red-500" : step.scvr < 70 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
                     {step.scvr.toFixed(1)}%
-                  </TableCell>
-                  <TableCell className={`font-mono text-[9px] px-1.5 py-0 text-right ${isHighDropOff ? "text-red-500 font-bold" : isMedDropOff ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}`}>
+                  </td>
+                  <td className={`font-mono text-[9px] px-1.5 py-0 text-right ${isHighDropOff ? "text-red-500 font-bold" : isMedDropOff ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}`}>
                     {step.dropOff.toFixed(1)}%
-                  </TableCell>
-                  <TableCell className="px-1.5 py-0">
+                  </td>
+                  <td className="px-1.5 py-0">
                     <div className="w-full bg-muted rounded-sm h-2.5">
                       <div
                         className={`h-2.5 rounded-sm ${isHighDropOff ? "bg-red-500" : isMedDropOff ? "bg-yellow-500" : "bg-primary"}`}
                         style={{ width: `${barWidth}%` }}
                       />
                     </div>
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
                 {isExpanded && (
-                  <TableRow className="bg-muted/10" data-testid={`row-funnel-step-responses-${audienceRow.groupValue}-${step.stepNumber}`}>
-                    <TableCell colSpan={6} className="px-3 py-1.5">
+                  <tr className="bg-muted/10" data-testid={`row-funnel-step-responses-${audienceRow.groupValue}-${step.stepNumber}`}>
+                    <td colSpan={6} className="px-3 py-1.5">
                       {hasBreakdown ? (
                         <div className="space-y-1">
                           <div className="text-[8px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
@@ -1278,14 +1286,14 @@ function AudienceFunnelPanel({
                           No response data available for this step.
                         </div>
                       )}
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 )}
               </Fragment>
             );
           })}
-        </TableBody>
-      </Table>
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -1446,7 +1454,7 @@ function FunnelReport({
     .sort((a, b) => (b.pageLands || b.uniqueViews) - (a.pageLands || a.uniqueViews));
 
   return (
-    <div data-testid="card-funnel-report">
+    <div data-testid="card-funnel-report" className="max-w-3xl">
       <div className="flex items-center gap-2 mb-1 flex-wrap">
         <h3 className="text-[11px] font-semibold" data-testid="text-funnel-title">Funnel Summary</h3>
         <FilterPanel filters={filters} onChange={onFiltersChange} filterOptions={filterOptions} testIdPrefix="report" />
