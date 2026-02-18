@@ -778,6 +778,7 @@ class DatabaseStorage implements IStorage {
       geoState: sql`COALESCE(${trackingEvents.geoState}, '(unknown)')`,
       selectedState: sql`COALESCE(${trackingEvents.selectedState}, '(unknown)')`,
       hourOfDay: sql`LPAD(EXTRACT(HOUR FROM ${trackingEvents.eventTimestamp})::text, 2, '0') || ':00'`,
+      funnelId: sql`COALESCE(${trackingEvents.funnelId}, '(none)')`,
     };
 
     const groupCol = groupColumn[groupBy] || groupColumn.domain;

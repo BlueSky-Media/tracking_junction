@@ -8,6 +8,20 @@ import { CalendarIcon, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { DateRange } from "react-day-picker";
 
+const FUNNEL_LABELS: Record<string, string> = {
+  "lead-seniors-f3q8": "Seniors Lead-Gen",
+  "lead-veterans-f3q8": "Veterans Lead-Gen",
+  "lead-firstresponders-f3q8": "First Responders Lead-Gen",
+  "quote-lead-seniors-fjk6": "Seniors Quote (w/ lead)",
+  "quote-lead-veterans-fjk6": "Veterans Quote (w/ lead)",
+  "quote-seniors-fjk6": "Seniors Quote (no lead)",
+  "quote-veterans-fjk6": "Veterans Quote (no lead)",
+};
+
+function formatFunnelLabel(id: string): string {
+  return FUNNEL_LABELS[id] || id;
+}
+
 export interface Filters {
   page: string;
   pageType: string;
@@ -106,7 +120,7 @@ export function DashboardFilters({ filters, onFiltersChange }: DashboardFiltersP
             <SelectContent>
               <SelectItem value="all">All Funnels</SelectItem>
               {options.funnelIds.map((f) => (
-                <SelectItem key={f} value={f}>{f}</SelectItem>
+                <SelectItem key={f} value={f}>{formatFunnelLabel(f)}</SelectItem>
               ))}
             </SelectContent>
           </Select>

@@ -29,6 +29,20 @@ const REFRESH_INTERVALS: { label: string; value: number }[] = [
   { label: "5m", value: 300000 },
 ];
 
+const FUNNEL_LABELS: Record<string, string> = {
+  "lead-seniors-f3q8": "Seniors Lead-Gen",
+  "lead-veterans-f3q8": "Veterans Lead-Gen",
+  "lead-firstresponders-f3q8": "First Responders Lead-Gen",
+  "quote-lead-seniors-fjk6": "Seniors Quote (w/ lead)",
+  "quote-lead-veterans-fjk6": "Veterans Quote (w/ lead)",
+  "quote-seniors-fjk6": "Seniors Quote (no lead)",
+  "quote-veterans-fjk6": "Veterans Quote (no lead)",
+};
+
+function formatFunnelLabel(id: string): string {
+  return FUNNEL_LABELS[id] || id;
+}
+
 function LiveClock() {
   const { timezone, getTimezoneShort } = useTimezone();
   const [now, setNow] = useState("");
@@ -213,6 +227,7 @@ const DRILL_DIMENSIONS = [
   { value: "domain", label: "Domain" },
   { value: "deviceType", label: "Device Type" },
   { value: "page", label: "Audience" },
+  { value: "funnelId", label: "Funnel ID" },
   { value: "geoState", label: "Geo State (IP)" },
   { value: "selectedState", label: "State (User-Entered)" },
   { value: "utmSource", label: "UTM Source" },
@@ -579,12 +594,15 @@ function FilterPanel({
               <MultiSelectDropdown label="States" selected={filters.geoState} filterKey="geoState" onChange={handleChange} testId={`${testIdPrefix}-filter-state`} options={
                 (filterOptions?.geoStates || []).map(s => ({ value: s, label: s }))
               } />
-              {(filterOptions?.funnelIds || []).length > 0 && (
-                <MultiSelectDropdown label="Funnel" selected={filters.funnelId} filterKey="funnelId" onChange={handleChange} testId={`${testIdPrefix}-filter-funnel`} options={
-                  (filterOptions?.funnelIds || []).map(s => ({ value: s, label: s }))
-                } />
-              )}
             </div>
+            {(filterOptions?.funnelIds || []).length > 0 && (
+              <div>
+                <span className="text-[9px] text-muted-foreground block mb-0.5">Funnel ID</span>
+                <MultiSelectDropdown label="Funnel ID" selected={filters.funnelId} filterKey="funnelId" onChange={handleChange} testId={`${testIdPrefix}-filter-funnel-id`} options={
+                  (filterOptions?.funnelIds || []).map(s => ({ value: s, label: formatFunnelLabel(s) }))
+                } />
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 border-t pt-1.5">
             <Button variant="outline" size="sm" onClick={() => setOpen(false)} data-testid={`${testIdPrefix}-close-filters`}>
@@ -974,7 +992,7 @@ function DrilldownRowComponent({
           </TableCell>
         )}
         <TableCell className="text-[10px] font-medium px-1 py-0">
-          {row.groupValue}
+          {groupBy === "funnelId" ? formatFunnelLabel(row.groupValue) : row.groupValue}
           {isExpanded && subDimLabel && (
             <span className="text-muted-foreground ml-1">- {subDimLabel}</span>
           )}
@@ -1248,6 +1266,8 @@ function FunnelReport({
   timeRange?: { startTime?: string; endTime?: string };
 }) {
 
+  const [audienceGroupBy, setAudienceGroupBy] = useState<"page" | "funnelId">("page");
+
   const { timezone } = useTimezone();
   const summaryQuery = buildQueryParams(dateRange, filters, { groupBy: "domain" }, timeRange, timezone);
   const { data: summaryData, isLoading: summaryLoading } = useQuery<DrilldownResult>({
@@ -1259,9 +1279,9 @@ function FunnelReport({
     },
   });
 
-  const audienceQuery = buildQueryParams(dateRange, filters, { groupBy: "page" }, timeRange, timezone);
+  const audienceQuery = buildQueryParams(dateRange, filters, { groupBy: audienceGroupBy }, timeRange, timezone);
   const { data: audienceData, isLoading: audienceLoading } = useQuery<DrilldownResult>({
-    queryKey: ["/api/analytics/drilldown", "audience-funnel", audienceQuery],
+    queryKey: ["/api/analytics/drilldown", "audience-funnel", audienceGroupBy, audienceQuery],
     queryFn: async () => {
       const res = await fetch(`/api/analytics/drilldown?${audienceQuery}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch audience funnel");
@@ -1322,10 +1342,35 @@ function FunnelReport({
         </Table>
       </div>
 
+      <div className="flex items-center gap-2 mb-1 flex-wrap">
+        <span className="text-[10px] text-muted-foreground">Group by:</span>
+        <div className="flex gap-0.5">
+          <Button
+            variant={audienceGroupBy === "page" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAudienceGroupBy("page")}
+            data-testid="button-group-audience"
+          >
+            <span className="text-[10px]">Audience</span>
+          </Button>
+          <Button
+            variant={audienceGroupBy === "funnelId" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAudienceGroupBy("funnelId")}
+            data-testid="button-group-funnel-id"
+          >
+            <span className="text-[10px]">Funnel ID</span>
+          </Button>
+        </div>
+      </div>
+
       {audienceRows.map((audienceRow) => (
         <AudienceFunnelPanel
           key={audienceRow.groupValue}
-          audienceRow={audienceRow}
+          audienceRow={{
+            ...audienceRow,
+            groupValue: audienceGroupBy === "funnelId" ? formatFunnelLabel(audienceRow.groupValue) : audienceRow.groupValue,
+          }}
           dateRange={dateRange}
           filters={filters}
           timeRange={timeRange}

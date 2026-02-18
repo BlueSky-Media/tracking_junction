@@ -412,7 +412,7 @@ export async function registerRoutes(
     try {
       const filters = parseFilters(req.query);
       const groupBy = (req.query.groupBy as string) || "domain";
-      const validGroups = ["domain", "deviceType", "utmSource", "utmCampaign", "utmMedium", "page", "geoState", "selectedState", "hourOfDay"];
+      const validGroups = ["domain", "deviceType", "utmSource", "utmCampaign", "utmMedium", "page", "geoState", "selectedState", "hourOfDay", "funnelId"];
       if (!validGroups.includes(groupBy)) {
         return res.status(400).json({ message: "Invalid groupBy parameter" });
       }
