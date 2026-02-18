@@ -39,6 +39,22 @@ const FUNNEL_LABELS: Record<string, string> = {
   "quote-veterans-fjk6": "Veterans Quote (no lead)",
 };
 
+const FUNNEL_CATEGORY_MAP: Record<string, string> = {
+  "lead-seniors-f3q8": "Seniors",
+  "quote-lead-seniors-fjk6": "Seniors",
+  "quote-seniors-fjk6": "Seniors",
+  "lead-veterans-f3q8": "Veterans",
+  "quote-lead-veterans-fjk6": "Veterans",
+  "quote-veterans-fjk6": "Veterans",
+  "lead-firstresponders-f3q8": "First Responders",
+};
+
+const CATEGORY_ORDER = ["Seniors", "Veterans", "First Responders"];
+
+function getFunnelCategory(id: string): string {
+  return FUNNEL_CATEGORY_MAP[id] || "Other";
+}
+
 function formatFunnelLabel(id: string): string {
   return FUNNEL_LABELS[id] || id;
 }
@@ -144,6 +160,7 @@ interface EventLog {
   browserVersion: string | null;
   osVersion: string | null;
   ipType: string | null;
+  funnelId: string | null;
 }
 
 interface EventLogResult {
@@ -189,6 +206,7 @@ interface SessionLogEntry {
   email: string | null;
   phone: string | null;
   quizAnswers: Record<string, string> | null;
+  funnelId: string | null;
 }
 
 interface SessionLogResult {
@@ -1063,11 +1081,15 @@ interface StepResponseData {
 
 function AudienceFunnelPanel({
   audienceRow,
+  displayLabel,
+  filterKey,
   dateRange,
   filters,
   timeRange,
 }: {
   audienceRow: DrilldownRow;
+  displayLabel?: string;
+  filterKey?: string;
   dateRange: DateRange | undefined;
   filters: Filters;
   timeRange?: { startTime?: string; endTime?: string };
@@ -1075,7 +1097,10 @@ function AudienceFunnelPanel({
   const { timezone } = useTimezone();
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
 
-  const breakdownQuery = buildQueryParams(dateRange, filters, { audience: audienceRow.groupValue }, timeRange, timezone);
+  const extraFilter = filterKey === "funnelId"
+    ? { funnelId: audienceRow.groupValue }
+    : { audience: audienceRow.groupValue };
+  const breakdownQuery = buildQueryParams(dateRange, filters, extraFilter, timeRange, timezone);
   const { data: breakdownData } = useQuery<StepResponseData[]>({
     queryKey: ["/api/analytics/breakdown", "audience-panel", audienceRow.groupValue, breakdownQuery],
     queryFn: async () => {
@@ -1128,7 +1153,7 @@ function AudienceFunnelPanel({
         <TableHeader>
           <TableRow className="h-5 bg-muted/30">
             <TableHead colSpan={6} className="text-[10px] px-1.5 py-0 font-semibold capitalize">
-              {audienceRow.groupValue}
+              {displayLabel || audienceRow.groupValue}
               <span className="text-muted-foreground font-normal ml-2">
                 Lands: {audLands.toLocaleString()}
                 {audFormComplete > 0 && <> | Form Complete: {audFormComplete} | Form CVR: {audFormCvr.toFixed(1)}%</>}
@@ -1244,6 +1269,96 @@ function AudienceFunnelPanel({
           })}
         </TableBody>
       </Table>
+    </div>
+  );
+}
+
+function FunnelCategoryGroups({
+  audienceRows,
+  dateRange,
+  filters,
+  timeRange,
+}: {
+  audienceRows: DrilldownRow[];
+  dateRange: DateRange | undefined;
+  filters: Filters;
+  timeRange?: { startTime?: string; endTime?: string };
+}) {
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set(CATEGORY_ORDER));
+
+  const categoryMap = new Map<string, DrilldownRow[]>();
+  for (const row of audienceRows) {
+    const cat = getFunnelCategory(row.groupValue);
+    if (!categoryMap.has(cat)) categoryMap.set(cat, []);
+    categoryMap.get(cat)!.push(row);
+  }
+
+  const sortedCategories = [...categoryMap.keys()].sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a);
+    const bi = CATEGORY_ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+
+  const toggleCategory = (cat: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      {sortedCategories.map(category => {
+        const rows = categoryMap.get(category) || [];
+        const isExpanded = expandedCategories.has(category);
+        const catLands = rows.reduce((sum, r) => sum + (r.pageLands ?? r.uniqueViews), 0);
+        const catFormComplete = rows.reduce((sum, r) => sum + r.formCompletions, 0);
+        const catCvr = catLands > 0 ? (catFormComplete / catLands) * 100 : 0;
+        return (
+          <div key={category} className="border rounded-md" data-testid={`funnel-category-${category}`}>
+            <button
+              onClick={() => toggleCategory(category)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover-elevate rounded-md"
+              data-testid={`button-toggle-category-${category}`}
+            >
+              {isExpanded
+                ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+              }
+              <span className="text-[11px] font-semibold">{category}</span>
+              <span className="text-[10px] text-muted-foreground">
+                {rows.length} funnel{rows.length !== 1 ? "s" : ""}
+              </span>
+              <span className="text-[10px] text-muted-foreground ml-auto flex items-center gap-2 flex-wrap">
+                <span>Lands: {catLands.toLocaleString()}</span>
+                {catFormComplete > 0 && (
+                  <>
+                    <span>Complete: {catFormComplete}</span>
+                    <span>CVR: {catCvr.toFixed(1)}%</span>
+                  </>
+                )}
+              </span>
+            </button>
+            {isExpanded && (
+              <div className="px-2 pb-2 space-y-1">
+                {rows.map(row => (
+                  <AudienceFunnelPanel
+                    key={row.groupValue}
+                    audienceRow={row}
+                    displayLabel={formatFunnelLabel(row.groupValue)}
+                    filterKey="funnelId"
+                    dateRange={dateRange}
+                    filters={filters}
+                    timeRange={timeRange}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1364,18 +1479,24 @@ function FunnelReport({
         </div>
       </div>
 
-      {audienceRows.map((audienceRow) => (
-        <AudienceFunnelPanel
-          key={audienceRow.groupValue}
-          audienceRow={{
-            ...audienceRow,
-            groupValue: audienceGroupBy === "funnelId" ? formatFunnelLabel(audienceRow.groupValue) : audienceRow.groupValue,
-          }}
+      {audienceGroupBy === "funnelId" ? (
+        <FunnelCategoryGroups
+          audienceRows={audienceRows}
           dateRange={dateRange}
           filters={filters}
           timeRange={timeRange}
         />
-      ))}
+      ) : (
+        audienceRows.map((audienceRow) => (
+          <AudienceFunnelPanel
+            key={audienceRow.groupValue}
+            audienceRow={audienceRow}
+            dateRange={dateRange}
+            filters={filters}
+            timeRange={timeRange}
+          />
+        ))
+      )}
 
       <div className="border-t pt-2 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
@@ -1417,6 +1538,7 @@ const DEFAULT_COL_WIDTHS: Record<string, number> = {
   status: 80,
   calls: 50,
   audience: 80,
+  funnelId: 120,
   domain: 120,
   device: 70,
   os: 70,
@@ -1493,6 +1615,8 @@ function getCellRenderer(key: string, session: SessionLogEntry, colWidths: Recor
     }
     case "audience":
       return <td key={key} className={cls} style={style}>{session.page}</td>;
+    case "funnelId":
+      return <td key={key} className={cls} style={style} title={session.funnelId || ""}>{session.funnelId ? formatFunnelLabel(session.funnelId) : "\u2014"}</td>;
     case "domain":
       return <td key={key} className={cls} style={style}>{session.domain}</td>;
     case "device":
@@ -1624,6 +1748,7 @@ const SESSION_COLUMNS: SessionColumn[] = [
   { key: "status", label: "Status", resizable: true, optional: true, defaultVisible: true },
   { key: "calls", label: "Calls", resizable: true, optional: true, defaultVisible: true },
   { key: "audience", label: "Audience", resizable: true, optional: true, defaultVisible: true },
+  { key: "funnelId", label: "Funnel ID", resizable: true, optional: true, defaultVisible: false },
   { key: "domain", label: "Domain", resizable: true, optional: true, defaultVisible: true },
   { key: "device", label: "Device", resizable: true, optional: true, defaultVisible: true },
   { key: "os", label: "OS", resizable: true, optional: true, defaultVisible: true },
@@ -2239,6 +2364,7 @@ function SessionLogRow({
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-x-3 gap-y-0.5 text-[10px]">
                 <DetailField label="Session ID" value={session.sessionId} />
                 <DetailField label="Audience" value={session.page} />
+                <DetailField label="Funnel ID" value={session.funnelId ? formatFunnelLabel(session.funnelId) : "\u2014"} />
                 <DetailField label="Funnel Type" value={session.pageType} />
                 <DetailField label="Domain" value={session.domain} />
                 <DetailField label="Device" value={session.deviceType || "\u2014"} />

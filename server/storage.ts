@@ -1207,6 +1207,7 @@ class DatabaseStorage implements IStorage {
           const lastWithAnswers = [...events].reverse().find(e => e.quizAnswers && Object.keys(e.quizAnswers as any).length > 0);
           return (lastWithAnswers?.quizAnswers as Record<string, string>) || null;
         })(),
+        funnelId: firstEvent.funnelId || null,
       };
     });
 
