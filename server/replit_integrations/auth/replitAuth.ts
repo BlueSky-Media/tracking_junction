@@ -53,7 +53,7 @@ function updateUserSession(
 async function upsertUser(claims: any) {
   await authStorage.upsertUser({
     id: claims["sub"],
-    email: claims["email"],
+    email: claims["email"]?.toLowerCase() || claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
@@ -138,23 +138,51 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
-    return next();
+  if (now > user.expires_at) {
+    const refreshToken = user.refresh_token;
+    if (!refreshToken) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const config = await getOidcConfig();
+      const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
+      updateUserSession(user, tokenResponse);
+    } catch (error) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
   }
 
-  const refreshToken = user.refresh_token;
-  if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+  const email = user.claims?.email;
+  if (!email) {
+    return res.status(403).json({ message: "Access denied. No email associated with your account." });
   }
 
-  try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
-    updateUserSession(user, tokenResponse);
-    return next();
-  } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+  const { allowedUsers } = await import("@shared/models/auth");
+  const { db } = await import("../../db");
+  const { eq, and } = await import("drizzle-orm");
+  const [allowed] = await db.select().from(allowedUsers).where(and(eq(allowedUsers.email, email.toLowerCase()), eq(allowedUsers.active, true)));
+  if (!allowed) {
+    return res.status(403).json({ message: "Access denied. Your account has not been approved for access." });
   }
+
+  return next();
+};
+
+export const isAdmin: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+  const email = user?.claims?.email;
+  if (!email) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  const { allowedUsers } = await import("@shared/models/auth");
+  const { db } = await import("../../db");
+  const { eq, and } = await import("drizzle-orm");
+  const [allowed] = await db.select().from(allowedUsers).where(and(eq(allowedUsers.email, email.toLowerCase()), eq(allowedUsers.active, true)));
+  if (!allowed || allowed.role !== "admin") {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  return next();
 };

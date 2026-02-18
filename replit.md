@@ -17,6 +17,7 @@ Key architectural decisions include:
 - **Robust Event Tracking:** A comprehensive event schema captures detailed user interaction data, including core event details, UTM parameters, ad campaign data, device information, geographic data, and Facebook tracking identifiers.
 - **Lead Scoring Engine:** An integrated engine (`server/lead-scoring.ts`) capable of parsing budget, estimating annual premiums, and classifying customer tiers based on defined rules.
 - **Bot Detection & Filtering:** Automated bot detection (`server/bot-detection.ts`) flags known bot user agents, missing/empty user agents, short user agents, and sessions with insufficient browser fingerprints (missing screen resolution, viewport, language, browser, OS). Events are tagged with `isBot` and `botReason` at ingest time. Bots are excluded by default in analytics. Retroactive rescanning and bulk purging of bot traffic are available via API endpoints.
+- **User Access Control:** Role-based access management with an `allowed_users` table controlling who can access the dashboard. Only emails on the allowed list (with `active=true`) can access protected routes. Admins (role='admin' in allowed_users) can manage the access list via `/users` page. The `isAuthenticated` middleware checks the allowed list on every request, and `isAdmin` verifies admin role from allowed_users. Self-modification protections prevent admins from removing their own access.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database for storing tracking events, user data, sessions, and blocked numbers.

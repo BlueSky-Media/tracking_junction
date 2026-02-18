@@ -6,6 +6,8 @@ import {
   metaConversionUploads,
   audienceSignalRules,
   signalFireLog,
+  users,
+  allowedUsers,
   type InsertTrackingEvent,
   type TrackingEvent,
   type InsertRequestLog,
@@ -18,6 +20,9 @@ import {
   type InsertAudienceSignalRule,
   type AudienceSignalRule,
   type SignalFireLog,
+  type User,
+  type AllowedUser,
+  type InsertAllowedUser,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, sql, count, countDistinct, desc, avg, isNotNull, isNull, ne, ilike, or, inArray, type SQL } from "drizzle-orm";
@@ -1846,6 +1851,43 @@ class DatabaseStorage implements IStorage {
     const [totalResult] = await db.select({ count: count() }).from(signalFireLog).where(whereClause);
     const logs = await db.select().from(signalFireLog).where(whereClause).orderBy(desc(signalFireLog.firedAt)).limit(limit).offset((page - 1) * limit);
     return { logs, total: Number(totalResult.count) };
+  }
+
+  async getAllowedUsers(): Promise<AllowedUser[]> {
+    return db.select().from(allowedUsers).orderBy(desc(allowedUsers.createdAt));
+  }
+
+  async addAllowedUser(data: InsertAllowedUser): Promise<AllowedUser> {
+    const [result] = await db.insert(allowedUsers).values(data).returning();
+    return result;
+  }
+
+  async updateAllowedUser(id: number, data: { role?: string; active?: boolean }): Promise<AllowedUser | undefined> {
+    const [result] = await db.update(allowedUsers).set(data).where(eq(allowedUsers.id, id)).returning();
+    return result;
+  }
+
+  async deleteAllowedUser(id: number): Promise<void> {
+    await db.delete(allowedUsers).where(eq(allowedUsers.id, id));
+  }
+
+  async isEmailAllowed(email: string): Promise<boolean> {
+    const [entry] = await db.select().from(allowedUsers).where(and(eq(allowedUsers.email, email.toLowerCase()), eq(allowedUsers.active, true)));
+    return !!entry;
+  }
+
+  async getAllowedUserByEmail(email: string): Promise<AllowedUser | undefined> {
+    const [entry] = await db.select().from(allowedUsers).where(eq(allowedUsers.email, email.toLowerCase()));
+    return entry;
+  }
+
+  async getRegisteredUsers(): Promise<User[]> {
+    return db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async updateUserRole(userId: string, role: string): Promise<User | undefined> {
+    const [result] = await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, userId)).returning();
+    return result;
   }
 }
 

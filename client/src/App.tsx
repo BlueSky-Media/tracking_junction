@@ -14,6 +14,7 @@ import ServerLogsPage from "@/pages/server-logs";
 import BlockListPage from "@/pages/block-list";
 import FacebookAdsPage from "@/pages/facebook-ads";
 import MetaConversionsPage from "@/pages/meta-conversions";
+import UsersPage from "@/pages/users";
 import PrivacyPage from "@/pages/privacy";
 import NotFound from "@/pages/not-found";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -48,6 +49,7 @@ function AuthenticatedLayout() {
               <Route path="/block-list" component={BlockListPage} />
               <Route path="/facebook-ads" component={FacebookAdsPage} />
               <Route path="/meta-conversions" component={MetaConversionsPage} />
+              <Route path="/users" component={UsersPage} />
               <Route component={NotFound} />
             </Switch>
           </main>
@@ -57,9 +59,30 @@ function AuthenticatedLayout() {
   );
 }
 
+function AccessDenied() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background" data-testid="access-denied-page">
+      <div className="text-center max-w-md p-8">
+        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-destructive/10 flex items-center justify-center">
+          <svg className="w-8 h-8 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m5-7V7a5 5 0 00-10 0v4a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2z" />
+          </svg>
+        </div>
+        <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+        <p className="text-muted-foreground mb-6">
+          Your account has not been approved for access to this dashboard. Please contact an administrator to request access.
+        </p>
+        <a href="/api/logout" className="text-sm text-primary underline" data-testid="link-logout">
+          Sign out and try a different account
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function Router() {
   const [isPrivacy] = useRoute("/page/privacy");
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, accessDenied } = useAuth();
 
   if (isPrivacy) {
     return <PrivacyPage />;
@@ -67,6 +90,10 @@ function Router() {
 
   if (isLoading) {
     return null;
+  }
+
+  if (accessDenied) {
+    return <AccessDenied />;
   }
 
   if (!user) {

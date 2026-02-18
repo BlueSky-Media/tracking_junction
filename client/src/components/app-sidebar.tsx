@@ -1,7 +1,7 @@
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useTimezone, TIMEZONE_OPTIONS } from "@/hooks/use-timezone";
-import { LayoutDashboard, BarChart3, FileText, LogOut, Server, Ban, Megaphone, Globe, Upload } from "lucide-react";
+import { LayoutDashboard, BarChart3, FileText, LogOut, Server, Ban, Megaphone, Globe, Upload, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,7 +28,8 @@ const navItems = [
   { title: "Facebook Ads", url: "/facebook-ads", icon: Megaphone, testId: "nav-facebook-ads" },
   { title: "Meta CAPI", url: "/meta-conversions", icon: Upload, testId: "nav-meta-conversions" },
   { title: "Block List", url: "/block-list", icon: Ban, testId: "nav-block-list" },
-];
+  { title: "Users", url: "/users", icon: Users, testId: "nav-users", adminOnly: true },
+] as const;
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -66,7 +67,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {navItems.filter((item) => !("adminOnly" in item && item.adminOnly) || user?.role === "admin").map((item) => {
                 const isActive = location === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>

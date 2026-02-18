@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { trackingEventApiSchema } from "@shared/schema";
 import { z } from "zod";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { setupAuth, registerAuthRoutes, isAuthenticated, isAdmin } from "./replit_integrations/auth";
 import * as facebook from "./facebook";
 import { buildConversionEvent, sendConversionEvents, MetaConversionError, fireAudienceSignal } from "./meta-conversions";
 import { calculateAnnualPremiumEstimate, getCapiEventName, classifyCustomerTier, evaluateRuleConditions, computeRuleValue, type EventContext, type SignalRuleConditions } from "./lead-scoring";
@@ -1661,6 +1661,119 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching audience events:", error);
       res.status(500).json({ message: "Failed to fetch audience events" });
+    }
+  });
+
+  app.get("/api/users/allowed", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const allowed = await storage.getAllowedUsers();
+      res.json(allowed);
+    } catch (error) {
+      console.error("Error fetching allowed users:", error);
+      res.status(500).json({ message: "Failed to fetch allowed users" });
+    }
+  });
+
+  app.post("/api/users/allowed", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        email: z.string().email().transform((e) => e.toLowerCase()),
+        role: z.enum(["admin", "viewer"]).default("viewer"),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input", errors: parsed.error.errors });
+      }
+      const existing = await storage.getAllowedUserByEmail(parsed.data.email);
+      if (existing) {
+        return res.status(409).json({ message: "User already exists in the allowed list" });
+      }
+      const adminEmail = req.user?.claims?.email || "unknown";
+      const result = await storage.addAllowedUser({
+        email: parsed.data.email,
+        role: parsed.data.role,
+        addedBy: adminEmail,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error adding allowed user:", error);
+      res.status(500).json({ message: "Failed to add allowed user" });
+    }
+  });
+
+  app.patch("/api/users/allowed/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const schema = z.object({
+        role: z.enum(["admin", "viewer"]).optional(),
+        active: z.boolean().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+      const allAllowed = await storage.getAllowedUsers();
+      const target = allAllowed.find((u) => u.id === id);
+      if (!target) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const adminEmail = req.user?.claims?.email?.toLowerCase();
+      if (target.email.toLowerCase() === adminEmail) {
+        return res.status(400).json({ message: "You cannot modify your own access entry" });
+      }
+      const result = await storage.updateAllowedUser(id, parsed.data);
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating allowed user:", error);
+      res.status(500).json({ message: "Failed to update allowed user" });
+    }
+  });
+
+  app.delete("/api/users/allowed/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const allAllowed = await storage.getAllowedUsers();
+      const target = allAllowed.find((u) => u.id === id);
+      if (!target) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const adminEmail = req.user?.claims?.email?.toLowerCase();
+      if (target.email.toLowerCase() === adminEmail) {
+        return res.status(400).json({ message: "You cannot remove your own access" });
+      }
+      await storage.deleteAllowedUser(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting allowed user:", error);
+      res.status(500).json({ message: "Failed to delete allowed user" });
+    }
+  });
+
+  app.get("/api/users/registered", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const registeredUsers = await storage.getRegisteredUsers();
+      res.json(registeredUsers);
+    } catch (error) {
+      console.error("Error fetching registered users:", error);
+      res.status(500).json({ message: "Failed to fetch registered users" });
+    }
+  });
+
+  app.patch("/api/users/:id/role", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const schema = z.object({ role: z.enum(["admin", "viewer"]) });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+      const result = await storage.updateUserRole(req.params.id, parsed.data.role);
+      if (!result) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
     }
   });
 

@@ -10,11 +10,22 @@ async function fetchUser(): Promise<User | null> {
     return null;
   }
 
+  if (response.status === 403) {
+    throw new AccessDeniedError();
+  }
+
   if (!response.ok) {
     throw new Error(`${response.status}: ${response.statusText}`);
   }
 
   return response.json();
+}
+
+class AccessDeniedError extends Error {
+  constructor() {
+    super("Access denied");
+    this.name = "AccessDeniedError";
+  }
 }
 
 async function logout(): Promise<void> {
@@ -23,12 +34,14 @@ async function logout(): Promise<void> {
 
 export function useAuth() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { data: user, isLoading, error } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
     retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
   });
+
+  const accessDenied = error instanceof AccessDeniedError;
 
   const logoutMutation = useMutation({
     mutationFn: logout,
@@ -41,6 +54,7 @@ export function useAuth() {
     user,
     isLoading,
     isAuthenticated: !!user,
+    accessDenied,
     logout: logoutMutation.mutate,
     isLoggingOut: logoutMutation.isPending,
   };
